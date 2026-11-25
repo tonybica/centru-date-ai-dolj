@@ -296,6 +296,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
   table.sens th, table.sens td { padding: 2px; } table.sens thead th { font-size: 11.5px; }
   table.sens td button { font-size: 11.5px; padding: 7px 0; }
   .pick > span { display: none; }
+  #t-ten { font-size: 12px; } #t-ten th, #t-ten td { padding: 6px 2px; } #t-ten thead th { font-size: 11.5px; }
 }
 @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
 @media (max-width: 900px) and (max-height: 520px) { .view { height: 78vh; max-height: none; } .pager { position: static; } }
@@ -375,7 +376,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <p>Cea mai mare cheltuială lunară este curentul. De aceea lângă clădire stau un parc fotovoltaic și baterii. Soarele din Dolj acoperă o parte din consum, iar restul vine din rețea.</p>
           <dl class="stats">
             <div class="stat"><dt>Puterea calculatoarelor</dt><dd><span data-v="it"></span><small><span data-v="gpus"></span> GPU-uri</small></dd></div>
-            <div class="stat"><dt>Investiție</dt><dd><span data-v="capexCloud"></span><small><span data-v="capexColo"></span> fără calculatoare</small></dd></div>
+            <div class="stat"><dt>Investiție</dt><dd><span data-v="capexTotal"></span><small>din care <span data-v="capexGpu"></span> calculatoarele</small></dd></div>
             <div class="stat"><dt>Teren</dt><dd><span data-v="landHa"></span> ha<small>din care <span data-v="pvHa"></span> ha panouri</small></dd></div>
             <div class="stat"><dt>Curent din soare și baterii</dt><dd><span data-v="coverage"></span><small>restul din rețea</small></dd></div>
           </dl>
@@ -539,7 +540,6 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
             <tbody>
               <tr><td><b>GPU pe contract</b></td><td>Firme de AI, furnizori mari de cloud</td><td>Preț fix pe 1–3 ani. Venit sigur, baza planului.</td></tr>
               <tr><td><b>GPU la cerere</b></td><td>Startup-uri, cercetători</td><td>Cu ora, mai scump, fără angajament.</td></tr>
-              <tr><td><b>Colocare</b></td><td>Bănci, spitale, firme cu servere proprii</td><td>Chirie pe kW pe lună, plus curentul.</td></tr>
               <tr><td><b>Servicii</b></td><td>Clienți fără echipă tehnică</td><td>Abonament pentru administrare, stocare, suport.</td></tr>
             </tbody>
           </table></div>
@@ -557,19 +557,16 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
 
         <article class="chapter" data-title="Banii" data-view="overview" hidden>
           <p class="eyebrow"></p>
-          <h2>Două feluri de a câștiga bani</h2>
-          <div class="seg wide" id="mode" role="group" aria-label="Modelul de afacere">
-            <button type="button" data-m="cloud" aria-pressed="true">Cloud GPU</button>
-            <button type="button" data-m="colo" aria-pressed="false">Colocare</button>
-          </div>
-          <p data-v="modeDesc"></p>
+          <h2>Cum câștigăm bani</h2>
+          <p><b>Închiriem putere de calcul.</b> Cumpărăm noi calculatoarele cu GPU-uri și le închiriem cu ora sau pe contract. Investiția este mare, venitul este mare și riscul este mare: GPU-urile se demodează în 4–6 ani.</p>
+          <p class="note" data-v="prudentLine"></p>
           <h3>Investiția: <span data-v="capexTotal"></span></h3>
           <div class="bars" id="c-capex"></div>
           <h3>Un an de funcționare</h3>
           <div id="money-ctrls"></div>
           <div class="tblwrap"><table id="t-pl"></table></div>
           <p data-v="paybackLine"></p>
-          <h3 data-v="unitTitle"></h3>
+          <h3>Cât ne costă o oră de GPU</h3>
           <div class="bars" id="c-unit"></div>
           <p data-v="unitLine"></p>
           <p class="note" data-v="solarLine"></p>
@@ -579,7 +576,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
         <article class="chapter" data-title="Zece ani" data-view="overview" hidden>
           <p class="eyebrow"></p>
           <h2>Zece ani, an cu an</h2>
-          <p>Capitolul „Banii” arată un an obișnuit. Viața reală este mai aspră: clienții vin treptat, creditul se plătește în fiecare an, iar <span data-v="tenIntro"></span></p>
+          <p>Capitolul „Banii” arată un an obișnuit. Viața reală este mai aspră: clienții vin treptat, creditul se plătește în fiecare an, iar GPU-urile se înlocuiesc după cinci ani.</p>
           <h4 id="cases-lbl">Trei feluri în care poate merge piața</h4>
           <div class="cases" id="cases" role="group" aria-labelledby="cases-lbl"></div>
           <div class="ctrl"><label for="s-loan">Cât din bani vine din credit</label><output id="o-loan" for="s-loan"></output><input type="range" id="s-loan" min="0" max="80" step="5" value="50"></div>
@@ -677,7 +674,6 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
             </div>
           </div>
           <h3>Ce schimbă la cifre</h3>
-          <p>Tabelul folosește modelul ales în capitolul „Banii”: <b data-v="modeName"></b>.</p>
           <div class="tblwrap"><table class="cmp" id="t-fund"></table></div>
           <p class="fine"><span data-v="caseNow"></span> Cele trei cazuri de preț se aleg în capitolul „Zece ani”.</p>
           <div class="seg wide wrap" id="fund2" role="group" aria-label="Fonduri folosite în calcul">
@@ -764,7 +760,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <div class="tblwrap"><table class="cmp" id="t-cmp"></table></div>
           <p class="fine"><span data-v="caseNow"></span> Creditul și fondurile sunt cele alese în capitolul „Zece ani”.</p>
           <p><b>Recomandare:</b> terenul și racordul la rețea se aleg pentru mărimea Mare, iar construcția începe cu mărimea Pilot. Așa riscăm puțin la început și avem unde crește.</p>
-          <p class="note">La mărimea Pilot, colocarea abia își acoperă costurile fixe. Varianta mică are sens cu GPU-uri proprii sau ca primă etapă dintr-un proiect mai mare.</p>
+          <p class="note" data-v="prudentLine"></p>
         </article>
 
         <article class="chapter" data-title="Riscuri" data-view="overview" hidden>
@@ -772,9 +768,9 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <h2>Ce poate merge prost și ce facem</h2>
           <div class="risks">
             <div class="risk"><h4>Nu vin clienții</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Fără contracte, calculatoarele stau și pierd valoare. <b>Ce facem:</b> scrisori de intenție înainte de construcție, „pasul zero” ca să avem deja clienți, pornire cu mărimea Pilot.</p></div>
-            <div class="risk"><h4>Scade chiria GPU-urilor</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Prețurile se pot schimba cu zeci de procente într-un an. <b>Ce facem:</b> contracte pe 1–3 ani cu preț fix, planul făcut pe prețuri prudente, o parte din spațiu dată în colocare.</p></div>
+            <div class="risk"><h4>Scade chiria GPU-urilor</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Prețurile se pot schimba cu zeci de procente într-un an. <b>Ce facem:</b> contracte pe 1–3 ani cu preț fix și planul făcut pe prețuri prudente.</p></div>
             <div class="risk"><h4>Racordul întârzie sau costă mult</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="hi">Lovitură mare</span></p><p>Operatorul poate cere întăriri de rețea plătite de noi. <b>Ce facem:</b> întrebăm ce putere este disponibilă înainte să cumpărăm terenul și alegem un loc lângă o stație.</p></div>
-            <div class="risk"><h4>Se scumpește curentul</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Curentul este cea mai mare cheltuială lunară. <b>Ce facem:</b> panouri și baterii proprii, contract de energie pe termen lung, curentul trecut în factura clientului la colocare.</p></div>
+            <div class="risk"><h4>Se scumpește curentul</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Curentul este cea mai mare cheltuială lunară. <b>Ce facem:</b> panouri și baterii proprii și contract de energie pe termen lung.</p></div>
             <div class="risk"><h4>Nu iese finanțarea</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="hi">Lovitură mare</span></p><p>Fondurile europene sunt o competiție, iar banca cere garanții. <b>Ce facem:</b> planul trebuie să stea în picioare și fără grant, construim în etape, căutăm un partener cu capital.</p></div>
             <div class="risk"><h4>Echipamentul se demodează</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="mid">Lovitură medie</span></p><p>O generație nouă de GPU-uri apare la 1–2 ani. <b>Ce facem:</b> punem bani deoparte pentru înlocuire în anul 6 și construim clădirea astfel încât să primească rackuri mai puternice.</p></div>
             <div class="risk"><h4>Concurentul mare de lângă noi</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>ClusterPower poate lua clienții mari și oamenii buni. <b>Ce facem:</b> țintim clienții mici și mijlocii și oferim ce un gigant nu oferă, adică flexibilitate și răspuns rapid.</p></div>
@@ -1655,6 +1651,50 @@ var Scene3D = (function () {
 
   /* ---------- piese: fiecare functie pune un obiect intreg la locul lui ---------- */
 
+
+  /* ---------- piese de fatada: usi, burlane, scara, camere (zw = fata peretelui, s = +1 spre sud, -1 spre nord) ---------- */
+  function fatDoor(g, x, zw, s, exit) {       // usa metalica de 1,0 x 2,1 m cu toc, maner, lampa, copertina si prag (podeaua e cu 10 cm peste platforma)
+    box(g, 1.0, 2.1, 0.08, SH.white, x, 1.35, zw + s * 0.04, false);
+    box(g, 0.08, 2.2, 0.12, SH.trim, x - 0.54, 1.4, zw + s * 0.05, false); box(g, 0.08, 2.2, 0.12, SH.trim, x + 0.54, 1.4, zw + s * 0.05, false);
+    box(g, 1.16, 0.08, 0.12, SH.trim, x, 2.44, zw + s * 0.05, false);
+    box(g, 0.04, 0.16, 0.07, SH.steel, x + 0.36, 1.32, zw + s * 0.1, false);
+    box(g, 0.5, 0.1, 0.18, SH.light, x, 2.66, zw + s * 0.1, false);
+    if (exit) box(g, 0.32, 0.13, 0.03, SH.led, x, 2.84, zw + s * 0.025, false);                        // indicatorul verde de iesire
+    box(g, 1.5, 0.1, 1.1, SH.concrete, x, 0.25, zw + s * 0.55, false);
+    box(g, 1.4, 0.05, 0.85, SH.trim, x, 2.98, zw + s * 0.42, false);
+    for (var k = -1; k <= 1; k += 2) beam(g, SH.trim, x + k * 0.62, 2.96, zw + s * 0.8, x + k * 0.62, 2.6, zw + s * 0.02, 0.04, false);   // consolele copertinei
+  }
+  function fatDownpipe(g, x, zw, s, H) {      // burlan: cotul de sub palnia de pe atic, teava prinsa cu bratari, papuc si gura de scurgere in platforma
+    var zp = zw + s * 0.2, y;
+    beam(g, SH.silver, x, H + 0.03, zw + s * 0.375, x, H - 0.42, zp, 0.12, false);
+    cyl(g, 0.06, 0.06, H - 0.72, SH.silver, x, (H - 0.42 + 0.3) / 2, zp, 8, null, false);
+    for (y = 1.4; y < H - 0.6; y += 1.9) box(g, 0.2, 0.05, 0.2, SH.steel, x, y, zw + s * 0.12, false);
+    beam(g, SH.silver, x, 0.34, zp, x, 0.24, zp + s * 0.12, 0.12, false);
+    box(g, 0.42, 0.04, 0.42, SH.dark, x, 0.222, zp + s * 0.16, false);
+  }
+  function fatLadder(g, x, zw, s, H) {        // scara fixa cu colivie: lonjeroane prinse de perete, trepte la 30 cm, colivie de la 2,5 m, panou incuiat jos
+    var z = zw + s * 0.42, top = H + 1.9, i, y;
+    for (i = -1; i <= 1; i += 2) {
+      box(g, 0.05, top - 0.2, 0.05, SH.steel, x + i * 0.25, (top + 0.2) / 2, z, false);
+      for (y = 1.0; y < H - 0.1; y += 1.5) box(g, 0.05, 0.05, 0.42, SH.steel, x + i * 0.25, y, zw + s * 0.21, false);
+      box(g, 0.14, 0.02, 0.14, SH.steel, x + i * 0.25, 0.21, z, false);
+    }
+    for (y = 0.5; y < H + 0.8; y += 0.3) box(g, 0.5, 0.03, 0.03, SH.steel, x, y, z, false);
+    for (y = 2.5; y < top + 0.01; y += 0.85) {
+      box(g, 0.03, 0.04, 0.66, SH.steel, x - 0.36, y, z + s * 0.33, false); box(g, 0.03, 0.04, 0.66, SH.steel, x + 0.36, y, z + s * 0.33, false);
+      box(g, 0.75, 0.04, 0.03, SH.steel, x, y, z + s * 0.66, false);
+    }
+    for (i = -1; i <= 1; i++) box(g, 0.03, top - 2.5, 0.03, SH.steel, x + i * 0.36, (top + 2.5) / 2, z + s * 0.66, false);
+    box(g, 0.62, 2.0, 0.03, SH.steel, x, 1.45, z + s * 0.05, false);
+    box(g, 0.2, 0.26, 0.02, SH.hazard, x, 1.6, z + s * 0.07, false);
+  }
+  function fatCam(g, x, y, zw, s, dx) {       // camera video pe consola, prinsa de perete, intoarsa spre curte
+    box(g, 0.1, 0.14, 0.03, SH.dark, x, y, zw + s * 0.015, false);
+    box(g, 0.04, 0.04, 0.3, SH.dark, x, y, zw + s * 0.16, false);
+    box(g, 0.11, 0.11, 0.26, SH.white, x + dx * 0.05, y - 0.11, zw + s * 0.3, false, [s * 0.35, -dx * s * 0.5, 0]);
+    box(g, 0.13, 0.02, 0.3, SH.white, x + dx * 0.05, y - 0.045, zw + s * 0.31, false, [s * 0.35, -dx * s * 0.5, 0]);
+  }
+
   function rackDetail(parent, x, z) {       // un rack desenat in detaliu: usa se deschide, un server iese pe sine
     var g = new T.Group(); g.position.set(x, 0.3, z); parent.add(g);
     [[-0.57, -0.27], [-0.57, 0.27], [0.57, -0.27], [0.57, 0.27]].forEach(function (c) { box(g, 0.06, 2.2, 0.06, SH.rackBody, c[0], 1.1, c[1], false); });
@@ -1697,37 +1737,60 @@ var Scene3D = (function () {
     return out;
   }
 
-  function genset(parent, x, z, len, s) {     // grup electrogen in carcasa antifonica, lungimea pe axa x
-    var h = 2.7 * s, w = 2.5 * s, yb = 0.22 + 0.3 * s, top = yb + h, nd = Math.max(2, Math.round(len / 3)), i, sd;
-    box(parent, len + 0.4, 0.3 * s, w + 0.2, SH.dark, x, 0.22 + 0.15 * s, z);                                    // sasiu cu rezervor
+  function genset(parent, x, z, len, s) {     // grup electrogen in container antifonic, lung pe axa x: radiatorul spre vest (drum), alternatorul si cablurile spre est (cladire), rezervorul pe partea de nord
+    var h = 2.9 * s, w = 2.6 * s, P = 0.2, yp = P + 0.15, yb = yp + 0.35 * s, top = yb + h, nd = Math.max(2, Math.round(len / 3)), fine = !Q.lite, i, sd;
+    box(parent, len + 0.8, 0.15, w + 0.6, SH.concrete, x, P + 0.075, z, false);                                  // fundatie de beton, 15 cm peste platforma
+    box(parent, len + 0.04, 0.35 * s, w + 0.04, SH.dark, x, yp + 0.175 * s, z);                                  // sasiu cu rezervor de zi
     box(parent, len, h, w, SH.contDark, x, yb + h / 2, z);
     box(parent, len + 0.06, 0.1 * s, w + 0.06, SH.dark, x, top + 0.05 * s, z, false);                            // rama acoperisului
+    box(parent, 0.06, h * 0.72, w * 0.8, SH.louver, x - len / 2 - 0.03, yb + h * 0.5, z, false);                 // jaluzele la capatul dinspre drum
+    box(parent, 0.06, h * 0.34, w * 0.8, SH.louver, x + len / 2 + 0.03, yb + h * 0.74, z, false);                // aerisire sus, la capatul cu alternatorul
     for (sd = -1; sd <= 1; sd += 2) {
-      box(parent, 0.06, h * 0.72, w * 0.8, SH.louver, x + sd * (len / 2 + 0.03), yb + h * 0.5, z, false);       // jaluzele la capete
       box(parent, len * 0.2, h * 0.5, 0.05, SH.louver, x - len * 0.32, yb + h * 0.56, z + sd * (w / 2 + 0.02), false);   // prize de aer pe laterale
-      box(parent, 0.2 * s, 0.14 * s, 0.1 * s, SH.steel, x - len * 0.42, top + 0.12 * s, z + sd * (w / 2 - 0.1 * s), false); box(parent, 0.2 * s, 0.14 * s, 0.1 * s, SH.steel, x + len * 0.42, top + 0.12 * s, z + sd * (w / 2 - 0.1 * s), false);   // urechi de ridicare
+      if (fine) { box(parent, 0.2 * s, 0.14 * s, 0.1 * s, SH.steel, x - len * 0.42, top + 0.12 * s, z + sd * (w / 2 - 0.1 * s), false); box(parent, 0.2 * s, 0.14 * s, 0.1 * s, SH.steel, x + len * 0.42, top + 0.12 * s, z + sd * (w / 2 - 0.1 * s), false); }   // urechi de ridicare
       for (i = 0; i <= nd; i++) {
         box(parent, 0.05, h * 0.82, 0.03, SH.dark, x - len / 2 + i * len / nd, yb + h * 0.47, z + sd * (w / 2 + 0.015), false);          // usi de serviciu
-        if (i < nd) box(parent, 0.05, 0.28 * s, 0.05, SH.steel, x - len / 2 + (i + 0.85) * len / nd, yb + h * 0.45, z + sd * (w / 2 + 0.04), false);
+        if (fine && i < nd) box(parent, 0.05, 0.28 * s, 0.05, SH.steel, x - len / 2 + (i + 0.85) * len / nd, yb + h * 0.45, z + sd * (w / 2 + 0.04), false);
       }
     }
-    box(parent, 0.7 * s, 0.9 * s, 0.14 * s, SH.silver, x + len * 0.38, yb + h * 0.55, z + w / 2 + 0.07 * s, false);     // tablou de comanda cu afisaj
-    box(parent, 0.34 * s, 0.2 * s, 0.02, SH.screen, x + len * 0.38, yb + h * 0.66, z + w / 2 + 0.15 * s, false); box(parent, 0.4 * s, 0.2 * s, 0.02, SH.hazard, x + len * 0.12, yb + h * 0.7, z + w / 2 + 0.03, false);
-    cyl(parent, 0.3 * s, 0.3 * s, len * 0.3, SH.silver, x + len * 0.16, top + 0.36 * s, z, 12, [0, 0, Math.PI / 2]);  // toba de esapament
+    box(parent, 0.7 * s, 0.9 * s, 0.14 * s, SH.silver, x + len * 0.36, yb + h * 0.55, z + w / 2 + 0.07 * s, false);     // tablou de comanda cu afisaj, pe partea de sud
+    box(parent, 0.34 * s, 0.2 * s, 0.02, SH.screen, x + len * 0.36, yb + h * 0.66, z + w / 2 + 0.15 * s, false); box(parent, 0.4 * s, 0.2 * s, 0.02, SH.hazard, x + len * 0.12, yb + h * 0.7, z + w / 2 + 0.03, false);
+    // esapament: teava iese prin acoperis, intra in toba, iar cosul urca din capatul tobei
+    cyl(parent, 0.11 * s, 0.11 * s, 0.3 * s, SH.silver, x + len * 0.03, top + 0.2 * s, z, 8, null, false);
+    cyl(parent, 0.3 * s, 0.3 * s, len * 0.3, SH.silver, x + len * 0.16, top + 0.36 * s, z, 12, [0, 0, Math.PI / 2]);
     box(parent, 0.12 * s, 0.3 * s, 0.5 * s, SH.steel, x + len * 0.06, top + 0.2 * s, z, false); box(parent, 0.12 * s, 0.3 * s, 0.5 * s, SH.steel, x + len * 0.26, top + 0.2 * s, z, false);
     cyl(parent, 0.13 * s, 0.13 * s, 1.5 * s, SH.silver, x + len * 0.3, top + 1.1 * s, z, 10);                          // cosul, cu capac de ploaie
     cyl(parent, 0.2 * s, 0.2 * s, 0.03 * s, SH.steel, x + len * 0.3 + 0.08 * s, top + 1.92 * s, z, 10, [0, 0, 0.5], false);
-    box(parent, len * 0.28, 0.25 * s, w * 0.8, SH.dark, x - len * 0.3, top + 0.125 * s, z, false);                    // radiator pe acoperis
-    disc(parent, w * 0.3, SH.fan, x - len * 0.3, top + 0.26 * s, z); disc(parent, w * 0.33, SH.grille, x - len * 0.3, top + 0.275 * s, z);
-    var tz = z + w / 2 + 1.5 * s, tl = len * 0.5;                                                                      // rezervor de motorina in cuva
-    cyl(parent, 0.6 * s, 0.6 * s, tl, SH.white, x, 0.22 + 1.0 * s, tz, 14, [0, 0, Math.PI / 2]);
-    blob(parent, SH.white, x - tl / 2, 0.22 + 1.0 * s, tz, 0.2 * s, 0.6 * s, 0.6 * s, 0, false); blob(parent, SH.white, x + tl / 2, 0.22 + 1.0 * s, tz, 0.2 * s, 0.6 * s, 0.6 * s, 0, false);
-    box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x - len * 0.17, 0.22 + 0.25 * s, tz, false); box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x + len * 0.17, 0.22 + 0.25 * s, tz, false);
-    cyl(parent, 0.09 * s, 0.09 * s, 0.16 * s, SH.red, x - tl * 0.25, 0.22 + 1.66 * s, tz, 8, null, false); cyl(parent, 0.035 * s, 0.035 * s, 0.6 * s, SH.steel, x + tl * 0.3, 0.22 + 1.85 * s, tz, 6, null, false);
-    cyl(parent, 0.04 * s, 0.04 * s, 1.5 * s, SH.steel, x + tl * 0.1, 0.22 + 0.5 * s, z + w / 2 + 0.75 * s, 6, [Math.PI / 2, 0, 0], false);      // teava de motorina spre motor
-    var bl = tl + 1.2 * s, bz = 1.7 * s;
-    box(parent, bl, 0.3 * s, 0.1, SH.base, x, 0.22 + 0.15 * s, tz + bz / 2, false); box(parent, 0.1, 0.3 * s, bz, SH.base, x - bl / 2, 0.22 + 0.15 * s, tz, false); box(parent, 0.1, 0.3 * s, bz, SH.base, x + bl / 2, 0.22 + 0.15 * s, tz, false);
-    ao(parent, len, w, x, 0.235, z, 1.5);
+    // radiator pe acoperis, cu ventilatoare
+    var nf = len >= 10 ? 2 : 1, fr = Math.min(w * 0.3, len * 0.062);
+    box(parent, len * 0.28, 0.25 * s, w * 0.8, SH.dark, x - len * 0.3, top + 0.125 * s, z, false);
+    for (i = 0; i < nf; i++) { var fxx = x - len * 0.3 + (i - (nf - 1) / 2) * len * 0.135; disc(parent, fr, SH.fan, fxx, top + 0.26 * s, z); disc(parent, fr * 1.08, SH.grille, fxx, top + 0.275 * s, z); }
+    // capatul dinspre cladire: cutia de borne cu intrerupatorul; cablurile coboara in fundatie si pleaca prin canal
+    var bx = x + len / 2 + 0.15 * s;
+    box(parent, 0.3 * s, 0.9 * s, 1.2 * s, SH.silver, bx, yb + 0.5 * s, z, false);
+    box(parent, 0.02, 0.2 * s, 0.34 * s, SH.hazard, bx + 0.15 * s + 0.011, yb + 0.68 * s, z, false);
+    for (i = -1; i <= 1; i++) cyl(parent, 0.05 * s, 0.05 * s, yb + 0.06 * s - yp, SH.dark, bx, (yb + 0.06 * s + yp) / 2, z + i * 0.35 * s, 8, null, false);
+    // rezervor de motorina cu perete dublu, pe sei, in cuva de retentie cu patru pereti (la nord de grup, cu loc de trecere intre ele)
+    var r = 0.65 * s, tl = len * 0.5, tz = z - (w / 2 + 0.9 * s + 0.1 + r + 0.3 * s), yt = P + 0.35 * s + r, bl = tl + 1.4 * s, bz = 2 * (r + 0.3 * s) + 0.2, bh = 0.45 * s, sh = 0.35 * s + 0.3 * r;
+    box(parent, bl, bh, 0.1, SH.base, x, P + bh / 2, tz - bz / 2 + 0.05, false); box(parent, bl, bh, 0.1, SH.base, x, P + bh / 2, tz + bz / 2 - 0.05, false);
+    box(parent, 0.1, bh, bz - 0.2, SH.base, x - bl / 2 + 0.05, P + bh / 2, tz, false); box(parent, 0.1, bh, bz - 0.2, SH.base, x + bl / 2 - 0.05, P + bh / 2, tz, false);
+    cyl(parent, r, r, tl, SH.white, x, yt, tz, 16, [0, 0, Math.PI / 2]);
+    blob(parent, SH.white, x - tl / 2, yt, tz, 0.22 * s, r, r, 0, false); blob(parent, SH.white, x + tl / 2, yt, tz, 0.22 * s, r, r, 0, false);
+    box(parent, 0.25, sh, 1.5 * r, SH.steel, x - tl * 0.3, P + sh / 2, tz, false); box(parent, 0.25, sh, 1.5 * r, SH.steel, x + tl * 0.3, P + sh / 2, tz, false);
+    cyl(parent, 0.3 * s, 0.3 * s, 0.08 * s, SH.steel, x, yt + r + 0.02 * s, tz, 12, null, false);                                      // gura de vizitare
+    cyl(parent, 0.09 * s, 0.09 * s, 0.16 * s, SH.red, x - tl * 0.25, yt + r + 0.06 * s, tz, 8, null, false);                           // capac de umplere
+    cyl(parent, 0.035 * s, 0.035 * s, 0.7 * s, SH.steel, x + tl * 0.3, yt + r + 0.33 * s, tz, 6, null, false); cyl(parent, 0.07 * s, 0.07 * s, 0.05 * s, SH.steel, x + tl * 0.3, yt + r + 0.69 * s, tz, 8, null, false);   // aerisire
+    // punctul de umplere pentru cisterna, pe stalp, la capatul dinspre drum, legat de rezervor
+    var cx0 = x - bl / 2 - 0.15 * s;
+    box(parent, 0.08, 0.53 * s, 0.08, SH.steel, cx0, P + 0.265 * s, tz, false);
+    box(parent, 0.3 * s, 0.55 * s, 0.6 * s, SH.silver, cx0, P + 0.8 * s, tz, false); box(parent, 0.02, 0.12 * s, 0.4 * s, SH.red, cx0 - 0.15 * s - 0.011, P + 0.92 * s, tz, false);
+    cyl(parent, 0.04 * s, 0.04 * s, bl / 2 - tl / 2 - 0.18 * s, SH.steel, (cx0 + 0.15 * s + x - tl / 2 - 0.18 * s) / 2, yt, tz, 8, [0, 0, Math.PI / 2], false);
+    // motorina spre motor si retur: doua tevi peste peretele cuvei, pe suport, cu robinet la rezervor
+    var fy = P + 0.15 + 0.45 * s, za = tz + 0.45 * s, zb = z - w / 2 + 0.02, fx = x + tl * 0.1;
+    for (sd = -1; sd <= 1; sd += 2) cyl(parent, 0.03 * s, 0.03 * s, zb - za, SH.steel, fx + sd * 0.08 * s, fy, (za + zb) / 2, 6, [Math.PI / 2, 0, 0], false);
+    box(parent, 0.34 * s, fy - P - 0.03 * s, 0.06, SH.steel, fx, P + (fy - P - 0.03 * s) / 2, z - w / 2 - 0.3 - 0.3 * s, false);
+    box(parent, 0.1 * s, 0.1 * s, 0.14 * s, SH.red, fx - 0.08 * s, fy, tz + r + 0.05 * s, false);
+    ao(parent, len + 0.8, w + 0.6, x, 0.207, z, 1.5); ao(parent, bl, bz, x, 0.207, tz, 1.2);
     return [x + len * 0.3, top + 2.0 * s, z];
   }
 
@@ -2076,20 +2139,27 @@ var Scene3D = (function () {
       var bx0 = -W / 2 + i * W / nBay;
       box(wg, 0.14, ph, 0.07, SH.trim, bx0, py, -D / 2 - 0.03, false);
       if (bx0 < xO - 0.4 && Math.abs(bx0 - xD) > 2.6) box(wg, 0.14, ph, 0.07, SH.trim, bx0, py, D / 2 + 0.03, false);
-      if (i % 2) cyl(wg, 0.07, 0.07, H - 1.2, SH.silver, bx0 + 0.35, (H - 1.2) / 2 + 0.6, -D / 2 - 0.11, 8, null, false);
+      if (i % 2) fatDownpipe(wg, bx0 + 0.35, -D / 2, -1, H);
     }
     var nBayD = Math.max(2, Math.round(D / 6));
-    for (i = 1; i < nBayD; i++) { var bz0 = -D / 2 + i * D / nBayD; box(wg, 0.07, ph, 0.14, SH.trim, -W / 2 - 0.03, py, bz0, false); if (bz0 < D / 2 - Math.min(D * 0.5, 9) - 0.8) box(wg, 0.07, ph, 0.14, SH.trim, W / 2 + 0.03, py, bz0, false); }
+    for (i = 1; i < nBayD; i++) { var bz0 = -D / 2 + i * D / nBayD; box(wg, 0.07, ph, 0.14, SH.trim, -W / 2 - 0.03, py, bz0, false); }      // stalpii fatadei de est se pun in 33-acoperis.js, dupa ce se stie pe unde ies conductele de racire
     // birourile: colt vitrat spre sud-est
     var gh = H - 2.4, gy = 1.05 + gh / 2, gl = Math.min(D * 0.5, 9);
     box(wg, offW - 1.0, gh, 0.16, SH.glass, xEnt, gy, D / 2 + 0.04, false);
     box(wg, 0.16, gh, gl, SH.glass, W / 2 + 0.04, gy, D / 2 - gl / 2 - 0.5, false);
+    // montantii si traversele peretelui cortina
+    var gwS = offW - 1.0, nMs = Math.max(2, Math.round(gwS / 1.5)), nMe = Math.max(2, Math.round(gl / 1.5));
+    for (i = 0; i <= nMs; i++) box(wg, 0.06, gh, 0.05, SH.trim, xEnt - gwS / 2 + i * gwS / nMs, gy, D / 2 + 0.135, false);
+    for (i = 0; i <= nMe; i++) box(wg, 0.05, gh, 0.06, SH.trim, W / 2 + 0.135, gy, D / 2 - 0.5 - i * gl / nMe, false);
+    [gy - gh / 2 + 0.03, gy - gh / 2 + 1.15, gy + gh / 2 - 0.03].forEach(function (yy) { box(wg, gwS, 0.06, 0.05, SH.trim, xEnt, yy, D / 2 + 0.135, false); box(wg, 0.05, 0.06, gl, SH.trim, W / 2 + 0.135, yy, D / 2 - gl / 2 - 0.5, false); });
     // intrarea: windfang de sticla, copertina, usi
     box(wg, 3.2, 2.7, 1.8, SH.glass, xEnt, 1.55, D / 2 + 0.9); box(wg, 3.5, 0.14, 2.1, SH.trim, xEnt, 2.97, D / 2 + 1.0, false);
     box(wg, 1.8, 2.25, 0.06, SH.trim, xEnt, 1.33, D / 2 + 1.82, false);
     box(wg, 0.8, 2.05, 0.04, SH.carGlass, xEnt - 0.42, 1.28, D / 2 + 1.85, false); box(wg, 0.8, 2.05, 0.04, SH.carGlass, xEnt + 0.42, 1.28, D / 2 + 1.85, false);
     box(wg, 5.4, 0.16, 3.6, SH.trim, xEnt, 3.3, D / 2 + 1.9);
-    cyl(wg, 0.07, 0.07, 3.0, SH.steel, xEnt - 2.5, 1.7, D / 2 + 3.5, 8); cyl(wg, 0.07, 0.07, 3.0, SH.steel, xEnt + 2.5, 1.7, D / 2 + 3.5, 8);
+    cyl(wg, 0.07, 0.07, 3.02, SH.steel, xEnt - 2.5, 1.71, D / 2 + 3.5, 8); cyl(wg, 0.07, 0.07, 3.02, SH.steel, xEnt + 2.5, 1.71, D / 2 + 3.5, 8);
+    box(wg, 0.3, 0.03, 0.3, SH.steel, xEnt - 2.5, 0.215, D / 2 + 3.5, false); box(wg, 0.3, 0.03, 0.3, SH.steel, xEnt + 2.5, 0.215, D / 2 + 3.5, false);
+    box(wg, 0.03, 0.5, 0.05, SH.steel, xEnt - 0.1, 1.3, D / 2 + 1.89, false); box(wg, 0.03, 0.5, 0.05, SH.steel, xEnt + 0.1, 1.3, D / 2 + 1.89, false);
     box(wg, 5.0, 0.04, 0.5, SH.light, xEnt, 3.2, D / 2 + 2.6, false);
     // firma
     var sw = Math.max(5, Math.min(9, W * 0.22)), xSign = Math.max(-W / 2 + sw / 2 + 1, xO - sw / 2 - 1.2);
@@ -2099,29 +2169,35 @@ var Scene3D = (function () {
     box(wg, 0.2, 3.8, 0.16, SH.trim, xD - 1.9, 2.2, D / 2 + 0.06, false); box(wg, 0.2, 3.8, 0.16, SH.trim, xD + 1.9, 2.2, D / 2 + 0.06, false); box(wg, 4.0, 0.2, 0.16, SH.trim, xD, 4.0, D / 2 + 0.06, false);
     box(wg, 0.24, 1.0, 0.2, SH.hazard, xD - 1.9, 0.8, D / 2 + 0.08, false); box(wg, 0.24, 1.0, 0.2, SH.hazard, xD + 1.9, 0.8, D / 2 + 0.08, false);
     box(wg, 4.6, 0.12, 1.6, SH.trim, xD, 4.3, D / 2 + 0.8);
-    if (xD - 3.4 > -W / 2 + 1) { box(wg, 1.0, 2.1, 0.08, SH.white, xD - 3.4, 1.35, D / 2 + 0.04, false); box(wg, 0.5, 0.1, 0.18, SH.light, xD - 3.4, 2.6, D / 2 + 0.1, false); }
+    for (sd = -1; sd <= 1; sd += 2) beam(wg, SH.steel, xD + sd * 2.1, 4.36, D / 2 + 1.5, xD + sd * 2.1, 5.25, D / 2 + 0.04, 0.04, false);      // tirantii copertinei
+    if (xD - 3.4 > -W / 2 + 1) fatDoor(wg, xD - 3.4, D / 2, 1, false);
     // aerisirile salii electrice (vest) si ale salii de date (nord), iesiri de urgenta
     for (i = 0; i < nBayD; i++) box(wg, 0.1, 1.6, Math.min(2.4, D / nBayD - 1), SH.louver, -W / 2 - 0.04, H - 2.7, -D / 2 + (i + 0.5) * D / nBayD, false);
-    for (i = 0; i < nBay; i++) if (i % 2) box(wg, 1.8, 1.2, 0.1, SH.louver, -W / 2 + (i + 0.5) * W / nBay, 2.6, -D / 2 - 0.04, false);
-    box(wg, 1.0, 2.1, 0.08, SH.white, xE - 1.6, 1.35, -D / 2 - 0.04, false); box(wg, 0.5, 0.1, 0.18, SH.light, xE - 1.6, 2.6, -D / 2 - 0.1, false);
+    // usile de iesire stau departe de stalpi si de fasia libera pentru cablurile de la baterii si panouri (x = -W/2 + 1,75 ... 4,25)
+    var fatClr = function (x) { for (var q = 1; q < nBay; q++) { var b = -W / 2 + q * W / nBay; if (x > b - 0.85 && x < b + 1.25) x = b - 0.9; } return x; };
+    var xDn = fatClr(Math.max(xE - 1.6, -W / 2 + 5.05)), xDn2 = big ? fatClr(xO - 2.2) : null;
+    for (i = 0; i < nBay; i++) if (i % 2) {
+      var lvx = -W / 2 + (i + 0.5) * W / nBay;
+      if (Math.abs(lvx - xDn) < 1.75 || (xDn2 !== null && Math.abs(lvx - xDn2) < 1.75)) continue;       // nicio aerisire peste o usa
+      box(wg, 1.8, 1.2, 0.1, SH.louver, lvx, 2.6, -D / 2 - 0.04, false); box(wg, 1.92, 0.05, 0.16, SH.trim, lvx, 3.23, -D / 2 - 0.07, false);
+    }
+    fatDoor(wg, xDn, -D / 2, -1, true); if (xDn2 !== null) fatDoor(wg, xDn2, -D / 2, -1, true);
     // lumini de perete, scara cu colivie spre acoperis, pat de cabluri pe fatada de vest, tampoane la rampa, firma si pe est
     for (i = 0; i < nBay; i++) {
       var wlx = -W / 2 + (i + 0.5) * W / nBay;
       box(wg, 0.3, 0.09, 0.14, SH.light, wlx, 3.5, -D / 2 - 0.1, false);
       if (wlx < xO - 1 && Math.abs(wlx - xD) > 3) box(wg, 0.3, 0.09, 0.14, SH.light, wlx, 3.5, D / 2 + 0.1, false);
     }
-    var ldx = -W / 2 + 2.2, ldz = -D / 2 - 0.28;
-    box(wg, 0.05, H + 0.9, 0.05, SH.steel, ldx - 0.25, (H + 0.9) / 2 + 0.3, ldz, false); box(wg, 0.05, H + 0.9, 0.05, SH.steel, ldx + 0.25, (H + 0.9) / 2 + 0.3, ldz, false);
-    for (i = 0; i < Math.floor((H + 0.5) / 0.32); i++) box(wg, 0.5, 0.03, 0.03, SH.steel, ldx, 0.6 + i * 0.32, ldz, false);
-    for (i = 0; i < Math.floor((H - 2.2) / 0.9) + 1; i++) {
-      var hy = 2.6 + i * 0.9;
-      box(wg, 0.03, 0.04, 0.6, SH.steel, ldx - 0.33, hy, ldz - 0.3, false); box(wg, 0.03, 0.04, 0.6, SH.steel, ldx + 0.33, hy, ldz - 0.3, false); box(wg, 0.69, 0.04, 0.03, SH.steel, ldx, hy, ldz - 0.6, false);
-    }
-    for (j = -1; j <= 1; j++) box(wg, 0.03, H - 1.9, 0.03, SH.steel, ldx + j * 0.33, 2.6 + (H - 1.9) / 2, ldz - 0.6, false);
+    var ldx = -W / 2 + 5.0; if (Math.abs(ldx - xDn) < 1.25) ldx = xDn + 1.3;
+    var ldz = -D / 2 - 0.42;
+    fatLadder(wg, ldx, -D / 2, -1, H);
+    // cablurile spre aparatele de pe acoperis ies din sala electrica printr-o cutie de trecere si urca pe un pat de cabluri
     var ctz = -D / 2 + D / nBayD + 0.55;
-    box(wg, 0.09, H - 1.0, 0.5, SH.steel, -W / 2 - 0.09, 0.9 + (H - 1.0) / 2, ctz, false);
-    for (i = 0; i < 6; i++) box(wg, 0.13, 0.05, 0.58, SH.dark, -W / 2 - 0.1, 1.4 + i * (H - 1.9) / 5, ctz, false);
-    box(wg, 0.3, 0.5, 0.16, SH.tire, xD - 1.3, 0.75, D / 2 + 0.14, false); box(wg, 0.3, 0.5, 0.16, SH.tire, xD + 1.3, 0.75, D / 2 + 0.14, false);
+    box(wg, 0.22, 0.45, 0.7, SH.steel, -W / 2 - 0.11, 2.7, ctz, false);
+    box(wg, 0.09, H - 3.0, 0.5, SH.steel, -W / 2 - 0.09, (H - 0.1 + 2.9) / 2, ctz, false);
+    for (i = 0; i < 5; i++) box(wg, 0.13, 0.05, 0.58, SH.dark, -W / 2 - 0.1, 3.3 + i * (H - 4.0) / 4, ctz, false);
+    // camere video pe colturi
+    [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (c) { fatCam(wg, c[0] * (W / 2 - 0.2), H - 1.62, c[1] * (D / 2 + 0.05), c[1], -c[0]); });
     var esz = D / 2 - gl - 1.5 - sw / 2;
     if (esz - sw / 2 > -D / 2 + 0.6) { box(wg, 0.08, sw / 4 + 0.3, sw + 0.3, SH.trim, W / 2 + 0.05, H - 2.25, esz, false); vpl(wg, sw, sw / 4, SH.sign, W / 2 + 0.1, H - 2.25, esz, Math.PI / 2); }
 
@@ -2244,25 +2320,57 @@ var Scene3D = (function () {
     var nU = Math.max(2, Math.round(W / 9));
     for (i = 0; i < nU; i++) {
       var rxU = -W / 2 + (i + 0.5) * W / nU, rzU = -D / 4;
+      if (Math.abs(rxU - ldx) < 1.8) rxU = ldx + (rxU < ldx ? -1.9 : 1.9);                 // loc pentru poteca dinspre scara
+      var rbx = rxU - (rxU > 0.5 ? 0.6 : rxU < -0.5 ? -0.6 : 0);
+      box(roofGroup, 0.2, 0.06, 0.6 - rzU - 0.9, SH.roofTrim, rbx, H + 0.37, (0.6 + rzU + 0.9) / 2, false);     // ramura de cabluri pana la patul principal
       box(roofGroup, 2.6, 0.15, 2.0, SH.roofTrim, rxU, H + 0.38, rzU, false); box(roofGroup, 2.4, 1.3, 1.8, SH.roofUnit, rxU, H + 1.1, rzU);
       box(roofGroup, 1.7, 0.8, 0.04, SH.roofTrim, rxU, H + 1.1, rzU + 0.91, false); cyl(roofGroup, 0.6, 0.6, 0.14, SH.roofTrim, rxU, H + 1.8, rzU, 16, null, false);
     }
     for (i = 0; i <= nU; i++) { var vx = -W / 2 + (i + 0.5) * W / (nU + 1); box(roofGroup, 1.3, 0.28, 1.3, SH.roofTrim, vx, H + 0.44, D / 4, false); box(roofGroup, 1.1, 0.1, 1.1, SH.roofUnit, vx, H + 0.62, D / 4, false); }
-    box(roofGroup, W * 0.8, 0.12, 0.4, SH.roofTrim, 0, H + 0.4, 0.6, false);
+    // patul principal de cabluri, pe traverse, legat de patul care urca pe fatada de vest
+    var rtx0 = -W / 2 + 0.4, rtx1 = W * 0.4;
+    box(roofGroup, rtx1 - rtx0, 0.12, 0.4, SH.roofTrim, (rtx0 + rtx1) / 2, H + 0.4, 0.6, false);
+    for (i = 0; i <= Math.round((rtx1 - rtx0) / 3); i++) box(roofGroup, 0.1, 0.1, 0.6, SH.roofUnit, rtx0 + 0.3 + i * (rtx1 - rtx0 - 0.6) / Math.round((rtx1 - rtx0) / 3), H + 0.35, 0.6, false);
+    box(roofGroup, 0.4, 0.12, Math.abs(0.6 - ctz) + 0.4, SH.roofTrim, -W / 2 + 0.6, H + 0.4, (0.6 + ctz) / 2, false);
+    box(roofGroup, 0.9, 0.3, 0.62, SH.roofUnit, -W / 2 + 0.18, H + 0.86, ctz, false);                           // capacul prin care cablurile trec peste atic
+    box(roofGroup, 0.4, 0.5, 0.4, SH.roofTrim, -W / 2 + 0.6, H + 0.55, ctz, false);
     // balustrada pe atic, poteci de intretinere, condensatoare, antena
     var nRp = Math.round(W / 2.4), nRd = Math.round(D / 2.4);
     for (sd = -1; sd <= 1; sd += 2) {
-      box(roofGroup, W, 0.04, 0.04, SH.roofTrim, 0, H + 1.5, sd * (D / 2 + 0.02), false); box(roofGroup, W, 0.03, 0.03, SH.roofTrim, 0, H + 1.12, sd * (D / 2 + 0.02), false);
+      var rzG = sd * (D / 2 + 0.02);
+      (sd < 0 ? [[-W / 2, ldx - 0.4], [ldx + 0.4, W / 2]] : [[-W / 2, W / 2]]).forEach(function (sg) {       // la nord balustrada are un gol in dreptul scarii
+        box(roofGroup, sg[1] - sg[0], 0.04, 0.04, SH.roofTrim, (sg[0] + sg[1]) / 2, H + 1.5, rzG, false); box(roofGroup, sg[1] - sg[0], 0.03, 0.03, SH.roofTrim, (sg[0] + sg[1]) / 2, H + 1.12, rzG, false);
+      });
       box(roofGroup, 0.04, 0.04, D, SH.roofTrim, sd * (W / 2 + 0.02), H + 1.5, 0, false); box(roofGroup, 0.03, 0.03, D, SH.roofTrim, sd * (W / 2 + 0.02), H + 1.12, 0, false);
-      for (i = 0; i <= nRp; i++) box(roofGroup, 0.04, 0.8, 0.04, SH.roofTrim, -W / 2 + i * W / nRp, H + 1.12, sd * (D / 2 + 0.02), false);
+      for (i = 0; i <= nRp; i++) { var rpx = -W / 2 + i * W / nRp; if (sd < 0 && Math.abs(rpx - ldx) < 0.42) continue; box(roofGroup, 0.04, 0.8, 0.04, SH.roofTrim, rpx, H + 1.12, rzG, false); }
       for (i = 1; i < nRd; i++) box(roofGroup, 0.04, 0.8, 0.04, SH.roofTrim, sd * (W / 2 + 0.02), H + 1.12, -D / 2 + i * D / nRd, false);
     }
+    // sosirea scarii: podet peste atic, o treapta spre acoperis, maini curente
+    for (sd = -1; sd <= 1; sd += 2) {
+      box(roofGroup, 0.04, 0.8, 0.04, SH.roofTrim, ldx + sd * 0.4, H + 1.12, -D / 2 - 0.02, false);
+      box(roofGroup, 0.04, 1.07, 0.04, SH.roofTrim, ldx + sd * 0.27, H + 1.385, -D / 2 + 0.84, false);
+      box(roofGroup, 0.04, 0.04, 1.3, SH.roofTrim, ldx + sd * 0.27, H + 1.9, -D / 2 + 0.21, false);
+      box(roofGroup, 0.04, 0.04, 1.3, SH.roofTrim, ldx + sd * 0.27, H + 1.4, -D / 2 + 0.21, false);
+      beam(roofGroup, SH.roofTrim, ldx + sd * 0.33, H + 0.81, -D / 2 + 0.86, ldx + sd * 0.33, H + 0.31, -D / 2 + 1.32, 0.05, false);
+    }
+    box(roofGroup, 0.7, 0.05, 1.3, SH.roofTrim, ldx, H + 0.83, -D / 2 + 0.23, false);
+    box(roofGroup, 0.7, 0.04, 0.28, SH.roofTrim, ldx, H + 0.565, -D / 2 + 1.06, false);
+    // palniile burlanelor, sub gurile de scurgere din atic
+    for (i = 1; i < nBay; i++) if (i % 2) box(roofGroup, 0.34, 0.36, 0.26, SH.roofUnit, -W / 2 + i * W / nBay + 0.35, H + 0.2, -D / 2 - 0.375, false);
+    // stalpii fatadei de est: lasa libera trecerea conductelor de racire prin perete
+    for (i = 1; i < nBayD; i++) {
+      var bzE = -D / 2 + i * D / nBayD;
+      if (bzE < D / 2 - gl - 0.8 && !(hzz !== undefined && bzE > hzz - 0.75 && bzE < hzz + 1.1)) box(wg, 0.07, ph, 0.14, SH.trim, W / 2 + 0.03, py, bzE, false);
+    }
     box(roofGroup, W * 0.84, 0.04, 0.7, SH.roofUnit, 0, H + 0.32, -D / 4 + 2.0, false);
-    box(roofGroup, 0.7, 0.04, D / 4 + 1.6, SH.roofUnit, -W / 2 + 2.2, H + 0.32, (-D / 2 + 0.4 - D / 4 + 2) / 2, false);
+    box(roofGroup, 0.7, 0.04, D / 4 + 0.7, SH.roofUnit, ldx, H + 0.32, (-D / 2 + 1.3 - D / 4 + 2) / 2, false);
     for (i = 0; i < Math.max(2, Math.round(offW / 2.5)); i++) {
       var cdx = xO + 1.2 + i * 1.6; if (cdx > W / 2 - 1) break;
       box(roofGroup, 1.1, 0.9, 0.8, SH.roofUnit, cdx, H + 0.85, D / 4 + 2.4); cyl(roofGroup, 0.3, 0.3, 0.05, SH.roofTrim, cdx, H + 1.32, D / 4 + 2.4, 12, null, false); box(roofGroup, 1.2, 0.1, 0.9, SH.roofTrim, cdx, H + 0.35, D / 4 + 2.4, false);
     }
+    box(roofGroup, 0.5, 0.06, 0.5, SH.roofTrim, W / 2 - 1.5, H + 0.33, -D / 2 + 1.5, false);
+    [[-1.3, 0.3], [0.6, 1.3], [0.7, -1.0]].forEach(function (a) { beam(roofGroup, SH.roofTrim, W / 2 - 1.5, H + 2.9, -D / 2 + 1.5, W / 2 - 1.5 + a[0], H + 0.32, -D / 2 + 1.5 + a[1], 0.02, false); box(roofGroup, 0.14, 0.05, 0.14, SH.roofTrim, W / 2 - 1.5 + a[0], H + 0.325, -D / 2 + 1.5 + a[1], false); });
+    [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (c) { cyl(roofGroup, 0.012, 0.012, 0.9, SH.roofTrim, c[0] * (W / 2 + 0.12), H + 1.23, c[1] * (D / 2 + 0.12), 6, null, false); });     // tije de paratrasnet pe colturi
     cyl(roofGroup, 0.04, 0.06, 4, SH.roofTrim, W / 2 - 1.5, H + 2.3, -D / 2 + 1.5, 6); box(roofGroup, 0.5, 0.5, 0.08, SH.roofUnit, W / 2 - 1.5, H + 3.7, -D / 2 + 1.58, false);
     roofK = roofOpen ? 1 : 0;
     tag(bld, 'building');
@@ -2293,9 +2401,28 @@ var Scene3D = (function () {
     box(cool, 2.2, 0.16, 1.2, SH.dark, W / 2 + 1.9, 0.28, -pz + 2.2, false); cyl(cool, 0.3, 0.3, 1.0, SH.blue, W / 2 + 1.6, 0.72, -pz + 2.2, 12, [0, 0, Math.PI / 2], false); cyl(cool, 0.24, 0.24, 0.7, SH.steel, W / 2 + 2.5, 0.72, -pz + 2.2, 12, [0, 0, Math.PI / 2], false);   // pompe
     tag(cool, 'cool');
 
-    // generatoare (vest)
+    // generatoare (vest): rezervoarele stau la nord de fiecare grup, cablurile ies pe la capatul dinspre cladire
     var gen = grp(root), zGen0 = -D / 2 + 3, genO = [], gStep = genS * 5.6 + 1.2;
     for (i = 0; i < nGen; i++) genO.push(genset(gen, xGen, zGen0 + i * gStep, genLen, genS));
+    (function () {
+      var gx1 = xGen + genLen / 2 + 0.4, gxc = -W / 2 - 1.6, gz0 = zGen0, gz1 = zGen0 + (nGen - 1) * gStep, gzm = (gz0 + gz1) / 2, tw = 0.6, ty = 0.2175, q, t, gw = 2.6 * genS;
+      // canal de cabluri cu capace de beton: o ramura de la fiecare grup, un colector de-a lungul randului, intrarea in peretele de vest la mijlocul randului
+      for (q = 0; q < nGen; q++) box(gen, gxc - tw / 2 - gx1, 0.035, tw, SH.base, (gx1 + gxc - tw / 2) / 2, ty, gz0 + q * gStep, false);
+      box(gen, tw, 0.035, gz1 - gz0 + tw, SH.base, gxc, ty, gzm, false);
+      box(gen, -W / 2 - (gxc + tw / 2), 0.035, tw, SH.base, (-W / 2 + gxc + tw / 2) / 2, ty, gzm, false);
+      if (!Q.lite) {                                                                    // rosturile dintre capace
+        for (t = gz0; t <= gz1 + 0.01; t += 1) flat(gen, tw, 0.03, SH.dark, gxc, 0.237, t + 0.5 > gz1 + tw / 2 ? t : t + 0.5);
+        for (q = 0; q < nGen; q++) for (t = gx1 + 0.5; t < gxc - tw / 2; t += 1) flat(gen, 0.03, tw, SH.dark, t, 0.237, gz0 + q * gStep);
+      }
+      // trecerea prin perete: cutie etansa cu semn de pericol
+      box(gen, 0.25, 0.55, 0.9, SH.silver, -W / 2 - 0.125, 0.2 + 0.275, gzm, false); box(gen, 0.02, 0.2, 0.3, SH.hazard, -W / 2 - 0.261, 0.55, gzm, false);
+      // stalpi de protectie spre drum, la fiecare grup si la punctul de umplere
+      for (q = 0; q < nGen; q++) {
+        var gzq = gz0 + q * gStep, gxw = xGen - genLen / 2 - 1.1;
+        bollard(gen, gxw, gzq - gw / 2 - 0.2); bollard(gen, gxw, gzq + gw / 2 + 0.2);
+        bollard(gen, xGen - genLen * 0.25 - 0.7 * genS - 0.15 * genS - 0.7, gzq - (gw / 2 + 0.9 * genS + 0.1 + 0.95 * genS) + 0.7 * genS);
+      }
+    })();
     tag(gen, 'gen');
 
     // statie electrica si linia din retea
@@ -2577,7 +2704,7 @@ var Scene3D = (function () {
     if (nT) zone(root, 'pv', -fieldW / 2 - 2, fieldW / 2 + 2, zPVend - 2, zPV0 + 6.5, 3.2);
     if (nB) zone(root, 'bess', xB0 - 5, xB0 + bN * 8 + 1, zB0 - (Math.max(1, rowsB) - 1) * 6 - 2.5, zB0 + 2.5, 3.4);
     zone(root, 'cool', W / 2 + 1.5, W / 2 + 4 + coolW, -Math.min(perCol, nCool) * 2 - 1, Math.min(D / 2, Math.min(perCol, nCool) * 2 + 3.5), 3.4);
-    zone(root, 'gen', xGen - genLen / 2 - 1, -W / 2 - 1, zGen0 - 2.5, zGen0 + (nGen - 1) * gStep + 4.5, 3.6);
+    zone(root, 'gen', xGen - genLen / 2 - 1, -W / 2 - 1, zGen0 - 4.4 * genS - 0.3, zGen0 + (nGen - 1) * gStep + 4.5, 3.6);
     zone(root, 'sub', xSub - subW / 2, xSub + subW / 2, zSub - subD / 2, zSub + subD / 2, 4 * subS + 2);
     zone(root, 'fiber', xF - 3, xF + 6, D / 2 + 0.6, zRoad - 4.5, 0.8);
     zone(root, 'fiber', x0 - 30, x1 + 30, zRoad - 10.5, zRoad - 5.2, 0.8);
@@ -2591,8 +2718,8 @@ var Scene3D = (function () {
     flows.fiberB = new Flow(fg, [[xF + 3, D / 2], [xF + 3, zRoad - 9], [x1 + 60 * k, zRoad - 9]], COL.fiber, k * 0.7, 8);
     flows.fiberA.set(0.5, 1); flows.fiberB.set(0.5, -1);
     var zGm = zGen0 + (nGen - 1) * gStep / 2;
-    flows.gen = new Flow(fg, [[xGen, zGm], [-W / 2, zGm]], COL.gen, k, 6);
-    puffGen = new Puffs(root, genO, SH.smoke, 0.8 * genS, 9, 4); puffGen.on = outage === 2 ? 1 : 0;
+    flows.gen = new Flow(fg, [[xGen + genLen / 2 + 0.4, zGen0], [-W / 2 - 1.6, zGen0], [-W / 2 - 1.6, zGm], [-W / 2, zGm]], COL.gen, k, 6);      // pe canalul de cabluri, nu pe sub rezervoare
+    puffGen = new Puffs(root, genO, SH.smoke, 1.4 * genS, 9, 4); puffGen.on = outage === 2 ? 1 : 0;
     puffHeat = new Puffs(root, coolO, SH.heat, 1.5, 11, 3); puffHeat.on = thermal ? 1 : 0;
 
 
@@ -2603,7 +2730,7 @@ var Scene3D = (function () {
         sub: [xSub, 4 * subS + 5, zSub], gen: [xGen, 6, zGm],
         cool: [coolX0 + (coolCols - 1) * (coolLen + 2) / 2, 6, 0], fiber: [xF + 1.5, 2.5, zRoad - 7],
         f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [xBc, 1.3 * k, (zB0 + 1.4 - D / 2) / 2] : null,
-        f_grid: [xSub + subW / 2 + 3, 1.3 * k, (zSub + subD / 2 + 2 + D / 2 - 2.5) / 2], f_gen: [(xGen - W / 2) / 2, 1.3 * k, zGm],
+        f_grid: [xSub + subW / 2 + 3, 1.3 * k, (zSub + subD / 2 + 2 + D / 2 - 2.5) / 2], f_gen: [-W / 2 - 1.6, 1.3 * k, (zGen0 + zGm) / 2],
         r_gpu: [rackPos[0] + 1.21, 1.95, rackPos[1] - 0.1], r_cool: [rackPos[0] - 0.5, 2.42, rackPos[1] + 0.2], r_net: [rackPos[0] + 0.35, 2.5, rackPos[1]],
         r_srv: [rackPos[0] + 0.62, 0.95, rackPos[1] + 0.25], r_pow: [rackPos[0] + 0.55, 0.47, rackPos[1] + 0.28]
       },
@@ -3045,7 +3172,7 @@ var Scene3D = (function () {
   'use strict';
   var M = Model, A = M.A, FU = M.FUNDS;
   function $(id) { return document.getElementById(id); }
-  var st = { scen: 'mediu', it: 1, pv: 4, bess: 4, hour: 13, month: 6, wx: 1, mode: 'cloud', ch: 0, playing: false, fund: 'fptj', outage: 0, rack: false, thermal: false, buildM: null, building: false };
+  var st = { scen: 'mediu', it: 1, pv: 4, bess: 4, hour: 13, month: 6, wx: 1, ch: 0, playing: false, fund: 'fptj', outage: 0, rack: false, thermal: false, buildM: null, building: false };
   var cache = { key: '', days: {} };
   var chapters = [].slice.call(document.querySelectorAll('.chapter'));
   var has3d = false;
@@ -3066,21 +3193,19 @@ var Scene3D = (function () {
   function eur(x) { return trim(num(x, Math.abs(x) < 10 ? 2 : 0)) + ' €'; }
 
   /* ---------- trei feluri in care poate merge piata ---------- */
-  var CASES = {
-    cloud: [{ k: 'prudent', name: 'Prudent', p: 3.5, o: 0.65 }, { k: 'piata', name: 'Piața de azi', p: 4.5, o: 0.75 }, { k: 'bun', name: 'Bun', p: 5.5, o: 0.85 }],
-    colo: [{ k: 'prudent', name: 'Prudent', p: 130, o: 0.75 }, { k: 'piata', name: 'Piața de azi', p: 150, o: 0.85 }, { k: 'bun', name: 'Bun', p: 180, o: 0.95 }]
-  };
+  var CASES = [{ k: 'prudent', name: 'Prudent', p: 3.5, o: 0.65 }, { k: 'piata', name: 'Piața de azi', p: 4.5, o: 0.75 }, { k: 'bun', name: 'Bun', p: 5.5, o: 0.85 }];
+  var SELL = 'cloud';   // se vand doar ore de GPU (GPU-uri proprii); modelul primeste inca acest cuvant
   var FUND_NAME = { none: 'fără fonduri', imm: 'grantul pentru IMM', fptj: 'Fondul de Participare Tranziție Justă' };
-  function getPO(mode) { return mode === 'cloud' ? { p: A.gpuHourPrice, o: A.occupancy } : { p: A.coloPrice, o: A.coloOccupancy }; }
-  function setPO(mode, p, o) { if (mode === 'cloud') { A.gpuHourPrice = p; A.occupancy = o; } else { A.coloPrice = p; A.coloOccupancy = o; } }
-  function withPO(mode, p, o, fn) { var old = getPO(mode); setPO(mode, p, o); try { return fn(); } finally { setPO(mode, old.p, old.o); } }
-  function curCase() { var c = getPO(st.mode), L = CASES[st.mode]; for (var i = 0; i < L.length; i++) if (Math.abs(L[i].p - c.p) < 1e-6 && Math.abs(L[i].o - c.o) < 1e-6) return L[i].k; return null; }
-  function caseText(mode, c) { return mode === 'cloud' ? trim(num(c.p, 1)) + ' € pe oră, ' + pct(c.o) + ' ocupare' : num(c.p) + ' € pe kW, ' + pct(c.o) + ' ocupare'; }
+  function getPO() { return { p: A.gpuHourPrice, o: A.occupancy }; }
+  function setPO(p, o) { A.gpuHourPrice = p; A.occupancy = o; }
+  function withPO(p, o, fn) { var old = getPO(); setPO(p, o); try { return fn(); } finally { setPO(old.p, old.o); } }
+  function curCase() { var c = getPO(), L = CASES; for (var i = 0; i < L.length; i++) if (Math.abs(L[i].p - c.p) < 1e-6 && Math.abs(L[i].o - c.o) < 1e-6) return L[i].k; return null; }
+  function caseText(c) { return trim(num(c.p, 1)) + ' € pe oră, ' + pct(c.o) + ' ocupare'; }
   var scenYears = {};
   function scenYear(k) { var s = M.SCEN[k]; if (!scenYears[k]) scenYears[k] = M.simulateYear(s.it, s.pv, s.bess, A); return scenYears[k]; }
-  function tenOf(it, pv, bess, mode, year, fundKey) {
-    var f = M.finance(it, pv, bess, A, mode, year), fu = M.funding(fundKey, f, bess, A);
-    var t = M.tenYear(it, pv, bess, A, mode, year, fu); t.fund = fu; return t;
+  function tenOf(it, pv, bess, year, fundKey) {
+    var f = M.finance(it, pv, bess, A, SELL, year), fu = M.funding(fundKey, f, bess, A);
+    var t = M.tenYear(it, pv, bess, A, SELL, year, fu); t.fund = fu; return t;
   }
   function breakTxt(t) { return t.breakeven ? 'în anul ' + t.breakeven : 'nu în 10 ani'; }
   function backCell(t) { return t.breakeven ? 'în anul ' + t.breakeven : 'nu'; }
@@ -3097,12 +3222,10 @@ var Scene3D = (function () {
     var dk = st.month + '|' + st.wx;
     if (!cache.days[dk]) cache.days[dk] = M.simulateDay(st.month, st.wx, st.it, st.pv, st.bess, A);
     cache.day = cache.days[dk];
-    cache.cloud = M.finance(st.it, st.pv, st.bess, A, 'cloud', cache.year);
-    cache.colo = M.finance(st.it, st.pv, st.bess, A, 'colo', cache.year);
-    cache.fin = st.mode === 'cloud' ? cache.cloud : cache.colo;
-    cache.ten = tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund);
-    cache.ten0 = st.fund === 'none' ? cache.ten : tenOf(st.it, st.pv, st.bess, st.mode, cache.year, 'none');
-    cache.unit = M.unitCost(st.it, st.pv, st.bess, A, st.mode, cache.year);
+    cache.fin = M.finance(st.it, st.pv, st.bess, A, SELL, cache.year);
+    cache.ten = tenOf(st.it, st.pv, st.bess, cache.year, st.fund);
+    cache.ten0 = st.fund === 'none' ? cache.ten : tenOf(st.it, st.pv, st.bess, cache.year, 'none');
+    cache.unit = M.unitCost(st.it, st.pv, st.bess, A, SELL, cache.year);
   }
 
   var GRID_NOTE = {
@@ -3110,14 +3233,22 @@ var Scene3D = (function () {
     mediu: 'La 1 MW este nevoie de un racord de medie tensiune (20 kV) cu post de transformare propriu.',
     mare: 'La 5 MW se discută un racord dedicat de medie tensiune sau o stație proprie de 110 kV, în funcție de ce capacitate are rețeaua din zonă.'
   };
-  var MODE_DESC = {
-    cloud: '<b>Cloud GPU.</b> Cumpărăm noi calculatoarele și le închiriem cu ora sau pe contract. Investiție mare, venit mare, risc mare: GPU-urile se demodează în 4–6 ani.',
-    colo: '<b>Colocare.</b> Clientul vine cu calculatoarele lui. Noi îi închiriem spațiu, curent și răcire. Investiția este de peste trei ori mai mică, venitul este stabil, iar câștigul mai mic.'
-  };
+  // la preturi prudente, pe fiecare marime: se intorc banii in 10 ani? (calculat pe loc, nu scris de mana)
+  function prudentLine() {
+    var c = CASES[0], res = ['pilot', 'mediu', 'mare'].map(function (k) {
+      var s = M.SCEN[k], y = scenYear(k);
+      return withPO(c.p, c.o, function () { return { name: s.name, t0: tenOf(s.it, s.pv, s.bess, y, 'none'), tf: tenOf(s.it, s.pv, s.bess, y, 'fptj') }; });
+    });
+    function list(key) { return res.filter(function (r) { return r[key].breakeven; }).map(function (r) { return r.name + ' (anul ' + r[key].breakeven + ')'; }); }
+    var a = list('t0'), b = list('tf'), head = 'La prețuri prudente (' + trim(num(c.p, 1)) + ' € pe GPU pe oră și ' + pct(c.o) + ' ocupare), ';
+    var s0 = a.length === 0 ? '<b>banii nu se întorc în 10 ani la nicio mărime</b>, dacă nu luăm fonduri' : a.length === 3 ? 'banii se întorc în 10 ani la toate mărimile și fără fonduri: ' + a.join(', ') : 'fără fonduri banii se întorc în 10 ani doar la: ' + a.join(', ');
+    var s1 = b.length === 0 ? (a.length === 0 ? ' Nici cu Fondul de Participare Tranziție Justă nu se întorc.' : ' Cu Fondul de Participare Tranziție Justă nu se întorc la nicio mărime.') : ' Cu Fondul de Participare Tranziție Justă se întorc la: ' + b.join(', ') + '.';
+    return head + s0 + '.' + s1 + ' Planul are sens doar cu prețuri mai bune decât cele prudente sau cu un contract semnat dinainte.';
+  }
   var CAL_TOTAL = { pilot: 22, mediu: 27, mare: 34 };
 
   function values() {
-    var ph = cache.ph, y = cache.year, f = cache.fin, v = {}, cloud = st.mode === 'cloud';
+    var ph = cache.ph, y = cache.year, f = cache.fin, v = {};
     v.it = mw(st.it); v.gpus = num(ph.gpus); v.servers = num(ph.servers); v.racks = num(ph.racks);
     v.buildingM2 = num(Math.round(ph.buildingM2 / 10) * 10); v.scenName = M.SCEN[st.scen].name;
     v.loadAvg = mw(ph.loadAvg); v.annualMWh = num(Math.round(ph.annualMWh / 100) * 100); v.households = num(Math.round(ph.households / 100) * 100);
@@ -3128,8 +3259,8 @@ var Scene3D = (function () {
     v.directShare = pct(y.directShare); v.battShare = pct(y.battShare); v.gridShare = pct(1 - y.directShare - y.battShare);
     v.nightMWh = num(Math.round(ph.loadAvg * 15.2 * 2) / 2, ph.loadAvg < 0.5 ? 1 : 0);
     v.monthName = M.MONTHS[st.month]; v.wxName = M.WEATHER[st.wx].label.toLowerCase();
-    v.capexCloud = mil(cache.cloud.capex.total); v.capexColo = mil(cache.colo.capex.total); v.capexTotal = mil(f.capex.total);
-    v.modeDesc = MODE_DESC[st.mode]; v.modeName = cloud ? 'Cloud GPU' : 'Colocare'; v.calTotal = CAL_TOTAL[st.scen];
+    v.capexTotal = mil(f.capex.total); v.capexGpu = mil(f.capex.gpu);
+    v.calTotal = CAL_TOTAL[st.scen]; v.prudentLine = prudentLine();
     if (f.ebitda <= 0) v.paybackLine = 'La aceste cifre, veniturile nu acoperă nici cheltuielile de funcționare.';
     else if (f.profit <= 0) v.paybackLine = 'La aceste cifre, banii rămași nu acoperă uzura echipamentelor. Proiectul ar pierde aproximativ <b>' + mil(-f.profit) + ' pe an</b>.';
     else v.paybackLine = 'La aceste cifre proiectul rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit și fonduri.';
@@ -3137,29 +3268,27 @@ var Scene3D = (function () {
     else v.solarLine = 'Fără panouri, tot curentul vine din rețea și costă aproximativ <b>' + mil(f.energyNoSolar) + ' pe an</b>.';
     // cat costa o unitate vanduta
     var u = cache.unit, left = u.price - u.total;
-    v.unitTitle = cloud ? 'Cât ne costă o oră de GPU' : 'Cât ne costă un kW închiriat, pe lună';
-    v.unitLine = (cloud ? 'O oră de GPU vândută ne costă' : 'Un kW închiriat ne costă pe lună') + ' aproximativ <b>' + eur(u.total) + '</b> și se vinde cu <b>' + eur(u.price) + '</b>. ' +
-      (left >= 0 ? 'Rămân ' + eur(left) + ' la fiecare ' + u.unit + '.' : 'Pierdem ' + eur(-left) + ' la fiecare ' + u.unit + '.');
+    v.unitLine = 'O oră de GPU vândută ne costă aproximativ <b>' + eur(u.total) + '</b> și se vinde cu <b>' + eur(u.price) + '</b>. ' +
+      (left >= 0 ? 'Rămân ' + eur(left) + ' la fiecare oră de GPU.' : 'Pierdem ' + eur(-left) + ' la fiecare oră de GPU.');
     // zece ani
     var t = cache.ten, t0 = cache.ten0, last = t.rows[10].cum;
-    v.tenIntro = cloud ? 'GPU-urile se înlocuiesc după cinci ani.' : 'spațiul se umple cu clienți abia din al treilea an.';
     v.tenEquity = mil(t.equity); v.tenGrant = t.grant > 0.0005 ? mil(t.grant) : 'nimic';
     v.tenGrantSub = st.fund === 'none' ? 'nicio cerere depusă' : st.fund === 'imm' ? 'grant, cel mult ' + mil(FU.immCap) : 'plus ' + mil(t.soft) + ' credit avantajos';
     v.tenBreak = breakTxt(t); v.tenCum = mil(last);
-    var po = getPO(st.mode), at = (cloud ? trim(num(po.p, 1)) + ' € pe oră' : num(po.p) + ' € pe kW') + ' și ' + pct(po.o) + ' ocupare';
+    var po = getPO(), at = trim(num(po.p, 1)) + ' € pe oră și ' + pct(po.o) + ' ocupare';
     v.caseNow = 'Calcul la valorile alese acum: ' + at + '.';
     if (st.fund === 'none') v.tenLine = 'La ' + at + ', fără fonduri: sunt necesari <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '. ' + cap(backSent(t)) + '.';
     else v.tenLine = 'La ' + at + ', cu ' + FUND_NAME[st.fund] + ': sunt necesari <b>' + mil(t.equity) + '</b> bani proprii, în loc de ' + mil(t0.equity) + '. ' +
       (!t.breakeven ? 'La aceste prețuri banii nu se întorc în 10 ani, cu sau fără fonduri.' : !t0.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '.</b> Fără fonduri nu s-ar întoarce în 10 ani.'
         : t0.breakeven === t.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '</b>, la fel ca fără fonduri, dar cu mai puțini bani proprii puși în joc.' : '<b>Banii se întorc în anul ' + t.breakeven + '</b>, față de anul ' + t0.breakeven + ' fără fonduri.');
-    var res = CASES[st.mode].map(function (c) { return withPO(st.mode, c.p, c.o, function () { return { c: c, t: tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund) }; }); });
-    v.tenNote = (cloud ? '<b>GPU-uri proprii, mărimea ' : '<b>Colocare, mărimea ') + M.SCEN[st.scen].name + '.</b> ' + res.map(function (r) { return r.c.name + ': ' + backSent(r.t) + '.'; }).join(' ') +
-      (cloud ? ' Totul atârnă de preț și de cât de pline sunt calculatoarele. De aceea primul contract semnat valorează mai mult decât orice grant.' : ' Colocarea aduce mai puțin, dar depinde mai puțin de prețul GPU-urilor.');
+    var res = CASES.map(function (c) { return withPO(c.p, c.o, function () { return { c: c, t: tenOf(st.it, st.pv, st.bess, cache.year, st.fund) }; }); });
+    v.tenNote = '<b>Mărimea ' + M.SCEN[st.scen].name + '.</b> ' + res.map(function (r) { return r.c.name + ': ' + backSent(r.t) + '.'; }).join(' ') +
+      ' Totul atârnă de preț și de cât de pline sunt calculatoarele. De aceea primul contract semnat valorează mai mult decât orice grant.';
     v.fundLine = st.fund === 'none' ? 'Fără fonduri, la mărimea ' + M.SCEN[st.scen].name + ' trebuie aduși <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '.'
       : 'Cu ' + FUND_NAME[st.fund] + ', la mărimea ' + M.SCEN[st.scen].name + ': grant de <b>' + mil(t.grant) + '</b>' + (t.soft > 0 ? ' și credit avantajos de ' + mil(t.soft) : '') + '. Banii proprii scad de la ' + mil(t0.equity) + ' la <b>' + mil(t.equity) + '</b>, iar creditul obișnuit de la ' + mil(t0.loan) + ' la ' + mil(t.loan) + '.';
     return v;
   }
-  var HTML_KEYS = { modeDesc: 1, paybackLine: 1, solarLine: 1, unitLine: 1, tenLine: 1, tenNote: 1, fundLine: 1 };
+  var HTML_KEYS = { prudentLine: 1, paybackLine: 1, solarLine: 1, unitLine: 1, tenLine: 1, tenNote: 1, fundLine: 1 };
   function fill() {
     var v = values();
     [].forEach.call(document.querySelectorAll('[data-v]'), function (el) {
@@ -3271,27 +3400,24 @@ var Scene3D = (function () {
     ].filter(function (r) { return r[1] > 0.0005; });
     $('c-capex').innerHTML = barsHtml(rows, mil);
     function tr(name, v, cls, sign) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td><td' + (sign ? ' class="' + (v < 0 ? 'neg' : 'pos') + '"' : '') + '>' + num(v, 2) + '</td></tr>'; }
-    var cloud = st.mode === 'cloud', h = '<thead><tr><th>Într-un an</th><th>mil. €</th></tr></thead><tbody>';
-    h += tr(cloud ? 'Venituri din închirierea GPU-urilor' : 'Chirie pentru spațiu și putere', f.rev.main);
-    if (!cloud) h += tr('Curent refacturat clienților', f.rev.energy);
+    var h = '<thead><tr><th>Într-un an</th><th>mil. €</th></tr></thead><tbody>';
+    h += tr('Venituri din închirierea GPU-urilor', f.rev.main);
     h += tr('Curent din rețea, după ce scădem soarele', -f.opex.energy);
     h += tr('Oameni', -f.opex.staff) + tr('Mentenanță', -f.opex.maint);
-    h += tr(cloud ? 'Licențe, asigurări, vânzări, internet' : 'Asigurări, vânzări, internet', -f.opex.other);
+    h += tr('Licențe, asigurări, vânzări, internet', -f.opex.other);
     h += tr('Rămâne înainte de uzură', f.ebitda, 'sum') + tr('Uzura echipamentelor', -f.dep);
     h += tr('Profit estimat pe an', f.profit, 'total', true);
     $('t-pl').innerHTML = h + '</tbody>';
-    $('grp-cloud').hidden = !cloud; $('grp-colo').hidden = cloud;
-    $('s-price').value = A.gpuHourPrice; $('s-occ').value = A.occupancy * 100; $('s-colo').value = A.coloPrice; $('s-cocc').value = A.coloOccupancy * 100;
+    $('s-price').value = A.gpuHourPrice; $('s-occ').value = A.occupancy * 100;
     $('o-price').textContent = trim(num(A.gpuHourPrice, 2)) + ' € pe oră'; $('o-occ').textContent = pct(A.occupancy);
-    $('o-colo').textContent = num(A.coloPrice) + ' € pe kW pe lună'; $('o-cocc').textContent = pct(A.coloOccupancy);
     $('c-unit').innerHTML = barsHtml(cache.unit.parts, eur);
   }
 
   /* ---------- zece ani ---------- */
   function drawTen() {
-    var cs = CASES[st.mode], cur = curCase(), sel = cache.ten, cloud = st.mode === 'cloud';
+    var cs = CASES, cur = curCase(), sel = cache.ten;
     var series = cs.map(function (c) {
-      var t = c.k === cur ? sel : withPO(st.mode, c.p, c.o, function () { return tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund); });
+      var t = c.k === cur ? sel : withPO(c.p, c.o, function () { return tenOf(st.it, st.pv, st.bess, cache.year, st.fund); });
       return { name: c.name, t: t, sel: c.k === cur };
     });
     if (!cur) series.push({ name: 'Alegerea ta', t: sel, sel: true });
@@ -3304,7 +3430,7 @@ var Scene3D = (function () {
     var s = '', dec = step < 1 ? (step < 0.1 ? 2 : 1) : 0;
     for (var v = y0; v <= y1 + 1e-9; v += step) s += '<line class="gridl" x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '"/><text x="' + (ml - 6) + '" y="' + (Y(v) + 3.5).toFixed(1) + '" text-anchor="end">' + trim(num(v, dec)) + '</text>';
     s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(0).toFixed(1) + '" y2="' + Y(0).toFixed(1) + '" stroke="var(--ink)" stroke-width="1"/>';
-    if (cloud) s += '<line x1="' + X(6).toFixed(1) + '" x2="' + X(6).toFixed(1) + '" y1="' + (mt - 4) + '" y2="' + (mt + ph) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3"/><text x="' + X(6).toFixed(1) + '" y="' + (mt - 9) + '" text-anchor="middle">GPU-uri noi</text>';
+    s += '<line x1="' + X(6).toFixed(1) + '" x2="' + X(6).toFixed(1) + '" y1="' + (mt - 4) + '" y2="' + (mt + ph) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3"/><text x="' + X(6).toFixed(1) + '" y="' + (mt - 9) + '" text-anchor="middle">GPU-uri noi</text>';
     [0, 2, 4, 6, 8, 10].forEach(function (y) { s += '<text x="' + X(y).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + (y === 0 ? 'start' : 'anul ' + y) + '</text>'; });
     function path(t) { return t.rows.map(function (r, i) { return (i ? 'L' : 'M') + X(r.y).toFixed(1) + ' ' + Y(r.cum).toFixed(1); }).join(''); }
     var labels = [];
@@ -3322,12 +3448,12 @@ var Scene3D = (function () {
     for (var yy = 0; yy <= 10; yy++) s += '<rect class="hit" data-y="' + yy + '" x="' + (X(yy) - pw / 20).toFixed(1) + '" y="' + mt + '" width="' + (pw / 10).toFixed(1) + '" height="' + ph + '" fill="transparent"/>';
     $('c-ten').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Banii adunați în zece ani. Varianta aleasă: ' + backSent(sel) + ', iar după zece ani rămân ' + mil(sel.rows[10].cum) + '.">' + s + '</svg>';
     // butoanele cu cele trei cazuri
-    $('cases').innerHTML = cs.map(function (c) { return '<button type="button" data-k="' + c.k + '" aria-pressed="' + (c.k === cur) + '">' + c.name + '<small>' + caseText(st.mode, c) + '</small></button>'; }).join('');
+    $('cases').innerHTML = cs.map(function (c) { return '<button type="button" data-k="' + c.k + '" aria-pressed="' + (c.k === cur) + '">' + c.name + '<small>' + caseText(c) + '</small></button>'; }).join('');
     // tabel pe ani
-    var h = '<thead><tr><th>Anul</th><th>Venituri</th><th>Cheltuieli</th><th>Rate</th>' + (cloud ? '<th>GPU noi</th>' : '') + '<th>Rămâne</th><th>Adunat</th></tr></thead><tbody>';
+    var h = '<thead><tr><th>Anul</th><th>Venituri</th><th>Cheltuieli</th><th>Rate</th><th>GPU noi</th><th>Rămâne</th><th>Adunat</th></tr></thead><tbody>';
     sel.rows.forEach(function (r) {
-      if (r.y === 0) { h += '<tr><td>start</td><td></td><td></td><td></td>' + (cloud ? '<td></td>' : '') + '<td class="neg">' + num(r.cash, 2) + '</td><td class="neg">' + num(r.cum, 2) + '</td></tr>'; return; }
-      h += '<tr><td>' + r.y + '</td><td>' + num(r.rev, 2) + '</td><td>' + num(-r.opex, 2) + '</td><td>' + num(-r.debt, 2) + '</td>' + (cloud ? '<td>' + (r.refresh ? num(-r.refresh, 2) : '') + '</td>' : '') +
+      if (r.y === 0) { h += '<tr><td>start</td><td></td><td></td><td></td><td></td><td class="neg">' + num(r.cash, 2) + '</td><td class="neg">' + num(r.cum, 2) + '</td></tr>'; return; }
+      h += '<tr><td>' + r.y + '</td><td>' + num(r.rev, 2) + '</td><td>' + num(-r.opex, 2) + '</td><td>' + num(-r.debt, 2) + '</td><td>' + (r.refresh ? num(-r.refresh, 2) : '') + '</td>' +
         '<td class="' + (r.cash < 0 ? 'neg' : 'pos') + '">' + num(r.cash, 2) + '</td><td class="' + (r.cum < 0 ? 'neg' : 'pos') + '">' + num(r.cum, 2) + '</td></tr>';
     });
     $('t-ten').innerHTML = h + '</tbody>';
@@ -3340,13 +3466,13 @@ var Scene3D = (function () {
     return '<b>Anul ' + y + '</b>' + row('Venituri', r.rev) + row('Cheltuieli', -r.opex) + row('Rate la credite', -r.debt) + (r.refresh ? row('GPU-uri noi, bani proprii', -r.refresh) : '') + row('Rămâne în an', r.cash) + row('Adunat de la început', r.cum);
   }
   function drawSens() {
-    var cloud = st.mode === 'cloud', P = cloud ? [2.5, 3.5, 4.5, 5.5, 6.5] : [110, 130, 150, 180, 220], O = cloud ? [0.5, 0.65, 0.75, 0.85, 0.95] : [0.65, 0.75, 0.85, 0.95], c0 = getPO(st.mode);
-    var h = '<thead><tr><th><span>' + (cloud ? '€ pe oră' : '€ pe kW') + ' ↓</span> <span>ocupare →</span></th>' + O.map(function (o) { return '<th>' + pct(o) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    var P = [2.5, 3.5, 4.5, 5.5, 6.5], O = [0.5, 0.65, 0.75, 0.85, 0.95], c0 = getPO();
+    var h = '<thead><tr><th><span>€ pe oră ↓</span> <span>ocupare →</span></th>' + O.map(function (o) { return '<th>' + pct(o) + '</th>'; }).join('') + '</tr></thead><tbody>';
     P.forEach(function (p) {
-      h += '<tr><td>' + (cloud ? trim(num(p, 1)) : num(p)) + '</td>' + O.map(function (o) {
-        var t = withPO(st.mode, p, o, function () { return tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund); });
+      h += '<tr><td>' + trim(num(p, 1)) + '</td>' + O.map(function (o) {
+        var t = withPO(p, o, function () { return tenOf(st.it, st.pv, st.bess, cache.year, st.fund); });
         var cls = (t.breakeven ? (t.breakeven <= 5 ? 'g' : '') : 'b') + (Math.abs(p - c0.p) < 1e-6 && Math.abs(o - c0.o) < 1e-6 ? ' cur' : '');
-        return '<td class="' + cls + '"><button type="button" data-p="' + p + '" data-o="' + o + '" aria-label="' + (cloud ? p + ' euro pe oră' : p + ' euro pe kW') + ', ocupare ' + pct(o) + ': ' + backSent(t) + '">' + (t.breakeven ? 'anul ' + t.breakeven : 'nu') + '</button></td>';
+        return '<td class="' + cls + '"><button type="button" data-p="' + p + '" data-o="' + o + '" aria-label="' + trim(num(p, 1)) + ' euro pe oră, ocupare ' + pct(o) + ': ' + backSent(t) + '">' + (t.breakeven ? 'anul ' + t.breakeven : 'nu') + '</button></td>';
       }).join('') + '</tr>';
     });
     $('t-sens').innerHTML = h + '</tbody>';
@@ -3356,17 +3482,17 @@ var Scene3D = (function () {
   function scenCols() {
     return ['pilot', 'mediu', 'mare'].map(function (k) {
       var s = M.SCEN[k], y = scenYear(k);
-      return { s: s, y: y, ph: M.physical(s.it, s.pv, s.bess, A), cl: M.finance(s.it, s.pv, s.bess, A, 'cloud', y), co: M.finance(s.it, s.pv, s.bess, A, 'colo', y) };
+      return { s: s, y: y, ph: M.physical(s.it, s.pv, s.bess, A), cl: M.finance(s.it, s.pv, s.bess, A, SELL, y) };
     });
   }
   function cmpHead(cols) { return '<thead><tr><th></th>' + cols.map(function (c) { return '<th' + (c.s.key === st.scen ? ' class="on"' : '') + '><button type="button" data-s="' + c.s.key + '" aria-pressed="' + (c.s.key === st.scen) + '">' + c.s.name + '</button></th>'; }).join('') + '</tr></thead><tbody>'; }
   function cmpRow(cols, name, fn, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td>' + cols.map(function (c) { return '<td' + (c.s.key === st.scen ? ' class="on"' : '') + '>' + fn(c) + '</td>'; }).join('') + '</tr>'; }
   function drawFund() {
-    var cols = scenCols(), mode = st.mode;
+    var cols = scenCols();
     cols.forEach(function (c) {
-      c.f = mode === 'cloud' ? c.cl : c.co;
+      c.f = c.cl;
       c.fu = M.funding('none', c.f, c.s.bess, A);
-      c.t0 = tenOf(c.s.it, c.s.pv, c.s.bess, mode, c.y, 'none'); c.t1 = tenOf(c.s.it, c.s.pv, c.s.bess, mode, c.y, 'imm'); c.t2 = tenOf(c.s.it, c.s.pv, c.s.bess, mode, c.y, 'fptj');
+      c.t0 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'none'); c.t1 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'imm'); c.t2 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'fptj');
     });
     var h = cmpHead(cols);
     h += cmpRow(cols, 'Investiție', function (c) { return mil(c.f.capex.total); });
@@ -3389,14 +3515,13 @@ var Scene3D = (function () {
     var h = cmpHead(cols);
     R.forEach(function (r) { h += cmpRow(cols, r[0], function (c) { var n = r[['pilot', 'mediu', 'mare'].indexOf(c.s.key) + 1]; return n ? n : 'din afară'; }); });
     h += cmpRow(cols, 'Total oameni', function (c) { return { pilot: 6, mediu: 10, mare: 25 }[c.s.key]; }, 'sum');
-    h += cmpRow(cols, 'Salarii pe an, Cloud GPU', function (c) { return mil(c.cl.opex.staff); });
-    h += cmpRow(cols, 'Salarii pe an, Colocare', function (c) { return mil(c.co.opex.staff); });
+    h += cmpRow(cols, 'Salarii pe an', function (c) { return mil(c.cl.opex.staff); });
     $('t-team').innerHTML = h + '</tbody>';
   }
 
   function drawCompare() {
     var cols = scenCols();
-    cols.forEach(function (c) { c.tc = tenOf(c.s.it, c.s.pv, c.s.bess, 'cloud', c.y, st.fund); c.to = tenOf(c.s.it, c.s.pv, c.s.bess, 'colo', c.y, st.fund); });
+    cols.forEach(function (c) { c.tc = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, st.fund); });
     function sg(v) { return '<span style="color:var(--' + (v < 0 ? 'bad' : 'good') + ')">' + mil(v) + '</span>'; }
     var h = cmpHead(cols), fn = st.fund === 'none' ? 'fără fonduri' : st.fund === 'imm' ? 'cu grant IMM' : 'cu Fondul Tranziție Justă';
     h += cmpRow(cols, 'Puterea calculatoarelor', function (c) { return mw(c.s.it); });
@@ -3408,18 +3533,13 @@ var Scene3D = (function () {
     h += cmpRow(cols, 'Curent din soare și baterii', function (c) { return pct(c.y.coverage); });
     h += cmpRow(cols, 'Oameni', function (c) { return { pilot: 6, mediu: 10, mare: 25 }[c.s.key]; });
     h += cmpRow(cols, 'Durată până la pornire', function (c) { return CAL_TOTAL[c.s.key] + ' luni'; });
-    h += cmpRow(cols, '<b>Cloud GPU</b>: investiție', function (c) { return mil(c.cl.capex.total); }, 'sum');
+    h += cmpRow(cols, '<b>Investiție</b>', function (c) { return mil(c.cl.capex.total); }, 'sum');
+    h += cmpRow(cols, 'din care calculatoarele', function (c) { return mil(c.cl.capex.gpu); });
     h += cmpRow(cols, 'venituri pe an', function (c) { return mil(c.cl.rev.total); });
     h += cmpRow(cols, 'profit pe an', function (c) { return sg(c.cl.profit); });
     h += cmpRow(cols, 'grant posibil', function (c) { return mil(c.tc.grant); });
     h += cmpRow(cols, 'bani proprii, ' + fn, function (c) { return mil(c.tc.equity); });
     h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.tc); });
-    h += cmpRow(cols, '<b>Colocare</b>: investiție', function (c) { return mil(c.co.capex.total); }, 'sum');
-    h += cmpRow(cols, 'venituri pe an', function (c) { return mil(c.co.rev.total); });
-    h += cmpRow(cols, 'profit pe an', function (c) { return sg(c.co.profit); });
-    h += cmpRow(cols, 'grant posibil', function (c) { return mil(c.to.grant); });
-    h += cmpRow(cols, 'bani proprii, ' + fn, function (c) { return mil(c.to.equity); });
-    h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.to); });
     $('t-cmp').innerHTML = h + '</tbody>';
   }
 
@@ -3434,8 +3554,7 @@ var Scene3D = (function () {
       'Curent din rețea: ' + A.gridPrice + ' €/MWh cu tarife și taxe, fără TVA. Energia singură era ofertată la 620–700 lei/MWh în august 2026.',
       'Surplusul de la prânz se vinde cu ' + A.exportPrice + ' €/MWh.',
       'Teren: 15 €/m² pentru platforma clădirii, 1,5 €/m² pentru parcul de panouri.',
-      'Cloud GPU. Prudent: 3,5 € pe GPU pe oră și 65% ocupare. Piața de azi: 4,5 € și 75%. Bun: 5,5 € și 85%.',
-      'Colocare. Prudent: 130 € pe kW pe lună și 75% ocupare. Piața de azi: 150 € și 85%. Bun: 180 € și 95%. Curentul se refacturează clientului la prețul rețelei.',
+      'Vindem doar ore de GPU, pe calculatoarele noastre. ' + CASES.map(function (c) { return c.name + ': ' + trim(num(c.p, 1)) + ' € pe GPU pe oră și ' + pct(c.o) + ' ocupare'; }).join('. ') + '.',
       'Vremea: jumătate din zile senine, o treime cu nori, restul închise, cu producția lunară păstrată.',
       'Durată de folosire: GPU-uri ' + A.gpuLifeYears + ' ani, clădire ' + A.facilityLifeYears + ', panouri ' + A.pvLifeYears + ', baterii ' + A.bessLifeYears + '.',
       'Oameni: 6, 10 sau 25 de angajați, în funcție de mărime. Mentenanță: 2,5% pe an din valoarea clădirii și 1,5% din panouri și baterii.',
@@ -3543,7 +3662,6 @@ var Scene3D = (function () {
   function syncUi() {
     [].forEach.call($('scen').children, function (b) { b.setAttribute('aria-pressed', b.dataset.s === st.scen); });
     [].forEach.call($('wx').children, function (b) { b.setAttribute('aria-pressed', +b.dataset.w === st.wx); });
-    [].forEach.call($('mode').children, function (b) { b.setAttribute('aria-pressed', b.dataset.m === st.mode); });
     ['fund', 'fund2'].forEach(function (id) { [].forEach.call($(id).children, function (b) { b.setAttribute('aria-pressed', b.dataset.f === st.fund); }); });
     $('month').value = st.month; $('hour').value = st.hour;
     $('o-pv').textContent = trim(num(st.pv, 2)) + ' MW'; $('o-bess').textContent = trim(num(st.bess, 2)) + ' MWh';
@@ -3634,9 +3752,7 @@ var Scene3D = (function () {
     M.MONTHS.forEach(function (m, i) { var o = document.createElement('option'); o.value = i; o.textContent = cap(m); $('month').appendChild(o); });
     $('money-ctrls').innerHTML =
       '<div id="grp-cloud"><div class="ctrl"><label for="s-price">Preț pe GPU</label><output id="o-price" for="s-price"></output><input type="range" id="s-price" min="1.5" max="8" step="0.1" value="' + A.gpuHourPrice + '"></div>' +
-      '<div class="ctrl"><label for="s-occ">Cât timp sunt închiriate GPU-urile</label><output id="o-occ" for="s-occ"></output><input type="range" id="s-occ" min="30" max="95" step="1" value="' + A.occupancy * 100 + '"></div></div>' +
-      '<div id="grp-colo" hidden><div class="ctrl"><label for="s-colo">Chirie</label><output id="o-colo" for="s-colo"></output><input type="range" id="s-colo" min="80" max="250" step="5" value="' + A.coloPrice + '"></div>' +
-      '<div class="ctrl"><label for="s-cocc">Cât din spațiu este închiriat</label><output id="o-cocc" for="s-cocc"></output><input type="range" id="s-cocc" min="40" max="100" step="1" value="' + A.coloOccupancy * 100 + '"></div></div>';
+      '<div class="ctrl"><label for="s-occ">Cât timp sunt închiriate GPU-urile</label><output id="o-occ" for="s-occ"></output><input type="range" id="s-occ" min="30" max="95" step="1" value="' + A.occupancy * 100 + '"></div></div>';
     drawAssumptions();
 
     if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) $('hint').textContent = 'Trage cu degetul ca să rotești · două degete apropie';
@@ -3665,14 +3781,13 @@ var Scene3D = (function () {
     $('scen').addEventListener('click', scenClick);
     ['t-cmp', 't-fund', 't-team'].forEach(function (id) { $(id).addEventListener('click', scenClick); });
     $('wx').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { st.wx = +b.dataset.w; render(); } });
-    $('mode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { st.mode = b.dataset.m; render(); } });
     function fundClick(e) { var b = e.target.closest('button'); if (b) { st.fund = b.dataset.f; render(); } }
     $('fund').addEventListener('click', fundClick); $('fund2').addEventListener('click', fundClick);
     $('cases').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      var c = CASES[st.mode].filter(function (x) { return x.k === b.dataset.k; })[0]; if (c) { setPO(st.mode, c.p, c.o); render(); }
+      var c = CASES.filter(function (x) { return x.k === b.dataset.k; })[0]; if (c) { setPO(c.p, c.o); render(); }
     });
-    $('t-sens').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { setPO(st.mode, +b.dataset.p, +b.dataset.o); render(); } });
+    $('t-sens').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { setPO(+b.dataset.p, +b.dataset.o); render(); } });
     $('s-loan').addEventListener('input', function () { A.loanShare = +this.value / 100; render(); });
     $('s-int').addEventListener('input', function () { A.interest = +this.value / 100; render(); });
     $('month').addEventListener('change', function () { st.month = +this.value; render(); });
@@ -3684,7 +3799,6 @@ var Scene3D = (function () {
     $('money-ctrls').addEventListener('input', function (e) {
       var v = +e.target.value;
       if (e.target.id === 's-price') A.gpuHourPrice = v; else if (e.target.id === 's-occ') A.occupancy = v / 100;
-      else if (e.target.id === 's-colo') A.coloPrice = v; else if (e.target.id === 's-cocc') A.coloOccupancy = v / 100;
       render();
     });
     $('prev').addEventListener('click', function () { goChapter(st.ch - 1); });

@@ -3,7 +3,7 @@
   'use strict';
   var M = Model, A = M.A, FU = M.FUNDS;
   function $(id) { return document.getElementById(id); }
-  var st = { scen: 'mediu', it: 1, pv: 4, bess: 4, hour: 13, month: 6, wx: 1, mode: 'cloud', ch: 0, playing: false, fund: 'fptj', outage: 0, rack: false, thermal: false, buildM: null, building: false };
+  var st = { scen: 'mediu', it: 1, pv: 4, bess: 4, hour: 13, month: 6, wx: 1, ch: 0, playing: false, fund: 'fptj', outage: 0, rack: false, thermal: false, buildM: null, building: false };
   var cache = { key: '', days: {} };
   var chapters = [].slice.call(document.querySelectorAll('.chapter'));
   var has3d = false;
@@ -24,21 +24,19 @@
   function eur(x) { return trim(num(x, Math.abs(x) < 10 ? 2 : 0)) + ' €'; }
 
   /* ---------- trei feluri in care poate merge piata ---------- */
-  var CASES = {
-    cloud: [{ k: 'prudent', name: 'Prudent', p: 3.5, o: 0.65 }, { k: 'piata', name: 'Piața de azi', p: 4.5, o: 0.75 }, { k: 'bun', name: 'Bun', p: 5.5, o: 0.85 }],
-    colo: [{ k: 'prudent', name: 'Prudent', p: 130, o: 0.75 }, { k: 'piata', name: 'Piața de azi', p: 150, o: 0.85 }, { k: 'bun', name: 'Bun', p: 180, o: 0.95 }]
-  };
+  var CASES = [{ k: 'prudent', name: 'Prudent', p: 3.5, o: 0.65 }, { k: 'piata', name: 'Piața de azi', p: 4.5, o: 0.75 }, { k: 'bun', name: 'Bun', p: 5.5, o: 0.85 }];
+  var SELL = 'cloud';   // se vand doar ore de GPU (GPU-uri proprii); modelul primeste inca acest cuvant
   var FUND_NAME = { none: 'fără fonduri', imm: 'grantul pentru IMM', fptj: 'Fondul de Participare Tranziție Justă' };
-  function getPO(mode) { return mode === 'cloud' ? { p: A.gpuHourPrice, o: A.occupancy } : { p: A.coloPrice, o: A.coloOccupancy }; }
-  function setPO(mode, p, o) { if (mode === 'cloud') { A.gpuHourPrice = p; A.occupancy = o; } else { A.coloPrice = p; A.coloOccupancy = o; } }
-  function withPO(mode, p, o, fn) { var old = getPO(mode); setPO(mode, p, o); try { return fn(); } finally { setPO(mode, old.p, old.o); } }
-  function curCase() { var c = getPO(st.mode), L = CASES[st.mode]; for (var i = 0; i < L.length; i++) if (Math.abs(L[i].p - c.p) < 1e-6 && Math.abs(L[i].o - c.o) < 1e-6) return L[i].k; return null; }
-  function caseText(mode, c) { return mode === 'cloud' ? trim(num(c.p, 1)) + ' € pe oră, ' + pct(c.o) + ' ocupare' : num(c.p) + ' € pe kW, ' + pct(c.o) + ' ocupare'; }
+  function getPO() { return { p: A.gpuHourPrice, o: A.occupancy }; }
+  function setPO(p, o) { A.gpuHourPrice = p; A.occupancy = o; }
+  function withPO(p, o, fn) { var old = getPO(); setPO(p, o); try { return fn(); } finally { setPO(old.p, old.o); } }
+  function curCase() { var c = getPO(), L = CASES; for (var i = 0; i < L.length; i++) if (Math.abs(L[i].p - c.p) < 1e-6 && Math.abs(L[i].o - c.o) < 1e-6) return L[i].k; return null; }
+  function caseText(c) { return trim(num(c.p, 1)) + ' € pe oră, ' + pct(c.o) + ' ocupare'; }
   var scenYears = {};
   function scenYear(k) { var s = M.SCEN[k]; if (!scenYears[k]) scenYears[k] = M.simulateYear(s.it, s.pv, s.bess, A); return scenYears[k]; }
-  function tenOf(it, pv, bess, mode, year, fundKey) {
-    var f = M.finance(it, pv, bess, A, mode, year), fu = M.funding(fundKey, f, bess, A);
-    var t = M.tenYear(it, pv, bess, A, mode, year, fu); t.fund = fu; return t;
+  function tenOf(it, pv, bess, year, fundKey) {
+    var f = M.finance(it, pv, bess, A, SELL, year), fu = M.funding(fundKey, f, bess, A);
+    var t = M.tenYear(it, pv, bess, A, SELL, year, fu); t.fund = fu; return t;
   }
   function breakTxt(t) { return t.breakeven ? 'în anul ' + t.breakeven : 'nu în 10 ani'; }
   function backCell(t) { return t.breakeven ? 'în anul ' + t.breakeven : 'nu'; }
@@ -55,12 +53,10 @@
     var dk = st.month + '|' + st.wx;
     if (!cache.days[dk]) cache.days[dk] = M.simulateDay(st.month, st.wx, st.it, st.pv, st.bess, A);
     cache.day = cache.days[dk];
-    cache.cloud = M.finance(st.it, st.pv, st.bess, A, 'cloud', cache.year);
-    cache.colo = M.finance(st.it, st.pv, st.bess, A, 'colo', cache.year);
-    cache.fin = st.mode === 'cloud' ? cache.cloud : cache.colo;
-    cache.ten = tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund);
-    cache.ten0 = st.fund === 'none' ? cache.ten : tenOf(st.it, st.pv, st.bess, st.mode, cache.year, 'none');
-    cache.unit = M.unitCost(st.it, st.pv, st.bess, A, st.mode, cache.year);
+    cache.fin = M.finance(st.it, st.pv, st.bess, A, SELL, cache.year);
+    cache.ten = tenOf(st.it, st.pv, st.bess, cache.year, st.fund);
+    cache.ten0 = st.fund === 'none' ? cache.ten : tenOf(st.it, st.pv, st.bess, cache.year, 'none');
+    cache.unit = M.unitCost(st.it, st.pv, st.bess, A, SELL, cache.year);
   }
 
   var GRID_NOTE = {
@@ -68,14 +64,22 @@
     mediu: 'La 1 MW este nevoie de un racord de medie tensiune (20 kV) cu post de transformare propriu.',
     mare: 'La 5 MW se discută un racord dedicat de medie tensiune sau o stație proprie de 110 kV, în funcție de ce capacitate are rețeaua din zonă.'
   };
-  var MODE_DESC = {
-    cloud: '<b>Cloud GPU.</b> Cumpărăm noi calculatoarele și le închiriem cu ora sau pe contract. Investiție mare, venit mare, risc mare: GPU-urile se demodează în 4–6 ani.',
-    colo: '<b>Colocare.</b> Clientul vine cu calculatoarele lui. Noi îi închiriem spațiu, curent și răcire. Investiția este de peste trei ori mai mică, venitul este stabil, iar câștigul mai mic.'
-  };
+  // la preturi prudente, pe fiecare marime: se intorc banii in 10 ani? (calculat pe loc, nu scris de mana)
+  function prudentLine() {
+    var c = CASES[0], res = ['pilot', 'mediu', 'mare'].map(function (k) {
+      var s = M.SCEN[k], y = scenYear(k);
+      return withPO(c.p, c.o, function () { return { name: s.name, t0: tenOf(s.it, s.pv, s.bess, y, 'none'), tf: tenOf(s.it, s.pv, s.bess, y, 'fptj') }; });
+    });
+    function list(key) { return res.filter(function (r) { return r[key].breakeven; }).map(function (r) { return r.name + ' (anul ' + r[key].breakeven + ')'; }); }
+    var a = list('t0'), b = list('tf'), head = 'La prețuri prudente (' + trim(num(c.p, 1)) + ' € pe GPU pe oră și ' + pct(c.o) + ' ocupare), ';
+    var s0 = a.length === 0 ? '<b>banii nu se întorc în 10 ani la nicio mărime</b>, dacă nu luăm fonduri' : a.length === 3 ? 'banii se întorc în 10 ani la toate mărimile și fără fonduri: ' + a.join(', ') : 'fără fonduri banii se întorc în 10 ani doar la: ' + a.join(', ');
+    var s1 = b.length === 0 ? (a.length === 0 ? ' Nici cu Fondul de Participare Tranziție Justă nu se întorc.' : ' Cu Fondul de Participare Tranziție Justă nu se întorc la nicio mărime.') : ' Cu Fondul de Participare Tranziție Justă se întorc la: ' + b.join(', ') + '.';
+    return head + s0 + '.' + s1 + ' Planul are sens doar cu prețuri mai bune decât cele prudente sau cu un contract semnat dinainte.';
+  }
   var CAL_TOTAL = { pilot: 22, mediu: 27, mare: 34 };
 
   function values() {
-    var ph = cache.ph, y = cache.year, f = cache.fin, v = {}, cloud = st.mode === 'cloud';
+    var ph = cache.ph, y = cache.year, f = cache.fin, v = {};
     v.it = mw(st.it); v.gpus = num(ph.gpus); v.servers = num(ph.servers); v.racks = num(ph.racks);
     v.buildingM2 = num(Math.round(ph.buildingM2 / 10) * 10); v.scenName = M.SCEN[st.scen].name;
     v.loadAvg = mw(ph.loadAvg); v.annualMWh = num(Math.round(ph.annualMWh / 100) * 100); v.households = num(Math.round(ph.households / 100) * 100);
@@ -86,8 +90,8 @@
     v.directShare = pct(y.directShare); v.battShare = pct(y.battShare); v.gridShare = pct(1 - y.directShare - y.battShare);
     v.nightMWh = num(Math.round(ph.loadAvg * 15.2 * 2) / 2, ph.loadAvg < 0.5 ? 1 : 0);
     v.monthName = M.MONTHS[st.month]; v.wxName = M.WEATHER[st.wx].label.toLowerCase();
-    v.capexCloud = mil(cache.cloud.capex.total); v.capexColo = mil(cache.colo.capex.total); v.capexTotal = mil(f.capex.total);
-    v.modeDesc = MODE_DESC[st.mode]; v.modeName = cloud ? 'Cloud GPU' : 'Colocare'; v.calTotal = CAL_TOTAL[st.scen];
+    v.capexTotal = mil(f.capex.total); v.capexGpu = mil(f.capex.gpu);
+    v.calTotal = CAL_TOTAL[st.scen]; v.prudentLine = prudentLine();
     if (f.ebitda <= 0) v.paybackLine = 'La aceste cifre, veniturile nu acoperă nici cheltuielile de funcționare.';
     else if (f.profit <= 0) v.paybackLine = 'La aceste cifre, banii rămași nu acoperă uzura echipamentelor. Proiectul ar pierde aproximativ <b>' + mil(-f.profit) + ' pe an</b>.';
     else v.paybackLine = 'La aceste cifre proiectul rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit și fonduri.';
@@ -95,29 +99,27 @@
     else v.solarLine = 'Fără panouri, tot curentul vine din rețea și costă aproximativ <b>' + mil(f.energyNoSolar) + ' pe an</b>.';
     // cat costa o unitate vanduta
     var u = cache.unit, left = u.price - u.total;
-    v.unitTitle = cloud ? 'Cât ne costă o oră de GPU' : 'Cât ne costă un kW închiriat, pe lună';
-    v.unitLine = (cloud ? 'O oră de GPU vândută ne costă' : 'Un kW închiriat ne costă pe lună') + ' aproximativ <b>' + eur(u.total) + '</b> și se vinde cu <b>' + eur(u.price) + '</b>. ' +
-      (left >= 0 ? 'Rămân ' + eur(left) + ' la fiecare ' + u.unit + '.' : 'Pierdem ' + eur(-left) + ' la fiecare ' + u.unit + '.');
+    v.unitLine = 'O oră de GPU vândută ne costă aproximativ <b>' + eur(u.total) + '</b> și se vinde cu <b>' + eur(u.price) + '</b>. ' +
+      (left >= 0 ? 'Rămân ' + eur(left) + ' la fiecare oră de GPU.' : 'Pierdem ' + eur(-left) + ' la fiecare oră de GPU.');
     // zece ani
     var t = cache.ten, t0 = cache.ten0, last = t.rows[10].cum;
-    v.tenIntro = cloud ? 'GPU-urile se înlocuiesc după cinci ani.' : 'spațiul se umple cu clienți abia din al treilea an.';
     v.tenEquity = mil(t.equity); v.tenGrant = t.grant > 0.0005 ? mil(t.grant) : 'nimic';
     v.tenGrantSub = st.fund === 'none' ? 'nicio cerere depusă' : st.fund === 'imm' ? 'grant, cel mult ' + mil(FU.immCap) : 'plus ' + mil(t.soft) + ' credit avantajos';
     v.tenBreak = breakTxt(t); v.tenCum = mil(last);
-    var po = getPO(st.mode), at = (cloud ? trim(num(po.p, 1)) + ' € pe oră' : num(po.p) + ' € pe kW') + ' și ' + pct(po.o) + ' ocupare';
+    var po = getPO(), at = trim(num(po.p, 1)) + ' € pe oră și ' + pct(po.o) + ' ocupare';
     v.caseNow = 'Calcul la valorile alese acum: ' + at + '.';
     if (st.fund === 'none') v.tenLine = 'La ' + at + ', fără fonduri: sunt necesari <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '. ' + cap(backSent(t)) + '.';
     else v.tenLine = 'La ' + at + ', cu ' + FUND_NAME[st.fund] + ': sunt necesari <b>' + mil(t.equity) + '</b> bani proprii, în loc de ' + mil(t0.equity) + '. ' +
       (!t.breakeven ? 'La aceste prețuri banii nu se întorc în 10 ani, cu sau fără fonduri.' : !t0.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '.</b> Fără fonduri nu s-ar întoarce în 10 ani.'
         : t0.breakeven === t.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '</b>, la fel ca fără fonduri, dar cu mai puțini bani proprii puși în joc.' : '<b>Banii se întorc în anul ' + t.breakeven + '</b>, față de anul ' + t0.breakeven + ' fără fonduri.');
-    var res = CASES[st.mode].map(function (c) { return withPO(st.mode, c.p, c.o, function () { return { c: c, t: tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund) }; }); });
-    v.tenNote = (cloud ? '<b>GPU-uri proprii, mărimea ' : '<b>Colocare, mărimea ') + M.SCEN[st.scen].name + '.</b> ' + res.map(function (r) { return r.c.name + ': ' + backSent(r.t) + '.'; }).join(' ') +
-      (cloud ? ' Totul atârnă de preț și de cât de pline sunt calculatoarele. De aceea primul contract semnat valorează mai mult decât orice grant.' : ' Colocarea aduce mai puțin, dar depinde mai puțin de prețul GPU-urilor.');
+    var res = CASES.map(function (c) { return withPO(c.p, c.o, function () { return { c: c, t: tenOf(st.it, st.pv, st.bess, cache.year, st.fund) }; }); });
+    v.tenNote = '<b>Mărimea ' + M.SCEN[st.scen].name + '.</b> ' + res.map(function (r) { return r.c.name + ': ' + backSent(r.t) + '.'; }).join(' ') +
+      ' Totul atârnă de preț și de cât de pline sunt calculatoarele. De aceea primul contract semnat valorează mai mult decât orice grant.';
     v.fundLine = st.fund === 'none' ? 'Fără fonduri, la mărimea ' + M.SCEN[st.scen].name + ' trebuie aduși <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '.'
       : 'Cu ' + FUND_NAME[st.fund] + ', la mărimea ' + M.SCEN[st.scen].name + ': grant de <b>' + mil(t.grant) + '</b>' + (t.soft > 0 ? ' și credit avantajos de ' + mil(t.soft) : '') + '. Banii proprii scad de la ' + mil(t0.equity) + ' la <b>' + mil(t.equity) + '</b>, iar creditul obișnuit de la ' + mil(t0.loan) + ' la ' + mil(t.loan) + '.';
     return v;
   }
-  var HTML_KEYS = { modeDesc: 1, paybackLine: 1, solarLine: 1, unitLine: 1, tenLine: 1, tenNote: 1, fundLine: 1 };
+  var HTML_KEYS = { prudentLine: 1, paybackLine: 1, solarLine: 1, unitLine: 1, tenLine: 1, tenNote: 1, fundLine: 1 };
   function fill() {
     var v = values();
     [].forEach.call(document.querySelectorAll('[data-v]'), function (el) {
@@ -229,27 +231,24 @@
     ].filter(function (r) { return r[1] > 0.0005; });
     $('c-capex').innerHTML = barsHtml(rows, mil);
     function tr(name, v, cls, sign) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td><td' + (sign ? ' class="' + (v < 0 ? 'neg' : 'pos') + '"' : '') + '>' + num(v, 2) + '</td></tr>'; }
-    var cloud = st.mode === 'cloud', h = '<thead><tr><th>Într-un an</th><th>mil. €</th></tr></thead><tbody>';
-    h += tr(cloud ? 'Venituri din închirierea GPU-urilor' : 'Chirie pentru spațiu și putere', f.rev.main);
-    if (!cloud) h += tr('Curent refacturat clienților', f.rev.energy);
+    var h = '<thead><tr><th>Într-un an</th><th>mil. €</th></tr></thead><tbody>';
+    h += tr('Venituri din închirierea GPU-urilor', f.rev.main);
     h += tr('Curent din rețea, după ce scădem soarele', -f.opex.energy);
     h += tr('Oameni', -f.opex.staff) + tr('Mentenanță', -f.opex.maint);
-    h += tr(cloud ? 'Licențe, asigurări, vânzări, internet' : 'Asigurări, vânzări, internet', -f.opex.other);
+    h += tr('Licențe, asigurări, vânzări, internet', -f.opex.other);
     h += tr('Rămâne înainte de uzură', f.ebitda, 'sum') + tr('Uzura echipamentelor', -f.dep);
     h += tr('Profit estimat pe an', f.profit, 'total', true);
     $('t-pl').innerHTML = h + '</tbody>';
-    $('grp-cloud').hidden = !cloud; $('grp-colo').hidden = cloud;
-    $('s-price').value = A.gpuHourPrice; $('s-occ').value = A.occupancy * 100; $('s-colo').value = A.coloPrice; $('s-cocc').value = A.coloOccupancy * 100;
+    $('s-price').value = A.gpuHourPrice; $('s-occ').value = A.occupancy * 100;
     $('o-price').textContent = trim(num(A.gpuHourPrice, 2)) + ' € pe oră'; $('o-occ').textContent = pct(A.occupancy);
-    $('o-colo').textContent = num(A.coloPrice) + ' € pe kW pe lună'; $('o-cocc').textContent = pct(A.coloOccupancy);
     $('c-unit').innerHTML = barsHtml(cache.unit.parts, eur);
   }
 
   /* ---------- zece ani ---------- */
   function drawTen() {
-    var cs = CASES[st.mode], cur = curCase(), sel = cache.ten, cloud = st.mode === 'cloud';
+    var cs = CASES, cur = curCase(), sel = cache.ten;
     var series = cs.map(function (c) {
-      var t = c.k === cur ? sel : withPO(st.mode, c.p, c.o, function () { return tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund); });
+      var t = c.k === cur ? sel : withPO(c.p, c.o, function () { return tenOf(st.it, st.pv, st.bess, cache.year, st.fund); });
       return { name: c.name, t: t, sel: c.k === cur };
     });
     if (!cur) series.push({ name: 'Alegerea ta', t: sel, sel: true });
@@ -262,7 +261,7 @@
     var s = '', dec = step < 1 ? (step < 0.1 ? 2 : 1) : 0;
     for (var v = y0; v <= y1 + 1e-9; v += step) s += '<line class="gridl" x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '"/><text x="' + (ml - 6) + '" y="' + (Y(v) + 3.5).toFixed(1) + '" text-anchor="end">' + trim(num(v, dec)) + '</text>';
     s += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(0).toFixed(1) + '" y2="' + Y(0).toFixed(1) + '" stroke="var(--ink)" stroke-width="1"/>';
-    if (cloud) s += '<line x1="' + X(6).toFixed(1) + '" x2="' + X(6).toFixed(1) + '" y1="' + (mt - 4) + '" y2="' + (mt + ph) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3"/><text x="' + X(6).toFixed(1) + '" y="' + (mt - 9) + '" text-anchor="middle">GPU-uri noi</text>';
+    s += '<line x1="' + X(6).toFixed(1) + '" x2="' + X(6).toFixed(1) + '" y1="' + (mt - 4) + '" y2="' + (mt + ph) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3"/><text x="' + X(6).toFixed(1) + '" y="' + (mt - 9) + '" text-anchor="middle">GPU-uri noi</text>';
     [0, 2, 4, 6, 8, 10].forEach(function (y) { s += '<text x="' + X(y).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + (y === 0 ? 'start' : 'anul ' + y) + '</text>'; });
     function path(t) { return t.rows.map(function (r, i) { return (i ? 'L' : 'M') + X(r.y).toFixed(1) + ' ' + Y(r.cum).toFixed(1); }).join(''); }
     var labels = [];
@@ -280,12 +279,12 @@
     for (var yy = 0; yy <= 10; yy++) s += '<rect class="hit" data-y="' + yy + '" x="' + (X(yy) - pw / 20).toFixed(1) + '" y="' + mt + '" width="' + (pw / 10).toFixed(1) + '" height="' + ph + '" fill="transparent"/>';
     $('c-ten').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Banii adunați în zece ani. Varianta aleasă: ' + backSent(sel) + ', iar după zece ani rămân ' + mil(sel.rows[10].cum) + '.">' + s + '</svg>';
     // butoanele cu cele trei cazuri
-    $('cases').innerHTML = cs.map(function (c) { return '<button type="button" data-k="' + c.k + '" aria-pressed="' + (c.k === cur) + '">' + c.name + '<small>' + caseText(st.mode, c) + '</small></button>'; }).join('');
+    $('cases').innerHTML = cs.map(function (c) { return '<button type="button" data-k="' + c.k + '" aria-pressed="' + (c.k === cur) + '">' + c.name + '<small>' + caseText(c) + '</small></button>'; }).join('');
     // tabel pe ani
-    var h = '<thead><tr><th>Anul</th><th>Venituri</th><th>Cheltuieli</th><th>Rate</th>' + (cloud ? '<th>GPU noi</th>' : '') + '<th>Rămâne</th><th>Adunat</th></tr></thead><tbody>';
+    var h = '<thead><tr><th>Anul</th><th>Venituri</th><th>Cheltuieli</th><th>Rate</th><th>GPU noi</th><th>Rămâne</th><th>Adunat</th></tr></thead><tbody>';
     sel.rows.forEach(function (r) {
-      if (r.y === 0) { h += '<tr><td>start</td><td></td><td></td><td></td>' + (cloud ? '<td></td>' : '') + '<td class="neg">' + num(r.cash, 2) + '</td><td class="neg">' + num(r.cum, 2) + '</td></tr>'; return; }
-      h += '<tr><td>' + r.y + '</td><td>' + num(r.rev, 2) + '</td><td>' + num(-r.opex, 2) + '</td><td>' + num(-r.debt, 2) + '</td>' + (cloud ? '<td>' + (r.refresh ? num(-r.refresh, 2) : '') + '</td>' : '') +
+      if (r.y === 0) { h += '<tr><td>start</td><td></td><td></td><td></td><td></td><td class="neg">' + num(r.cash, 2) + '</td><td class="neg">' + num(r.cum, 2) + '</td></tr>'; return; }
+      h += '<tr><td>' + r.y + '</td><td>' + num(r.rev, 2) + '</td><td>' + num(-r.opex, 2) + '</td><td>' + num(-r.debt, 2) + '</td><td>' + (r.refresh ? num(-r.refresh, 2) : '') + '</td>' +
         '<td class="' + (r.cash < 0 ? 'neg' : 'pos') + '">' + num(r.cash, 2) + '</td><td class="' + (r.cum < 0 ? 'neg' : 'pos') + '">' + num(r.cum, 2) + '</td></tr>';
     });
     $('t-ten').innerHTML = h + '</tbody>';
@@ -298,13 +297,13 @@
     return '<b>Anul ' + y + '</b>' + row('Venituri', r.rev) + row('Cheltuieli', -r.opex) + row('Rate la credite', -r.debt) + (r.refresh ? row('GPU-uri noi, bani proprii', -r.refresh) : '') + row('Rămâne în an', r.cash) + row('Adunat de la început', r.cum);
   }
   function drawSens() {
-    var cloud = st.mode === 'cloud', P = cloud ? [2.5, 3.5, 4.5, 5.5, 6.5] : [110, 130, 150, 180, 220], O = cloud ? [0.5, 0.65, 0.75, 0.85, 0.95] : [0.65, 0.75, 0.85, 0.95], c0 = getPO(st.mode);
-    var h = '<thead><tr><th><span>' + (cloud ? '€ pe oră' : '€ pe kW') + ' ↓</span> <span>ocupare →</span></th>' + O.map(function (o) { return '<th>' + pct(o) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    var P = [2.5, 3.5, 4.5, 5.5, 6.5], O = [0.5, 0.65, 0.75, 0.85, 0.95], c0 = getPO();
+    var h = '<thead><tr><th><span>€ pe oră ↓</span> <span>ocupare →</span></th>' + O.map(function (o) { return '<th>' + pct(o) + '</th>'; }).join('') + '</tr></thead><tbody>';
     P.forEach(function (p) {
-      h += '<tr><td>' + (cloud ? trim(num(p, 1)) : num(p)) + '</td>' + O.map(function (o) {
-        var t = withPO(st.mode, p, o, function () { return tenOf(st.it, st.pv, st.bess, st.mode, cache.year, st.fund); });
+      h += '<tr><td>' + trim(num(p, 1)) + '</td>' + O.map(function (o) {
+        var t = withPO(p, o, function () { return tenOf(st.it, st.pv, st.bess, cache.year, st.fund); });
         var cls = (t.breakeven ? (t.breakeven <= 5 ? 'g' : '') : 'b') + (Math.abs(p - c0.p) < 1e-6 && Math.abs(o - c0.o) < 1e-6 ? ' cur' : '');
-        return '<td class="' + cls + '"><button type="button" data-p="' + p + '" data-o="' + o + '" aria-label="' + (cloud ? p + ' euro pe oră' : p + ' euro pe kW') + ', ocupare ' + pct(o) + ': ' + backSent(t) + '">' + (t.breakeven ? 'anul ' + t.breakeven : 'nu') + '</button></td>';
+        return '<td class="' + cls + '"><button type="button" data-p="' + p + '" data-o="' + o + '" aria-label="' + trim(num(p, 1)) + ' euro pe oră, ocupare ' + pct(o) + ': ' + backSent(t) + '">' + (t.breakeven ? 'anul ' + t.breakeven : 'nu') + '</button></td>';
       }).join('') + '</tr>';
     });
     $('t-sens').innerHTML = h + '</tbody>';
@@ -314,17 +313,17 @@
   function scenCols() {
     return ['pilot', 'mediu', 'mare'].map(function (k) {
       var s = M.SCEN[k], y = scenYear(k);
-      return { s: s, y: y, ph: M.physical(s.it, s.pv, s.bess, A), cl: M.finance(s.it, s.pv, s.bess, A, 'cloud', y), co: M.finance(s.it, s.pv, s.bess, A, 'colo', y) };
+      return { s: s, y: y, ph: M.physical(s.it, s.pv, s.bess, A), cl: M.finance(s.it, s.pv, s.bess, A, SELL, y) };
     });
   }
   function cmpHead(cols) { return '<thead><tr><th></th>' + cols.map(function (c) { return '<th' + (c.s.key === st.scen ? ' class="on"' : '') + '><button type="button" data-s="' + c.s.key + '" aria-pressed="' + (c.s.key === st.scen) + '">' + c.s.name + '</button></th>'; }).join('') + '</tr></thead><tbody>'; }
   function cmpRow(cols, name, fn, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td>' + cols.map(function (c) { return '<td' + (c.s.key === st.scen ? ' class="on"' : '') + '>' + fn(c) + '</td>'; }).join('') + '</tr>'; }
   function drawFund() {
-    var cols = scenCols(), mode = st.mode;
+    var cols = scenCols();
     cols.forEach(function (c) {
-      c.f = mode === 'cloud' ? c.cl : c.co;
+      c.f = c.cl;
       c.fu = M.funding('none', c.f, c.s.bess, A);
-      c.t0 = tenOf(c.s.it, c.s.pv, c.s.bess, mode, c.y, 'none'); c.t1 = tenOf(c.s.it, c.s.pv, c.s.bess, mode, c.y, 'imm'); c.t2 = tenOf(c.s.it, c.s.pv, c.s.bess, mode, c.y, 'fptj');
+      c.t0 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'none'); c.t1 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'imm'); c.t2 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'fptj');
     });
     var h = cmpHead(cols);
     h += cmpRow(cols, 'Investiție', function (c) { return mil(c.f.capex.total); });
@@ -347,14 +346,13 @@
     var h = cmpHead(cols);
     R.forEach(function (r) { h += cmpRow(cols, r[0], function (c) { var n = r[['pilot', 'mediu', 'mare'].indexOf(c.s.key) + 1]; return n ? n : 'din afară'; }); });
     h += cmpRow(cols, 'Total oameni', function (c) { return { pilot: 6, mediu: 10, mare: 25 }[c.s.key]; }, 'sum');
-    h += cmpRow(cols, 'Salarii pe an, Cloud GPU', function (c) { return mil(c.cl.opex.staff); });
-    h += cmpRow(cols, 'Salarii pe an, Colocare', function (c) { return mil(c.co.opex.staff); });
+    h += cmpRow(cols, 'Salarii pe an', function (c) { return mil(c.cl.opex.staff); });
     $('t-team').innerHTML = h + '</tbody>';
   }
 
   function drawCompare() {
     var cols = scenCols();
-    cols.forEach(function (c) { c.tc = tenOf(c.s.it, c.s.pv, c.s.bess, 'cloud', c.y, st.fund); c.to = tenOf(c.s.it, c.s.pv, c.s.bess, 'colo', c.y, st.fund); });
+    cols.forEach(function (c) { c.tc = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, st.fund); });
     function sg(v) { return '<span style="color:var(--' + (v < 0 ? 'bad' : 'good') + ')">' + mil(v) + '</span>'; }
     var h = cmpHead(cols), fn = st.fund === 'none' ? 'fără fonduri' : st.fund === 'imm' ? 'cu grant IMM' : 'cu Fondul Tranziție Justă';
     h += cmpRow(cols, 'Puterea calculatoarelor', function (c) { return mw(c.s.it); });
@@ -366,18 +364,13 @@
     h += cmpRow(cols, 'Curent din soare și baterii', function (c) { return pct(c.y.coverage); });
     h += cmpRow(cols, 'Oameni', function (c) { return { pilot: 6, mediu: 10, mare: 25 }[c.s.key]; });
     h += cmpRow(cols, 'Durată până la pornire', function (c) { return CAL_TOTAL[c.s.key] + ' luni'; });
-    h += cmpRow(cols, '<b>Cloud GPU</b>: investiție', function (c) { return mil(c.cl.capex.total); }, 'sum');
+    h += cmpRow(cols, '<b>Investiție</b>', function (c) { return mil(c.cl.capex.total); }, 'sum');
+    h += cmpRow(cols, 'din care calculatoarele', function (c) { return mil(c.cl.capex.gpu); });
     h += cmpRow(cols, 'venituri pe an', function (c) { return mil(c.cl.rev.total); });
     h += cmpRow(cols, 'profit pe an', function (c) { return sg(c.cl.profit); });
     h += cmpRow(cols, 'grant posibil', function (c) { return mil(c.tc.grant); });
     h += cmpRow(cols, 'bani proprii, ' + fn, function (c) { return mil(c.tc.equity); });
     h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.tc); });
-    h += cmpRow(cols, '<b>Colocare</b>: investiție', function (c) { return mil(c.co.capex.total); }, 'sum');
-    h += cmpRow(cols, 'venituri pe an', function (c) { return mil(c.co.rev.total); });
-    h += cmpRow(cols, 'profit pe an', function (c) { return sg(c.co.profit); });
-    h += cmpRow(cols, 'grant posibil', function (c) { return mil(c.to.grant); });
-    h += cmpRow(cols, 'bani proprii, ' + fn, function (c) { return mil(c.to.equity); });
-    h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.to); });
     $('t-cmp').innerHTML = h + '</tbody>';
   }
 
@@ -392,8 +385,7 @@
       'Curent din rețea: ' + A.gridPrice + ' €/MWh cu tarife și taxe, fără TVA. Energia singură era ofertată la 620–700 lei/MWh în august 2026.',
       'Surplusul de la prânz se vinde cu ' + A.exportPrice + ' €/MWh.',
       'Teren: 15 €/m² pentru platforma clădirii, 1,5 €/m² pentru parcul de panouri.',
-      'Cloud GPU. Prudent: 3,5 € pe GPU pe oră și 65% ocupare. Piața de azi: 4,5 € și 75%. Bun: 5,5 € și 85%.',
-      'Colocare. Prudent: 130 € pe kW pe lună și 75% ocupare. Piața de azi: 150 € și 85%. Bun: 180 € și 95%. Curentul se refacturează clientului la prețul rețelei.',
+      'Vindem doar ore de GPU, pe calculatoarele noastre. ' + CASES.map(function (c) { return c.name + ': ' + trim(num(c.p, 1)) + ' € pe GPU pe oră și ' + pct(c.o) + ' ocupare'; }).join('. ') + '.',
       'Vremea: jumătate din zile senine, o treime cu nori, restul închise, cu producția lunară păstrată.',
       'Durată de folosire: GPU-uri ' + A.gpuLifeYears + ' ani, clădire ' + A.facilityLifeYears + ', panouri ' + A.pvLifeYears + ', baterii ' + A.bessLifeYears + '.',
       'Oameni: 6, 10 sau 25 de angajați, în funcție de mărime. Mentenanță: 2,5% pe an din valoarea clădirii și 1,5% din panouri și baterii.',
@@ -501,7 +493,6 @@
   function syncUi() {
     [].forEach.call($('scen').children, function (b) { b.setAttribute('aria-pressed', b.dataset.s === st.scen); });
     [].forEach.call($('wx').children, function (b) { b.setAttribute('aria-pressed', +b.dataset.w === st.wx); });
-    [].forEach.call($('mode').children, function (b) { b.setAttribute('aria-pressed', b.dataset.m === st.mode); });
     ['fund', 'fund2'].forEach(function (id) { [].forEach.call($(id).children, function (b) { b.setAttribute('aria-pressed', b.dataset.f === st.fund); }); });
     $('month').value = st.month; $('hour').value = st.hour;
     $('o-pv').textContent = trim(num(st.pv, 2)) + ' MW'; $('o-bess').textContent = trim(num(st.bess, 2)) + ' MWh';
@@ -592,9 +583,7 @@
     M.MONTHS.forEach(function (m, i) { var o = document.createElement('option'); o.value = i; o.textContent = cap(m); $('month').appendChild(o); });
     $('money-ctrls').innerHTML =
       '<div id="grp-cloud"><div class="ctrl"><label for="s-price">Preț pe GPU</label><output id="o-price" for="s-price"></output><input type="range" id="s-price" min="1.5" max="8" step="0.1" value="' + A.gpuHourPrice + '"></div>' +
-      '<div class="ctrl"><label for="s-occ">Cât timp sunt închiriate GPU-urile</label><output id="o-occ" for="s-occ"></output><input type="range" id="s-occ" min="30" max="95" step="1" value="' + A.occupancy * 100 + '"></div></div>' +
-      '<div id="grp-colo" hidden><div class="ctrl"><label for="s-colo">Chirie</label><output id="o-colo" for="s-colo"></output><input type="range" id="s-colo" min="80" max="250" step="5" value="' + A.coloPrice + '"></div>' +
-      '<div class="ctrl"><label for="s-cocc">Cât din spațiu este închiriat</label><output id="o-cocc" for="s-cocc"></output><input type="range" id="s-cocc" min="40" max="100" step="1" value="' + A.coloOccupancy * 100 + '"></div></div>';
+      '<div class="ctrl"><label for="s-occ">Cât timp sunt închiriate GPU-urile</label><output id="o-occ" for="s-occ"></output><input type="range" id="s-occ" min="30" max="95" step="1" value="' + A.occupancy * 100 + '"></div></div>';
     drawAssumptions();
 
     if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) $('hint').textContent = 'Trage cu degetul ca să rotești · două degete apropie';
@@ -623,14 +612,13 @@
     $('scen').addEventListener('click', scenClick);
     ['t-cmp', 't-fund', 't-team'].forEach(function (id) { $(id).addEventListener('click', scenClick); });
     $('wx').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { st.wx = +b.dataset.w; render(); } });
-    $('mode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { st.mode = b.dataset.m; render(); } });
     function fundClick(e) { var b = e.target.closest('button'); if (b) { st.fund = b.dataset.f; render(); } }
     $('fund').addEventListener('click', fundClick); $('fund2').addEventListener('click', fundClick);
     $('cases').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      var c = CASES[st.mode].filter(function (x) { return x.k === b.dataset.k; })[0]; if (c) { setPO(st.mode, c.p, c.o); render(); }
+      var c = CASES.filter(function (x) { return x.k === b.dataset.k; })[0]; if (c) { setPO(c.p, c.o); render(); }
     });
-    $('t-sens').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { setPO(st.mode, +b.dataset.p, +b.dataset.o); render(); } });
+    $('t-sens').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { setPO(+b.dataset.p, +b.dataset.o); render(); } });
     $('s-loan').addEventListener('input', function () { A.loanShare = +this.value / 100; render(); });
     $('s-int').addEventListener('input', function () { A.interest = +this.value / 100; render(); });
     $('month').addEventListener('change', function () { st.month = +this.value; render(); });
@@ -642,7 +630,6 @@
     $('money-ctrls').addEventListener('input', function (e) {
       var v = +e.target.value;
       if (e.target.id === 's-price') A.gpuHourPrice = v; else if (e.target.id === 's-occ') A.occupancy = v / 100;
-      else if (e.target.id === 's-colo') A.coloPrice = v; else if (e.target.id === 's-cocc') A.coloOccupancy = v / 100;
       render();
     });
     $('prev').addEventListener('click', function () { goChapter(st.ch - 1); });

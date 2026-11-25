@@ -7,6 +7,6 @@
     flows.fiberB = new Flow(fg, [[xF + 3, D / 2], [xF + 3, zRoad - 9], [x1 + 60 * k, zRoad - 9]], COL.fiber, k * 0.7, 8);
     flows.fiberA.set(0.5, 1); flows.fiberB.set(0.5, -1);
     var zGm = zGen0 + (nGen - 1) * gStep / 2;
-    flows.gen = new Flow(fg, [[xGen, zGm], [-W / 2, zGm]], COL.gen, k, 6);
-    puffGen = new Puffs(root, genO, SH.smoke, 0.8 * genS, 9, 4); puffGen.on = outage === 2 ? 1 : 0;
+    flows.gen = new Flow(fg, [[xGen + genLen / 2 + 0.4, zGen0], [-W / 2 - 1.6, zGen0], [-W / 2 - 1.6, zGm], [-W / 2, zGm]], COL.gen, k, 6);      // pe canalul de cabluri, nu pe sub rezervoare
+    puffGen = new Puffs(root, genO, SH.smoke, 1.4 * genS, 9, 4); puffGen.on = outage === 2 ? 1 : 0;
     puffHeat = new Puffs(root, coolO, SH.heat, 1.5, 11, 3); puffHeat.on = thermal ? 1 : 0;

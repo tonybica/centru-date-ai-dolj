@@ -1,6 +1,6 @@
 const { chromium, devices } = require('playwright'); const path = require('path');
 (async () => {
-  const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  const b = await chromium.launch({ args: process.env.NOGL ? ['--disable-gpu'] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const d = Object.assign({}, devices['Galaxy S8']); delete d.defaultBrowserType; d.deviceScaleFactor = 1;
   const ctx = await b.newContext(d); const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push('PAGEERROR ' + e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
@@ -8,8 +8,8 @@ const { chromium, devices } = require('playwright'); const path = require('path'
   const bad = [];
   for (const scen of ['pilot', 'mediu', 'mare']) {
     await p.evaluate(s => document.querySelector(`#scen button[data-s="${s}"]`).click(), scen);
-    for (const mode of ['cloud', 'colo']) {
-      await p.evaluate(m => document.querySelector(`#mode button[data-m="${m}"]`).click(), mode);
+    for (const mode of ['gpu']) {   // un singur fel de venit: ore de GPU (colocarea a fost scoasa)
+      if (await p.evaluate(() => !!document.querySelector('#mode'))) bad.push({ scen, err: 'comutatorul de venit inca exista' });
       for (let i = 0; i < 16; i++) {
         await p.evaluate(i => document.querySelectorAll('#toc button')[i].click(), i); await p.waitForTimeout(120);
         const r = await p.evaluate(() => { [...document.querySelectorAll('.chapter:not([hidden]) details')].forEach(x => x.open = true);

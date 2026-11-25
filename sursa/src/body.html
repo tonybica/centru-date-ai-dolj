@@ -71,7 +71,7 @@
           <p>Cea mai mare cheltuială lunară este curentul. De aceea lângă clădire stau un parc fotovoltaic și baterii. Soarele din Dolj acoperă o parte din consum, iar restul vine din rețea.</p>
           <dl class="stats">
             <div class="stat"><dt>Puterea calculatoarelor</dt><dd><span data-v="it"></span><small><span data-v="gpus"></span> GPU-uri</small></dd></div>
-            <div class="stat"><dt>Investiție</dt><dd><span data-v="capexCloud"></span><small><span data-v="capexColo"></span> fără calculatoare</small></dd></div>
+            <div class="stat"><dt>Investiție</dt><dd><span data-v="capexTotal"></span><small>din care <span data-v="capexGpu"></span> calculatoarele</small></dd></div>
             <div class="stat"><dt>Teren</dt><dd><span data-v="landHa"></span> ha<small>din care <span data-v="pvHa"></span> ha panouri</small></dd></div>
             <div class="stat"><dt>Curent din soare și baterii</dt><dd><span data-v="coverage"></span><small>restul din rețea</small></dd></div>
           </dl>
@@ -235,7 +235,6 @@
             <tbody>
               <tr><td><b>GPU pe contract</b></td><td>Firme de AI, furnizori mari de cloud</td><td>Preț fix pe 1–3 ani. Venit sigur, baza planului.</td></tr>
               <tr><td><b>GPU la cerere</b></td><td>Startup-uri, cercetători</td><td>Cu ora, mai scump, fără angajament.</td></tr>
-              <tr><td><b>Colocare</b></td><td>Bănci, spitale, firme cu servere proprii</td><td>Chirie pe kW pe lună, plus curentul.</td></tr>
               <tr><td><b>Servicii</b></td><td>Clienți fără echipă tehnică</td><td>Abonament pentru administrare, stocare, suport.</td></tr>
             </tbody>
           </table></div>
@@ -253,19 +252,16 @@
 
         <article class="chapter" data-title="Banii" data-view="overview" hidden>
           <p class="eyebrow"></p>
-          <h2>Două feluri de a câștiga bani</h2>
-          <div class="seg wide" id="mode" role="group" aria-label="Modelul de afacere">
-            <button type="button" data-m="cloud" aria-pressed="true">Cloud GPU</button>
-            <button type="button" data-m="colo" aria-pressed="false">Colocare</button>
-          </div>
-          <p data-v="modeDesc"></p>
+          <h2>Cum câștigăm bani</h2>
+          <p><b>Închiriem putere de calcul.</b> Cumpărăm noi calculatoarele cu GPU-uri și le închiriem cu ora sau pe contract. Investiția este mare, venitul este mare și riscul este mare: GPU-urile se demodează în 4–6 ani.</p>
+          <p class="note" data-v="prudentLine"></p>
           <h3>Investiția: <span data-v="capexTotal"></span></h3>
           <div class="bars" id="c-capex"></div>
           <h3>Un an de funcționare</h3>
           <div id="money-ctrls"></div>
           <div class="tblwrap"><table id="t-pl"></table></div>
           <p data-v="paybackLine"></p>
-          <h3 data-v="unitTitle"></h3>
+          <h3>Cât ne costă o oră de GPU</h3>
           <div class="bars" id="c-unit"></div>
           <p data-v="unitLine"></p>
           <p class="note" data-v="solarLine"></p>
@@ -275,7 +271,7 @@
         <article class="chapter" data-title="Zece ani" data-view="overview" hidden>
           <p class="eyebrow"></p>
           <h2>Zece ani, an cu an</h2>
-          <p>Capitolul „Banii” arată un an obișnuit. Viața reală este mai aspră: clienții vin treptat, creditul se plătește în fiecare an, iar <span data-v="tenIntro"></span></p>
+          <p>Capitolul „Banii” arată un an obișnuit. Viața reală este mai aspră: clienții vin treptat, creditul se plătește în fiecare an, iar GPU-urile se înlocuiesc după cinci ani.</p>
           <h4 id="cases-lbl">Trei feluri în care poate merge piața</h4>
           <div class="cases" id="cases" role="group" aria-labelledby="cases-lbl"></div>
           <div class="ctrl"><label for="s-loan">Cât din bani vine din credit</label><output id="o-loan" for="s-loan"></output><input type="range" id="s-loan" min="0" max="80" step="5" value="50"></div>
@@ -373,7 +369,6 @@
             </div>
           </div>
           <h3>Ce schimbă la cifre</h3>
-          <p>Tabelul folosește modelul ales în capitolul „Banii”: <b data-v="modeName"></b>.</p>
           <div class="tblwrap"><table class="cmp" id="t-fund"></table></div>
           <p class="fine"><span data-v="caseNow"></span> Cele trei cazuri de preț se aleg în capitolul „Zece ani”.</p>
           <div class="seg wide wrap" id="fund2" role="group" aria-label="Fonduri folosite în calcul">
@@ -460,7 +455,7 @@
           <div class="tblwrap"><table class="cmp" id="t-cmp"></table></div>
           <p class="fine"><span data-v="caseNow"></span> Creditul și fondurile sunt cele alese în capitolul „Zece ani”.</p>
           <p><b>Recomandare:</b> terenul și racordul la rețea se aleg pentru mărimea Mare, iar construcția începe cu mărimea Pilot. Așa riscăm puțin la început și avem unde crește.</p>
-          <p class="note">La mărimea Pilot, colocarea abia își acoperă costurile fixe. Varianta mică are sens cu GPU-uri proprii sau ca primă etapă dintr-un proiect mai mare.</p>
+          <p class="note" data-v="prudentLine"></p>
         </article>
 
         <article class="chapter" data-title="Riscuri" data-view="overview" hidden>
@@ -468,9 +463,9 @@
           <h2>Ce poate merge prost și ce facem</h2>
           <div class="risks">
             <div class="risk"><h4>Nu vin clienții</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Fără contracte, calculatoarele stau și pierd valoare. <b>Ce facem:</b> scrisori de intenție înainte de construcție, „pasul zero” ca să avem deja clienți, pornire cu mărimea Pilot.</p></div>
-            <div class="risk"><h4>Scade chiria GPU-urilor</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Prețurile se pot schimba cu zeci de procente într-un an. <b>Ce facem:</b> contracte pe 1–3 ani cu preț fix, planul făcut pe prețuri prudente, o parte din spațiu dată în colocare.</p></div>
+            <div class="risk"><h4>Scade chiria GPU-urilor</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Prețurile se pot schimba cu zeci de procente într-un an. <b>Ce facem:</b> contracte pe 1–3 ani cu preț fix și planul făcut pe prețuri prudente.</p></div>
             <div class="risk"><h4>Racordul întârzie sau costă mult</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="hi">Lovitură mare</span></p><p>Operatorul poate cere întăriri de rețea plătite de noi. <b>Ce facem:</b> întrebăm ce putere este disponibilă înainte să cumpărăm terenul și alegem un loc lângă o stație.</p></div>
-            <div class="risk"><h4>Se scumpește curentul</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Curentul este cea mai mare cheltuială lunară. <b>Ce facem:</b> panouri și baterii proprii, contract de energie pe termen lung, curentul trecut în factura clientului la colocare.</p></div>
+            <div class="risk"><h4>Se scumpește curentul</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Curentul este cea mai mare cheltuială lunară. <b>Ce facem:</b> panouri și baterii proprii și contract de energie pe termen lung.</p></div>
             <div class="risk"><h4>Nu iese finanțarea</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="hi">Lovitură mare</span></p><p>Fondurile europene sunt o competiție, iar banca cere garanții. <b>Ce facem:</b> planul trebuie să stea în picioare și fără grant, construim în etape, căutăm un partener cu capital.</p></div>
             <div class="risk"><h4>Echipamentul se demodează</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="mid">Lovitură medie</span></p><p>O generație nouă de GPU-uri apare la 1–2 ani. <b>Ce facem:</b> punem bani deoparte pentru înlocuire în anul 6 și construim clădirea astfel încât să primească rackuri mai puternice.</p></div>
             <div class="risk"><h4>Concurentul mare de lângă noi</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>ClusterPower poate lua clienții mari și oamenii buni. <b>Ce facem:</b> țintim clienții mici și mijlocii și oferim ce un gigant nu oferă, adică flexibilitate și răspuns rapid.</p></div>
