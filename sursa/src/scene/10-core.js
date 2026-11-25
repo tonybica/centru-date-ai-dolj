@@ -295,7 +295,7 @@ var Scene3D = (function () {
     SH.tire = M(0x15171a, { roughness: 0.95 });
     SH.wood = M(0xb08a5a, { roughness: 0.8 });
     SH.box = M(0xb89a6a, { roughness: 0.95 });
-    SH.contain = M(0xbfe0ee, { roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, env: 1.4 });
+    SH.contain = M(0xcfe6f0, { roughness: 0.08, metalness: 0, transparent: true, opacity: 0.2, depthWrite: false, env: 1.2 });
     SH.cabF = M(0xffffff, { map: TEX.cab, roughness: 0.5, metalness: 0.4, emissive: 0xffffff, emissiveMap: TEX.cabE, emissiveIntensity: 1 });
     SH.rackFront = M(0xffffff, { map: TEX.rack, roughness: 0.55, metalness: 0.4, emissive: 0xffffff, emissiveMap: TEX.rackE, emissiveIntensity: 1.6 });
     SH.rackBody = M(0x1b2024, { roughness: 0.5, metalness: 0.5 });
@@ -313,10 +313,10 @@ var Scene3D = (function () {
     SH.wire = new T.LineBasicMaterial({ color: 0x2c3236 });
     SH.hot = B(0xe8573f, { transparent: true, opacity: 0.16, depthWrite: false }); SH.cold = B(0x3f8fe8, { transparent: true, opacity: 0.12, depthWrite: false });
     SH.screen = B(0x7fd6ff); SH.led = B(0x35e08a); SH.upsLed = B(0x35e08a);
-    SH.zone = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
+    SH.zone = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0, visible: false });
     SH.cloud = new T.MeshBasicMaterial({ map: TEX.shade, transparent: true, opacity: 0.3, depthWrite: false, fog: false });
     SH.lampHead = B(0x8a8f8c);
-    SH.smoke = new T.MeshBasicMaterial({ color: 0x6f6f6f, transparent: true, opacity: 0.34, depthWrite: false, toneMapped: false });
+    SH.smoke = new T.MeshBasicMaterial({ color: 0x6f6f6f, transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false });
     SH.heat = B(0xff9a3c, { transparent: true, opacity: 0.3, depthWrite: false });
     SH.glow = new T.MeshBasicMaterial({ map: TEX.glow, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false });
     SH.carPaint = [0xb5332b, 0xeef0f0, 0x2b5596, 0x30353a, 0xcfc9bb, 0x7d868c].map(function (c) { return M(c, { roughness: 0.28, metalness: 0.55, env: 2.2 }); });
@@ -328,7 +328,7 @@ var Scene3D = (function () {
       [SH.louver, warm], [SH.door, cool], [SH.coil, 0xf2883a], [SH.trafo, 0xe2603c], [SH.trafoFin, 0xee7440], [SH.ceramic, warm], [SH.frame, warm], [SH.panelBack, warm], [SH.panel, 0xa868d0], [SH.green, 0x5a40a8],
       [SH.blue, 0x2fb4ff], [SH.red, 0xff6a2a], [SH.leaf, 0x141c50], [SH.trunk, 0x141c50], [SH.glass, 0x34389a], [SH.carGlass, 0x34389a], [SH.tire, 0x2a2a70], [SH.wood, 0x3a3a96], [SH.box, 0x3a3a96], [SH.contain, 0xf2a060],
       [SH.cabF, 0xe07038], [SH.rackFront, 0xffe070], [SH.rackBody, vhot], [SH.rackAlt, 0xf2883a], [SH.copper, 0xfff2a8], [SH.pcb, 0xff9a3c], [SH.person, 0xf29a3c], [SH.pants, 0xe08a3c], [SH.skin, 0xf2a03c], [SH.helmet, 0xf29a3c],
-      [SH.hazard, cool], [SH.sign, cool], [SH.fan, 0xf2883a]].map(function (e) { return { m: e[0], hot: e[1], base: e[0].color.getHex(), map: e[0].map || null }; });
+      [SH.hazard, cool], [SH.sign, cool], [SH.fan, 0xf2883a]].map(function (e) { return { m: e[0], hot: e[1], base: e[0].color.getHex(), map: e[0].map || null, metal: e[0].metalness }; });
     SH.crops.forEach(function (m) { THERM.push({ m: m, hot: 0x121844, base: m.color.getHex(), map: m.map }); });
     SH.carPaint.forEach(function (m) { THERM.push({ m: m, hot: 0x3a3a96, base: m.color.getHex(), map: null }); });
   }
@@ -423,67 +423,3 @@ var Scene3D = (function () {
     me.position.set((xa + xb) / 2, h / 2, (za + zb) / 2); me.userData.pick = id; me.renderOrder = -1; parent.add(me); pickObjs.push(me);
   }
   function disposeTree(o) { o.traverse(function (c) { if (c.geometry) c.geometry.dispose(); }); }
-
-  /* ---------- fluxuri de energie: cablu pe sol + puncte care curg ---------- */
-  function Flow(parent, pts, color, k, n) {
-    this.pts = pts.map(function (p) { return new T.Vector3(p[0], 0.35 * k, p[1]); });
-    this.seg = []; this.len = 0;
-    for (var i = 1; i < this.pts.length; i++) { var d = this.pts[i].distanceTo(this.pts[i - 1]); this.seg.push(d); this.len += d; }
-    this.k = k; this.n = n || 10; this.phase = 0; this.dir = 1; this.power = 0; this.active = 0;
-    var cm = B(color, { transparent: true, opacity: 0.35 });
-    this.cableMat = cm; this.group = new T.Group(); parent.add(this.group);
-    for (i = 1; i < this.pts.length; i++) {
-      var a = this.pts[i - 1], b = this.pts[i], mid = a.clone().add(b).multiplyScalar(0.5);
-      var me = new T.Mesh(new T.BoxGeometry(0.45 * k, 0.1 * k, this.seg[i - 1] + 0.45 * k), cm);
-      me.position.copy(mid); me.lookAt(b); this.group.add(me);
-    }
-    this.dotMat = B(color);
-    this.dots = [];
-    var sg = new T.SphereGeometry(1, 12, 8);
-    for (i = 0; i < this.n; i++) { var s = new T.Mesh(sg, this.dotMat); s.visible = false; this.group.add(s); this.dots.push(s); }
-  }
-  Flow.prototype.at = function (u, out) {
-    var d = u * this.len;
-    for (var i = 0; i < this.seg.length; i++) {
-      if (d <= this.seg[i] || i === this.seg.length - 1) { return out.copy(this.pts[i]).lerp(this.pts[i + 1], Math.min(1, d / this.seg[i])); }
-      d -= this.seg[i];
-    }
-    return out;
-  };
-  Flow.prototype.set = function (frac, dir, color) {   // frac 0..1 = cat de mult curge
-    this.power = Math.max(0, Math.min(1, frac)); this.dir = dir || 1;
-    if (color !== undefined) { this.dotMat.color.setHex(color); this.cableMat.color.setHex(color); }
-    this.active = this.power > 0.004 ? Math.max(2, Math.round(this.n * (0.25 + 0.75 * this.power))) : 0;
-    this.cableMat.opacity = this.active ? 0.62 : 0.2;
-  };
-  Flow.prototype.update = function (dt, camPos) {
-    var speed = (16 + 26 * this.power) * this.k / this.len;
-    if (!reduced) this.phase = (this.phase + dt * speed) % 1;
-    for (var i = 0; i < this.n; i++) {
-      var s = this.dots[i];
-      if (i >= this.active) { s.visible = false; continue; }
-      var u = (i / this.active + this.phase) % 1; if (this.dir < 0) u = 1 - u;
-      this.at(u, s.position); s.position.y += 0.5 * this.k; s.visible = true;
-      s.scale.setScalar(Math.max(0.12, s.position.distanceTo(camPos) * 0.0052));
-    }
-  };
-
-  /* ---------- pufuri care urca: fum la generatoare, caldura la racitoare ---------- */
-  function Puffs(parent, origins, mat, size, rise, n) {
-    this.items = []; this.on = 0; this.rise = rise; this.size = size;
-    var g = new T.SphereGeometry(1, 8, 6);
-    for (var i = 0; i < origins.length; i++) for (var j = 0; j < n; j++) {
-      var m = new T.Mesh(g, mat); m.visible = false; parent.add(m);
-      this.items.push({ m: m, o: origins[i], ph: ((j + i * 0.37) / n) % 1 });
-    }
-  }
-  Puffs.prototype.update = function (dt) {
-    for (var i = 0; i < this.items.length; i++) {
-      var it = this.items[i];
-      if (this.on <= 0.01) { it.m.visible = false; continue; }
-      if (!reduced) it.ph = (it.ph + dt * 0.32) % 1;
-      var p = it.ph; it.m.visible = true;
-      it.m.position.set(it.o[0] + Math.sin(p * 9 + i) * 0.4 * this.size, it.o[1] + p * this.rise, it.o[2] + Math.cos(p * 7 + i) * 0.4 * this.size);
-      it.m.scale.setScalar(this.size * (0.45 + p * 1.3) * (p > 0.8 ? (1 - p) * 5 : 1) * this.on);
-    }
-  };

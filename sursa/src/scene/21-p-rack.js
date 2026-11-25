@@ -1,0 +1,41 @@
+  function rackDetail(parent, x, z) {       // un rack desenat in detaliu: usa se deschide, un server iese pe sine
+    var g = new T.Group(); g.position.set(x, 0.3, z); parent.add(g);
+    [[-0.57, -0.27], [-0.57, 0.27], [0.57, -0.27], [0.57, 0.27]].forEach(function (c) { box(g, 0.06, 2.2, 0.06, SH.rackBody, c[0], 1.1, c[1], false); });
+    box(g, 1.2, 0.06, 0.6, SH.rackBody, 0, 2.17, 0); box(g, 1.2, 0.06, 0.6, SH.rackBody, 0, 0.03, 0, false);
+    box(g, 1.14, 2.08, 0.02, SH.rackBody, 0, 1.1, -0.29, false); box(g, 0.02, 2.08, 0.56, SH.rackBody, -0.59, 1.1, 0, false);
+    cyl(g, 0.028, 0.028, 2.0, SH.blue, -0.5, 1.1, -0.2, 8, null, false); cyl(g, 0.028, 0.028, 2.0, SH.red, -0.5, 1.1, 0.2, 8, null, false);     // colectoarele de lichid
+    box(g, 0.05, 1.9, 0.05, SH.copper, -0.5, 1.1, 0, false);                                                                                   // bara de alimentare
+    box(g, 0.04, 1.9, 0.07, SH.dark, 0.5, 1.1, -0.255, false); for (var q = 0; q < 12; q++) box(g, 0.012, 0.02, 0.02, SH.led, 0.522, 0.35 + q * 0.14, -0.255, false);   // priza verticala
+    box(g, 1.0, 0.2, 0.5, SH.silver, 0.02, 0.17, 0, false); box(g, 0.012, 0.03, 0.4, SH.led, 0.53, 0.17, 0, false);
+    box(g, 0.8, 0.09, 0.5, SH.rackAlt, 0.12, 2.06, 0, false); box(g, 0.012, 0.04, 0.44, SH.led, 0.525, 2.06, 0, false);
+    var out = { g: g, door: null, server: null, cover: null }, m;
+    for (var i = 0; i < 4; i++) {
+      var s = new T.Group(); s.position.set(0.02, 0.32 + i * 0.42, 0); g.add(s);
+      if (i !== 2) {
+        box(s, 1.0, 0.36, 0.5, SH.dark, 0, 0.18, 0, false);
+        box(s, 0.02, 0.32, 0.48, SH.rackAlt, 0.51, 0.18, 0, false); box(s, 0.012, 0.03, 0.3, SH.led, 0.522, 0.3, 0, false);
+        for (m = 0; m < 6; m++) box(s, 0.014, 0.2, 0.05, SH.dark, 0.522, 0.15, -0.19 + m * 0.076, false);
+        continue;
+      }
+      out.server = s;
+      box(s, 1.0, 0.02, 0.5, SH.steel, 0, 0.01, 0, false);
+      box(s, 1.0, 0.34, 0.012, SH.rackAlt, 0, 0.18, -0.244, false); box(s, 1.0, 0.34, 0.012, SH.rackAlt, 0, 0.18, 0.244, false);
+      box(s, 0.02, 0.34, 0.5, SH.rackAlt, 0.5, 0.18, 0, false); box(s, 0.012, 0.03, 0.3, SH.led, 0.512, 0.3, 0, false);
+      box(s, 0.4, 0.016, 0.44, SH.pcb, -0.16, 0.03, 0, false);                                                     // placa de baza
+      box(s, 0.09, 0.07, 0.09, SH.silver, -0.12, 0.075, -0.1, false); box(s, 0.09, 0.07, 0.09, SH.silver, -0.12, 0.075, 0.1, false);   // procesoare
+      for (m = 0; m < 8; m++) box(s, 0.13, 0.05, 0.008, SH.dark, -0.27, 0.065, -0.2 + m * 0.057, false);          // memorie
+      for (m = 0; m < 4; m++) box(s, 0.16, 0.1, 0.1, SH.silver, -0.41, 0.07, -0.18 + m * 0.12, false);             // surse
+      for (m = 0; m < 8; m++) {                                                                                      // cele 8 GPU-uri, fiecare cu placa de racire
+        var gz = -0.203 + m * 0.058;
+        box(s, 0.36, 0.24, 0.014, SH.pcb, 0.27, 0.15, gz, false);
+        box(s, 0.16, 0.13, 0.022, SH.copper, 0.27, 0.17, gz + 0.018, false);
+      }
+      cyl(s, 0.011, 0.011, 0.46, SH.blue, 0.31, 0.295, 0, 6, [Math.PI / 2, 0, 0], false); cyl(s, 0.011, 0.011, 0.46, SH.red, 0.23, 0.295, 0, 6, [Math.PI / 2, 0, 0], false);
+      cyl(s, 0.011, 0.011, 0.75, SH.blue, -0.07, 0.295, -0.22, 6, [0, 0, Math.PI / 2], false); cyl(s, 0.011, 0.011, 0.67, SH.red, -0.11, 0.295, 0.22, 6, [0, 0, Math.PI / 2], false);
+      out.cover = mesh(s, new T.BoxGeometry(1.0, 0.016, 0.5), SH.rackAlt, 0, 0.352, 0, false);
+    }
+    var d = new T.Group(); d.position.set(0.61, 0, -0.3); g.add(d);
+    box(d, 0.02, 2.1, 0.6, SH.rackFront, 0, 1.1, 0.3, false);
+    out.door = d;
+    return out;
+  }

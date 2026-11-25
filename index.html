@@ -341,7 +341,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
       </div>
       <div class="dock">
         <div class="dock-row">
-          <button type="button" class="btn" id="play" aria-pressed="false">▶ O zi întreagă</button>
+          <button type="button" class="btn" id="play" aria-pressed="false">▶ Rulează 24 de ore</button>
           <div class="time">
             <output id="clock" for="hour">13:00</output>
             <input type="range" id="hour" min="0" max="23.75" step="0.25" value="13" aria-label="Ora din zi">
@@ -1421,7 +1421,7 @@ var Scene3D = (function () {
     SH.tire = M(0x15171a, { roughness: 0.95 });
     SH.wood = M(0xb08a5a, { roughness: 0.8 });
     SH.box = M(0xb89a6a, { roughness: 0.95 });
-    SH.contain = M(0xbfe0ee, { roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, env: 1.4 });
+    SH.contain = M(0xcfe6f0, { roughness: 0.08, metalness: 0, transparent: true, opacity: 0.2, depthWrite: false, env: 1.2 });
     SH.cabF = M(0xffffff, { map: TEX.cab, roughness: 0.5, metalness: 0.4, emissive: 0xffffff, emissiveMap: TEX.cabE, emissiveIntensity: 1 });
     SH.rackFront = M(0xffffff, { map: TEX.rack, roughness: 0.55, metalness: 0.4, emissive: 0xffffff, emissiveMap: TEX.rackE, emissiveIntensity: 1.6 });
     SH.rackBody = M(0x1b2024, { roughness: 0.5, metalness: 0.5 });
@@ -1439,10 +1439,10 @@ var Scene3D = (function () {
     SH.wire = new T.LineBasicMaterial({ color: 0x2c3236 });
     SH.hot = B(0xe8573f, { transparent: true, opacity: 0.16, depthWrite: false }); SH.cold = B(0x3f8fe8, { transparent: true, opacity: 0.12, depthWrite: false });
     SH.screen = B(0x7fd6ff); SH.led = B(0x35e08a); SH.upsLed = B(0x35e08a);
-    SH.zone = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
+    SH.zone = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0, visible: false });
     SH.cloud = new T.MeshBasicMaterial({ map: TEX.shade, transparent: true, opacity: 0.3, depthWrite: false, fog: false });
     SH.lampHead = B(0x8a8f8c);
-    SH.smoke = new T.MeshBasicMaterial({ color: 0x6f6f6f, transparent: true, opacity: 0.34, depthWrite: false, toneMapped: false });
+    SH.smoke = new T.MeshBasicMaterial({ color: 0x6f6f6f, transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false });
     SH.heat = B(0xff9a3c, { transparent: true, opacity: 0.3, depthWrite: false });
     SH.glow = new T.MeshBasicMaterial({ map: TEX.glow, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false });
     SH.carPaint = [0xb5332b, 0xeef0f0, 0x2b5596, 0x30353a, 0xcfc9bb, 0x7d868c].map(function (c) { return M(c, { roughness: 0.28, metalness: 0.55, env: 2.2 }); });
@@ -1454,7 +1454,7 @@ var Scene3D = (function () {
       [SH.louver, warm], [SH.door, cool], [SH.coil, 0xf2883a], [SH.trafo, 0xe2603c], [SH.trafoFin, 0xee7440], [SH.ceramic, warm], [SH.frame, warm], [SH.panelBack, warm], [SH.panel, 0xa868d0], [SH.green, 0x5a40a8],
       [SH.blue, 0x2fb4ff], [SH.red, 0xff6a2a], [SH.leaf, 0x141c50], [SH.trunk, 0x141c50], [SH.glass, 0x34389a], [SH.carGlass, 0x34389a], [SH.tire, 0x2a2a70], [SH.wood, 0x3a3a96], [SH.box, 0x3a3a96], [SH.contain, 0xf2a060],
       [SH.cabF, 0xe07038], [SH.rackFront, 0xffe070], [SH.rackBody, vhot], [SH.rackAlt, 0xf2883a], [SH.copper, 0xfff2a8], [SH.pcb, 0xff9a3c], [SH.person, 0xf29a3c], [SH.pants, 0xe08a3c], [SH.skin, 0xf2a03c], [SH.helmet, 0xf29a3c],
-      [SH.hazard, cool], [SH.sign, cool], [SH.fan, 0xf2883a]].map(function (e) { return { m: e[0], hot: e[1], base: e[0].color.getHex(), map: e[0].map || null }; });
+      [SH.hazard, cool], [SH.sign, cool], [SH.fan, 0xf2883a]].map(function (e) { return { m: e[0], hot: e[1], base: e[0].color.getHex(), map: e[0].map || null, metal: e[0].metalness }; });
     SH.crops.forEach(function (m) { THERM.push({ m: m, hot: 0x121844, base: m.color.getHex(), map: m.map }); });
     SH.carPaint.forEach(function (m) { THERM.push({ m: m, hot: 0x3a3a96, base: m.color.getHex(), map: null }); });
   }
@@ -1616,12 +1616,45 @@ var Scene3D = (function () {
 
 
   /* ---------- piese: fiecare functie pune un obiect intreg la locul lui ---------- */
-  function person(parent, x, y, z) {
-    box(parent, 0.13, 0.82, 0.15, SH.pants, x - 0.09, y + 0.41, z, false); box(parent, 0.13, 0.82, 0.15, SH.pants, x + 0.09, y + 0.41, z, false);
-    box(parent, 0.4, 0.58, 0.22, SH.person, x, y + 1.11, z);
-    box(parent, 0.1, 0.55, 0.12, SH.person, x - 0.26, y + 1.1, z, false); box(parent, 0.1, 0.55, 0.12, SH.person, x + 0.26, y + 1.1, z, false);
-    sph(parent, 0.115, SH.skin, x, y + 1.55, z, false, 1.1); sph(parent, 0.135, SH.helmet, x, y + 1.63, z, false, 0.6);
+  // ajutoare doar pentru piese: cutie care se ingusteaza in sus, bulgare turtit, disc in picioare, roata
+  function taper(parent, w, h, d, m, x, y, z, kx, kz, oz, cast) {
+    oz = oz || 0;
+    addGeo(parent, unit('tap|' + kx + '|' + kz + '|' + oz, function () {
+      var g = new T.BoxGeometry(1, 1, 1), P = g.attributes.position;
+      for (var i = 0; i < P.count; i++) if (P.getY(i) > 0) P.setXYZ(i, P.getX(i) * kx, P.getY(i), P.getZ(i) * kz + oz);
+      g.computeVertexNormals(); return g;
+    }), m, x, y, z, w, h, d, null, cast);
   }
+  function blob(parent, m, x, y, z, sx, sy, sz, ry, cast) {
+    addGeo(parent, unit('ico1', function () { return new T.IcosahedronGeometry(1, 1); }), m, x, y, z, sx, sy, sz, ry ? [0.3 * ry, ry, 0] : null, cast);
+  }
+  function lump(parent, m, x, y, z, sx, sy, sz, ry, det, seed) {     // coroana de copac: sfera cu denivelari, cu umbrire neteda
+    addGeo(parent, unit('lump|' + det + '|' + seed, function () {
+      var g = new T.IcosahedronGeometry(1, det), P = g.attributes.position, N = g.attributes.normal, acc = {}, keys = [], i, k, v = new T.Vector3(), a = new T.Vector3(), b = new T.Vector3(), c = new T.Vector3();
+      for (i = 0; i < P.count; i++) {
+        v.set(P.getX(i), P.getY(i), P.getZ(i)); keys.push(Math.round(v.x * 500) + ',' + Math.round(v.y * 500) + ',' + Math.round(v.z * 500));
+        var n = Math.sin(v.x * 3.1 + seed) * Math.sin(v.y * 2.6 + seed * 1.7) * Math.sin(v.z * 3.3 + seed * 0.6) * 0.3 + Math.sin(v.x * 6.1 + v.y * 4.3 + seed * 2.1) * Math.sin(v.z * 5.7 + v.y * 3.9 + seed) * 0.13;
+        v.multiplyScalar(1 + n); P.setXYZ(i, v.x, v.y, v.z);
+      }
+      for (i = 0; i < P.count; i += 3) {
+        a.fromBufferAttribute(P, i); b.fromBufferAttribute(P, i + 1); c.fromBufferAttribute(P, i + 2); b.sub(a); c.sub(a); b.cross(c);
+        for (k = 0; k < 3; k++) { var e = acc[keys[i + k]] || (acc[keys[i + k]] = new T.Vector3()); e.add(b); }
+      }
+      for (i = 0; i < P.count; i++) { v.copy(acc[keys[i]]).normalize(); N.setXYZ(i, v.x, v.y, v.z); }
+      return g;
+    }), m, x, y, z, sx, sy, sz, ry ? [0, ry, 0] : null, true);
+  }
+  function vdisc(parent, r, m, x, y, z, alongX) {      // disc in picioare (ventilator pe o fata verticala)
+    addGeo(parent, unit('disc', function () { var g = new T.CircleGeometry(1, 20); g.rotateX(-Math.PI / 2); return g; }), m, x, y, z, r, 1, r, alongX ? [0, 0, -Math.PI / 2] : [Math.PI / 2, 0, 0], false);
+  }
+  function wheel(parent, x, y, z, r, w, sd) {          // roata cu janta; sd = partea pe care se vede janta
+    cyl(parent, r, r, w, SH.tire, x, y, z, 14, [0, 0, Math.PI / 2], false);
+    cyl(parent, r * 0.6, r * 0.6, 0.03, SH.silver, x + sd * (w / 2 + 0.005), y, z, 10, [0, 0, Math.PI / 2], false);
+    cyl(parent, r * 0.2, r * 0.2, 0.05, SH.dark, x + sd * (w / 2 + 0.01), y, z, 6, [0, 0, Math.PI / 2], false);
+  }
+
+  /* ---------- piese: fiecare functie pune un obiect intreg la locul lui ---------- */
+
   function rackDetail(parent, x, z) {       // un rack desenat in detaliu: usa se deschide, un server iese pe sine
     var g = new T.Group(); g.position.set(x, 0.3, z); parent.add(g);
     [[-0.57, -0.27], [-0.57, 0.27], [0.57, -0.27], [0.57, 0.27]].forEach(function (c) { box(g, 0.06, 2.2, 0.06, SH.rackBody, c[0], 1.1, c[1], false); });
@@ -1663,109 +1696,83 @@ var Scene3D = (function () {
     out.door = d;
     return out;
   }
+
+  function genset(parent, x, z, len, s) {     // grup electrogen in carcasa antifonica, lungimea pe axa x
+    var h = 2.7 * s, w = 2.5 * s, yb = 0.22 + 0.3 * s, top = yb + h, nd = Math.max(2, Math.round(len / 3)), i, sd;
+    box(parent, len + 0.4, 0.3 * s, w + 0.2, SH.dark, x, 0.22 + 0.15 * s, z);                                    // sasiu cu rezervor
+    box(parent, len, h, w, SH.contDark, x, yb + h / 2, z);
+    box(parent, len + 0.06, 0.1 * s, w + 0.06, SH.dark, x, top + 0.05 * s, z, false);                            // rama acoperisului
+    for (sd = -1; sd <= 1; sd += 2) {
+      box(parent, 0.06, h * 0.72, w * 0.8, SH.louver, x + sd * (len / 2 + 0.03), yb + h * 0.5, z, false);       // jaluzele la capete
+      box(parent, len * 0.2, h * 0.5, 0.05, SH.louver, x - len * 0.32, yb + h * 0.56, z + sd * (w / 2 + 0.02), false);   // prize de aer pe laterale
+      box(parent, 0.2 * s, 0.14 * s, 0.1 * s, SH.steel, x - len * 0.42, top + 0.12 * s, z + sd * (w / 2 - 0.1 * s), false); box(parent, 0.2 * s, 0.14 * s, 0.1 * s, SH.steel, x + len * 0.42, top + 0.12 * s, z + sd * (w / 2 - 0.1 * s), false);   // urechi de ridicare
+      for (i = 0; i <= nd; i++) {
+        box(parent, 0.05, h * 0.82, 0.03, SH.dark, x - len / 2 + i * len / nd, yb + h * 0.47, z + sd * (w / 2 + 0.015), false);          // usi de serviciu
+        if (i < nd) box(parent, 0.05, 0.28 * s, 0.05, SH.steel, x - len / 2 + (i + 0.85) * len / nd, yb + h * 0.45, z + sd * (w / 2 + 0.04), false);
+      }
+    }
+    box(parent, 0.7 * s, 0.9 * s, 0.14 * s, SH.silver, x + len * 0.38, yb + h * 0.55, z + w / 2 + 0.07 * s, false);     // tablou de comanda cu afisaj
+    box(parent, 0.34 * s, 0.2 * s, 0.02, SH.screen, x + len * 0.38, yb + h * 0.66, z + w / 2 + 0.15 * s, false); box(parent, 0.4 * s, 0.2 * s, 0.02, SH.hazard, x + len * 0.12, yb + h * 0.7, z + w / 2 + 0.03, false);
+    cyl(parent, 0.3 * s, 0.3 * s, len * 0.3, SH.silver, x + len * 0.16, top + 0.36 * s, z, 12, [0, 0, Math.PI / 2]);  // toba de esapament
+    box(parent, 0.12 * s, 0.3 * s, 0.5 * s, SH.steel, x + len * 0.06, top + 0.2 * s, z, false); box(parent, 0.12 * s, 0.3 * s, 0.5 * s, SH.steel, x + len * 0.26, top + 0.2 * s, z, false);
+    cyl(parent, 0.13 * s, 0.13 * s, 1.5 * s, SH.silver, x + len * 0.3, top + 1.1 * s, z, 10);                          // cosul, cu capac de ploaie
+    cyl(parent, 0.2 * s, 0.2 * s, 0.03 * s, SH.steel, x + len * 0.3 + 0.08 * s, top + 1.92 * s, z, 10, [0, 0, 0.5], false);
+    box(parent, len * 0.28, 0.25 * s, w * 0.8, SH.dark, x - len * 0.3, top + 0.125 * s, z, false);                    // radiator pe acoperis
+    disc(parent, w * 0.3, SH.fan, x - len * 0.3, top + 0.26 * s, z); disc(parent, w * 0.33, SH.grille, x - len * 0.3, top + 0.275 * s, z);
+    var tz = z + w / 2 + 1.5 * s, tl = len * 0.5;                                                                      // rezervor de motorina in cuva
+    cyl(parent, 0.6 * s, 0.6 * s, tl, SH.white, x, 0.22 + 1.0 * s, tz, 14, [0, 0, Math.PI / 2]);
+    blob(parent, SH.white, x - tl / 2, 0.22 + 1.0 * s, tz, 0.2 * s, 0.6 * s, 0.6 * s, 0, false); blob(parent, SH.white, x + tl / 2, 0.22 + 1.0 * s, tz, 0.2 * s, 0.6 * s, 0.6 * s, 0, false);
+    box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x - len * 0.17, 0.22 + 0.25 * s, tz, false); box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x + len * 0.17, 0.22 + 0.25 * s, tz, false);
+    cyl(parent, 0.09 * s, 0.09 * s, 0.16 * s, SH.red, x - tl * 0.25, 0.22 + 1.66 * s, tz, 8, null, false); cyl(parent, 0.035 * s, 0.035 * s, 0.6 * s, SH.steel, x + tl * 0.3, 0.22 + 1.85 * s, tz, 6, null, false);
+    cyl(parent, 0.04 * s, 0.04 * s, 1.5 * s, SH.steel, x + tl * 0.1, 0.22 + 0.5 * s, z + w / 2 + 0.75 * s, 6, [Math.PI / 2, 0, 0], false);      // teava de motorina spre motor
+    var bl = tl + 1.2 * s, bz = 1.7 * s;
+    box(parent, bl, 0.3 * s, 0.1, SH.base, x, 0.22 + 0.15 * s, tz + bz / 2, false); box(parent, 0.1, 0.3 * s, bz, SH.base, x - bl / 2, 0.22 + 0.15 * s, tz, false); box(parent, 0.1, 0.3 * s, bz, SH.base, x + bl / 2, 0.22 + 0.15 * s, tz, false);
+    ao(parent, len, w, x, 0.235, z, 1.5);
+    return [x + len * 0.3, top + 2.0 * s, z];
+  }
+
   function transformer(parent, x, z, s) {
     var y0 = 0.32, i, sd;
     box(parent, 3.6 * s, 0.25 * s, 2.6 * s, SH.dark, x, y0 + 0.125 * s, z);                                       // sasiu
+    box(parent, 3.9 * s, 0.1 * s, 0.22 * s, SH.steel, x, y0 + 0.03 * s, z - 0.8 * s, false); box(parent, 3.9 * s, 0.1 * s, 0.22 * s, SH.steel, x, y0 + 0.03 * s, z + 0.8 * s, false);   // sine
     box(parent, 3 * s, 2.3 * s, 1.9 * s, SH.trafo, x, y0 + 1.4 * s, z);                                           // cuva cu ulei
     box(parent, 3.2 * s, 0.12 * s, 2.1 * s, SH.trafo, x, y0 + 2.6 * s, z, false);
-    for (sd = -1; sd <= 1; sd += 2) {                                                                              // radiatoare, lamela cu lamela
+    for (i = -1; i <= 1; i++) box(parent, 0.06 * s, 2.2 * s, 1.96 * s, SH.trafo, x + i * 0.75 * s, y0 + 1.4 * s, z, false);                        // nervuri de rigidizare
+    for (sd = -1; sd <= 1; sd += 2) {                                                                              // radiatoare, lamela cu lamela, cu ventilatoare
       for (i = 0; i < 9; i++) box(parent, 0.07 * s, 1.75 * s, 0.62 * s, SH.trafoFin, x - 1.2 * s + i * 0.3 * s, y0 + 1.35 * s, z + sd * 1.32 * s);
       cyl(parent, 0.07 * s, 0.07 * s, 2.7 * s, SH.trafo, x, y0 + 2.2 * s, z + sd * 1.3 * s, 8, [0, 0, Math.PI / 2], false);
       cyl(parent, 0.07 * s, 0.07 * s, 2.7 * s, SH.trafo, x, y0 + 0.55 * s, z + sd * 1.3 * s, 8, [0, 0, Math.PI / 2], false);
+      for (i = -1; i <= 1; i += 2) {
+        cyl(parent, 0.34 * s, 0.34 * s, 0.07 * s, SH.dark, x + i * 0.62 * s, y0 + 1.35 * s, z + sd * 1.66 * s, 14, [Math.PI / 2, 0, 0], false);
+        vdisc(parent, 0.3 * s, SH.fan, x + i * 0.62 * s, y0 + 1.35 * s, z + sd * 1.7 * s, false);
+      }
     }
     for (i = -1; i <= 1; i++) {                                                                                    // izolatoare: inalta tensiune (mari) si joasa (mici)
+      cyl(parent, 0.13 * s, 0.2 * s, 0.14 * s, SH.trafo, x + i * 0.85 * s, y0 + 2.72 * s, z - 0.35 * s, 10, null, false);
       cyl(parent, 0.09 * s, 0.17 * s, 1.25 * s, SH.ceramic, x + i * 0.85 * s, y0 + 3.28 * s, z - 0.35 * s, 10);
       cyl(parent, 0.05 * s, 0.05 * s, 0.22 * s, SH.silver, x + i * 0.85 * s, y0 + 4.0 * s, z - 0.35 * s, 8, null, false);
       cyl(parent, 0.06 * s, 0.1 * s, 0.5 * s, SH.ceramic, x + i * 0.5 * s, y0 + 2.9 * s, z + 0.55 * s, 8, null, false);
+      cyl(parent, 0.035 * s, 0.035 * s, 0.12 * s, SH.copper, x + i * 0.5 * s, y0 + 3.2 * s, z + 0.55 * s, 6, null, false);
     }
-    cyl(parent, 0.36 * s, 0.36 * s, 2.3 * s, SH.trafo, x, y0 + 3.5 * s, z + 0.2 * s, 12, [0, 0, Math.PI / 2]);     // conservatorul de ulei
+    cyl(parent, 0.36 * s, 0.36 * s, 2.3 * s, SH.trafo, x, y0 + 3.5 * s, z + 0.2 * s, 12, [0, 0, Math.PI / 2]);     // conservatorul de ulei, cu capace bombate
+    blob(parent, SH.trafo, x - 1.15 * s, y0 + 3.5 * s, z + 0.2 * s, 0.14 * s, 0.36 * s, 0.36 * s, 0, false); blob(parent, SH.trafo, x + 1.15 * s, y0 + 3.5 * s, z + 0.2 * s, 0.14 * s, 0.36 * s, 0.36 * s, 0, false);
     box(parent, 0.1 * s, 0.6 * s, 0.1 * s, SH.trafo, x - 0.8 * s, y0 + 2.95 * s, z + 0.2 * s, false); box(parent, 0.1 * s, 0.6 * s, 0.1 * s, SH.trafo, x + 0.8 * s, y0 + 2.95 * s, z + 0.2 * s, false);
+    cyl(parent, 0.045 * s, 0.045 * s, 0.75 * s, SH.steel, x + 0.35 * s, y0 + 2.98 * s, z + 0.02 * s, 6, [0.5, 0, 0], false); box(parent, 0.16 * s, 0.14 * s, 0.14 * s, SH.dark, x + 0.35 * s, y0 + 2.98 * s, z + 0.02 * s, false);   // teava de ulei cu releu
+    box(parent, 0.18 * s, 0.18 * s, 0.03 * s, SH.white, x + 1.0 * s, y0 + 3.5 * s, z + 0.57 * s, false);            // indicator de nivel
     box(parent, 0.3 * s, 0.9 * s, 0.6 * s, SH.silver, x + 1.65 * s, y0 + 1.3 * s, z, false);                       // dulap de comanda
-    var bw = 4.6 * s, bd = 4.2 * s;                                                                                 // cuva de retentie din beton
+    box(parent, 0.02 * s, 0.2 * s, 0.3 * s, SH.hazard, x + 1.81 * s, y0 + 1.5 * s, z, false);
+    box(parent, 0.5 * s, 1.5 * s, 1.0 * s, SH.trafo, x - 1.75 * s, y0 + 1.5 * s, z);                               // comutatorul de ploturi
+    box(parent, 0.26 * s, 0.5 * s, 0.4 * s, SH.silver, x - 2.12 * s, y0 + 1.0 * s, z + 0.2 * s, false); cyl(parent, 0.04 * s, 0.04 * s, 0.9 * s, SH.steel, x - 2.05 * s, y0 + 1.7 * s, z + 0.2 * s, 6, null, false);
+    var bw = 4.6 * s, bd = 4.2 * s;                                                                                 // cuva de retentie din beton, cu pietris
     box(parent, bw, 0.35, 0.18, SH.base, x, 0.45, z - bd / 2, false); box(parent, bw, 0.35, 0.18, SH.base, x, 0.45, z + bd / 2, false);
     box(parent, 0.18, 0.35, bd, SH.base, x - bw / 2, 0.45, z, false); box(parent, 0.18, 0.35, bd, SH.base, x + bw / 2, 0.45, z, false);
     ao(parent, 3.4 * s, 3.3 * s, x, 0.34, z, 1.6);
     return [-1, 0, 1].map(function (k) { return new T.Vector3(x + k * 0.85 * s, y0 + 4.1 * s, z - 0.35 * s); });
   }
-  function genset(parent, x, z, len, s) {     // grup electrogen in carcasa antifonica, lungimea pe axa x
-    var h = 2.7 * s, w = 2.5 * s, yb = 0.22 + 0.3 * s, top = yb + h, nd = Math.max(2, Math.round(len / 3)), i;
-    box(parent, len + 0.4, 0.3 * s, w + 0.2, SH.dark, x, 0.22 + 0.15 * s, z);                                    // sasiu cu rezervor
-    box(parent, len, h, w, SH.contDark, x, yb + h / 2, z);
-    box(parent, 0.06, h * 0.72, w * 0.8, SH.louver, x - len / 2 - 0.03, yb + h * 0.5, z, false); box(parent, 0.06, h * 0.72, w * 0.8, SH.louver, x + len / 2 + 0.03, yb + h * 0.5, z, false);
-    for (i = 0; i <= nd; i++) for (var sd = -1; sd <= 1; sd += 2) {
-      box(parent, 0.05, h * 0.82, 0.03, SH.dark, x - len / 2 + i * len / nd, yb + h * 0.47, z + sd * (w / 2 + 0.015), false);          // usi de serviciu
-      if (i < nd) box(parent, 0.05, 0.28 * s, 0.05, SH.steel, x - len / 2 + (i + 0.85) * len / nd, yb + h * 0.45, z + sd * (w / 2 + 0.04), false);
-    }
-    cyl(parent, 0.3 * s, 0.3 * s, len * 0.3, SH.silver, x + len * 0.16, top + 0.36 * s, z, 12, [0, 0, Math.PI / 2]);  // toba de esapament
-    cyl(parent, 0.13 * s, 0.13 * s, 1.5 * s, SH.silver, x + len * 0.3, top + 1.1 * s, z, 10);                          // cosul
-    box(parent, len * 0.28, 0.25 * s, w * 0.8, SH.dark, x - len * 0.3, top + 0.125 * s, z, false);                    // radiator pe acoperis
-    disc(parent, w * 0.3, SH.fan, x - len * 0.3, top + 0.26 * s, z);
-    var tz = z + w / 2 + 1.5 * s;                                                                                      // rezervor de motorina
-    cyl(parent, 0.6 * s, 0.6 * s, len * 0.5, SH.white, x, 0.22 + 1.0 * s, tz, 14, [0, 0, Math.PI / 2]);
-    box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x - len * 0.17, 0.22 + 0.25 * s, tz, false); box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x + len * 0.17, 0.22 + 0.25 * s, tz, false);
-    ao(parent, len, w, x, 0.235, z, 1.5);
-    return [x + len * 0.3, top + 2.0 * s, z];
-  }
-  function coolerTpl(len) {                   // racitor uscat: baterie cu lamele, ventilatoare deasupra
-    return tpl(function (g) {
-      var i, j, nf = Math.max(2, Math.round(len / 2.3));
-      for (i = 0; i < 3; i++) for (j = -1; j <= 1; j += 2) box(g, 0.12, 1.2, 0.12, SH.steel, -len / 2 + 0.3 + i * (len - 0.6) / 2, 0.6, j * 1.0, false);
-      box(g, len, 0.12, 2.3, SH.steel, 0, 1.22, 0, false);
-      box(g, len - 0.1, 1.25, 2.2, SH.coil, 0, 1.9, 0);
-      box(g, len, 0.1, 2.3, SH.silver, 0, 2.57, 0, false);
-      box(g, 0.1, 1.3, 2.3, SH.silver, -len / 2, 1.9, 0, false); box(g, 0.1, 1.3, 2.3, SH.silver, len / 2, 1.9, 0, false);
-      for (var f = 0; f < nf; f++) {
-        var fx = -len / 2 + (f + 0.5) * len / nf;
-        cyl(g, 0.98, 0.98, 0.28, SH.silver, fx, 2.76, 0, 20, null, false);
-        disc(g, 0.9, SH.dark, fx, 2.905, 0); disc(g, 0.88, SH.fan, fx, 2.915, 0); disc(g, 0.96, SH.grille, fx, 2.93, 0);
-      }
-      cyl(g, 0.1, 0.1, len, SH.blue, 0, 1.0, 1.25, 8, [0, 0, Math.PI / 2], false); cyl(g, 0.1, 0.1, len, SH.red, 0, 0.75, 1.25, 8, [0, 0, Math.PI / 2], false);
-      ao(g, len, 2.4, 0, 0.02, 0, 1.5);
-    });
-  }
-  function bessTpl() {                        // container de baterii de 20 de picioare
-    return tpl(function (g) {
-      var i;
-      box(g, 6.6, 0.3, 3.0, SH.concrete, 0, 0.15, 0, false);
-      box(g, 6.1, 0.18, 2.46, SH.dark, 0, 0.39, 0, false);
-      box(g, 6.06, 2.6, 2.44, SH.cont, 0, 1.78, 0);
-      box(g, 6.1, 0.34, 2.48, SH.green, 0, 2.86, 0, false);
-      for (i = 0; i < 6; i++) {
-        var dx = -2.5 + i * 1.0;
-        box(g, 0.94, 2.2, 0.04, SH.white, dx, 1.62, 1.235, false);
-        box(g, 0.03, 0.9, 0.03, SH.steel, dx + 0.36, 1.6, 1.27, false);
-        if (i % 2 === 0) box(g, 0.5, 0.3, 0.02, SH.louver, dx, 0.85, 1.262, false);
-      }
-      box(g, 0.24, 0.24, 0.015, SH.hazard, 2.5, 2.3, 1.262, false);
-      for (i = -1; i <= 1; i += 2) { box(g, 0.45, 1.3, 1.5, SH.silver, i * 3.27, 1.5, 0); box(g, 0.02, 1.0, 1.2, SH.louver, i * 3.5, 1.5, 0, false); }
-      for (i = -1; i <= 1; i++) box(g, 1.2, 0.12, 1.0, SH.white, i * 1.9, 3.12, 0, false);
-      ao(g, 6.8, 3.0, 0, 0.02, 0, 1.45);
-    });
-  }
-  function pvTableTpl() {                     // o masa de panouri: 52 de module pe structura metalica, inclinata 25 de grade spre sud
-    var a = 0.436, ca = Math.cos(a), sa = Math.sin(a), yc = 1.9, rot = [a, 0, 0], np = Q.lite ? 4 : 7;
-    return tpl(function (g) {
-      addGeo(g, unit('flat', function () { var gg = new T.PlaneGeometry(1, 1); gg.rotateX(-Math.PI / 2); return gg; }), SH.panel, 0, yc + 0.02 * ca, 0.02 * sa, 30, 1, 4.6, rot, true);                 // fata cu celule
-      addGeo(g, unit('flatDown', function () { var gg = new T.PlaneGeometry(1, 1); gg.rotateX(Math.PI / 2); return gg; }), SH.panelBack, 0, yc - 0.02 * ca, -0.02 * sa, 30, 1, 4.6, rot, true);     // spatele alb
-      [-2.3, 2.3].forEach(function (zl) { box(g, 30, 0.07, 0.05, SH.frame, 0, yc - zl * sa, zl * ca, false, rot); });
-      [-1.25, 1.25].forEach(function (zl) { box(g, 30, 0.1, 0.07, SH.frame, 0, yc - 0.07 * ca - zl * sa, -0.07 * sa + zl * ca, false, rot); });
-      for (var i = 0; i < np; i++) {
-        var px = -13.5 + i * 27 / (np - 1);
-        [-1.25, 1.25].forEach(function (zl) { var top = yc - 0.12 * ca - zl * sa; box(g, 0.1, top, 0.12, SH.steel, px, top / 2, zl * ca, true); });
-        if (!Q.lite) beam(g, SH.steel, px, 0.25, 1.25 * ca, px, yc - 0.12 * ca + 1.25 * sa - 0.25, -1.25 * ca, 0.06, false);
-      }
-    });
-  }
-  function inverterStation(parent, x, z) {    // statie de invertoare cu transformator, pe placa de beton
-    box(parent, 6.8, 0.3, 3.2, SH.concrete, x, 0.15, z, false);
-    box(parent, 5.0, 2.5, 2.4, SH.cont, x - 0.6, 1.55, z);
-    box(parent, 1.6, 1.6, 0.04, SH.louver, x - 1.8, 1.5, z + 1.22, false); box(parent, 0.9, 2.0, 0.04, SH.white, x + 0.4, 1.4, z + 1.22, false); box(parent, 0.03, 0.5, 0.03, SH.steel, x + 0.7, 1.4, z + 1.25, false);
-    box(parent, 1.1, 1.5, 1.4, SH.trafo, x + 2.7, 1.05, z); for (var i = 0; i < 3; i++) cyl(parent, 0.05, 0.08, 0.4, SH.ceramic, x + 2.7, 2.0, z - 0.4 + i * 0.4, 8, null, false);
-    ao(parent, 6.8, 3.2, x, 0.03, z, 1.4);
-  }
   function towerLattice(parent, x, z, h) {    // stalp metalic cu zabrele, pentru linia de 110 kV
     var b = h * 0.1, t = h * 0.022 + 0.3, hb = h * 0.78, ns = 5, i, s, c = [[1, 1], [1, -1], [-1, -1], [-1, 1]], th = Math.max(0.14, h * 0.009);
     for (i = 0; i < 4; i++) {
+      box(parent, th * 5, 0.5, th * 5, SH.concrete, x + c[i][0] * b, 0.25, z + c[i][1] * b, false);                 // fundatii
       beam(parent, SH.steel, x + c[i][0] * b, 0, z + c[i][1] * b, x + c[i][0] * t, hb, z + c[i][1] * t, th * 1.3);
       beam(parent, SH.steel, x + c[i][0] * t, hb, z + c[i][1] * t, x + c[i][0] * t * 0.6, h, z + c[i][1] * t * 0.6, th * 1.1);
     }
@@ -1781,16 +1788,21 @@ var Scene3D = (function () {
     var a = h * 0.2, y1 = h * 0.8, y2 = h * 0.93, ins = Math.max(1.2, h * 0.05), arms = [[-a, y1], [a * 0.75, y2], [a, y1]];
     arms.forEach(function (e) {
       beam(parent, SH.steel, x, e[1] + h * 0.035, z, x, e[1], z + e[0], th); beam(parent, SH.steel, x, e[1] - h * 0.02, z, x, e[1], z + e[0], th, false);
-      cyl(parent, 0.09, 0.09, ins, SH.ceramic, x, e[1] - ins / 2, z + e[0], 8, null, false);
+      cyl(parent, 0.11, 0.11, ins, SH.ceramic, x, e[1] - ins / 2, z + e[0], 8, null, false);
+      box(parent, 0.5, 0.08, 0.12, SH.silver, x, e[1] - ins - 0.02, z + e[0], false); box(parent, th * 1.6, th * 1.6, th * 1.6, SH.steel, x, e[1], z + e[0], false);    // clema conductorului
     });
+    cyl(parent, 0.03, 0.05, h * 0.06, SH.steel, x, h * 1.03, z, 6, null, false);                                    // paratrasnet
     return arms.map(function (e) { return new T.Vector3(x, e[1] - ins, z + e[0]); });
   }
   function poleMV(parent, x, z, h) {          // stalp de beton pentru linia de medie tensiune
-    cyl(parent, 0.13, 0.22, h, SH.base, x, h / 2, z, 8);
+    cyl(parent, 0.13, 0.22, h, SH.base, x, h / 2, z, 8); cyl(parent, 0.3, 0.34, 0.25, SH.concrete, x, 0.125, z, 8, null, false);
     box(parent, 0.12, 0.12, 2.8, SH.steel, x, h * 0.93, z); box(parent, 0.1, 0.5, 0.1, SH.steel, x, h * 0.93 + 0.3, z, false);
+    beam(parent, SH.steel, x, h * 0.93 - 0.9, z, x, h * 0.93, z - 1.0, 0.05, false); beam(parent, SH.steel, x, h * 0.93 - 0.9, z, x, h * 0.93, z + 1.0, 0.05, false);   // contrafise
+    box(parent, 0.26, 0.2, 0.012, SH.hazard, x, 2.2, z + 0.2, false);
     return [-1.25, 0, 1.25].map(function (dz, i) {
       var yy = h * 0.93 + (i === 1 ? 0.75 : 0.35);
       cyl(parent, 0.05, 0.08, 0.5, SH.ceramic, x, yy - 0.2, z + dz, 8, null, false);
+      cyl(parent, 0.025, 0.025, 0.06, SH.silver, x, yy + 0.07, z + dz, 6, null, false);
       return new T.Vector3(x, yy + 0.05, z + dz);
     });
   }
@@ -1799,33 +1811,197 @@ var Scene3D = (function () {
     for (var i = 0; i <= 12; i++) { var t = i / 12, p = a.clone().lerp(b, t); p.y -= Math.sin(Math.PI * t) * sag; pts.push(p); }
     parent.add(new T.Line(new T.BufferGeometry().setFromPoints(pts), SH.wire));
   }
-  function car(parent, x, z, ci) {            // lung pe z
-    var p = SH.carPaint[ci % SH.carPaint.length];
-    box(parent, 1.82, 0.52, 4.3, p, x, 0.74, z); box(parent, 1.7, 0.12, 4.1, SH.dark, x, 0.44, z, false);
-    box(parent, 1.62, 0.5, 2.3, SH.carGlass, x, 1.24, z - 0.15); box(parent, 1.5, 0.06, 1.9, p, x, 1.51, z - 0.15, false);
-    [[-0.86, 1.35], [0.86, 1.35], [-0.86, -1.35], [0.86, -1.35]].forEach(function (w) { cyl(parent, 0.33, 0.33, 0.24, SH.tire, x + w[0], 0.56, z + w[1], 12, [0, 0, Math.PI / 2], false); });
-    box(parent, 1.5, 0.12, 0.04, SH.light, x, 0.82, z + 2.16, false); box(parent, 1.5, 0.1, 0.04, SH.red, x, 0.84, z - 2.16, false);
+
+  function coolerTpl(len) {                   // racitor uscat: baterie cu lamele, ventilatoare deasupra
+    return tpl(function (g) {
+      var i, j, nf = Math.max(2, Math.round(len / 2.3));
+      for (i = 0; i < 3; i++) for (j = -1; j <= 1; j += 2) { box(g, 0.12, 1.2, 0.12, SH.steel, -len / 2 + 0.3 + i * (len - 0.6) / 2, 0.6, j * 1.0, false); box(g, 0.3, 0.03, 0.3, SH.steel, -len / 2 + 0.3 + i * (len - 0.6) / 2, 0.015, j * 1.0, false); }
+      for (j = -1; j <= 1; j += 2) for (i = 0; i < 2; i++) beam(g, SH.steel, -len / 2 + 0.3 + i * (len - 0.6) / 2, 0.15, j * 1.0, -len / 2 + 0.3 + (i + 1) * (len - 0.6) / 2, 1.1, j * 1.0, 0.05, false);    // contravantuiri
+      box(g, len, 0.12, 2.3, SH.steel, 0, 1.22, 0, false);
+      box(g, len - 0.1, 1.25, 2.2, SH.coil, 0, 1.9, 0);
+      box(g, len, 0.1, 2.3, SH.silver, 0, 2.57, 0, false);
+      box(g, 0.1, 1.3, 2.3, SH.silver, -len / 2, 1.9, 0, false); box(g, 0.1, 1.3, 2.3, SH.silver, len / 2, 1.9, 0, false);
+      for (i = 1; i < nf; i++) for (j = -1; j <= 1; j += 2) box(g, 0.08, 1.26, 0.04, SH.silver, -len / 2 + i * len / nf, 1.9, j * 1.12, false);      // montantii dintre celule
+      for (var f = 0; f < nf; f++) {
+        var fx = -len / 2 + (f + 0.5) * len / nf;
+        cyl(g, 0.98, 1.04, 0.3, SH.silver, fx, 2.77, 0, 20, null, false);
+        disc(g, 0.92, SH.dark, fx, 2.86, 0); disc(g, 0.9, SH.fan, fx, 2.9, 0); disc(g, 0.97, SH.grille, fx, 2.93, 0);
+        cyl(g, 0.16, 0.2, 0.14, SH.dark, fx, 2.95, 0, 10, null, false);                                 // motorul ventilatorului
+      }
+      cyl(g, 0.1, 0.1, len, SH.blue, 0, 1.0, 1.25, 8, [0, 0, Math.PI / 2], false); cyl(g, 0.1, 0.1, len, SH.red, 0, 0.75, 1.25, 8, [0, 0, Math.PI / 2], false);
+      for (i = -1; i <= 1; i += 2) {                                                                    // colectoarele care leaga bateria de tevi
+        cyl(g, 0.07, 0.07, 1.5, SH.blue, i * (len / 2 - 0.5), 1.72, 1.2, 8, null, false); cyl(g, 0.07, 0.07, 1.3, SH.red, i * (len / 2 - 0.9), 1.38, 1.2, 8, null, false);
+      }
+      box(g, 0.5, 0.7, 0.22, SH.silver, len / 2 - 0.45, 1.75, -1.26, false); box(g, 0.2, 0.12, 0.02, SH.led, len / 2 - 0.45, 1.95, -1.375, false);   // cutia electrica
+      cyl(g, 0.03, 0.03, 1.2, SH.dark, len / 2 - 0.45, 0.8, -1.26, 6, null, false);
+      ao(g, len, 2.4, 0, 0.02, 0, 1.5);
+    });
+  }
+
+  function bessTpl() {                        // container de baterii de 20 de picioare
+    return tpl(function (g) {
+      var i, sx, sz;
+      box(g, 6.6, 0.3, 3.0, SH.concrete, 0, 0.15, 0, false);
+      box(g, 6.1, 0.18, 2.46, SH.dark, 0, 0.39, 0, false);
+      box(g, 6.06, 2.6, 2.44, SH.cont, 0, 1.78, 0);
+      box(g, 6.1, 0.3, 2.48, SH.green, 0, 2.88, 0, false);
+      for (sx = -1; sx <= 1; sx += 2) for (sz = -1; sz <= 1; sz += 2) {                                  // stalpii si colturile containerului
+        box(g, 0.13, 2.62, 0.13, SH.white, sx * 3.0, 1.78, sz * 1.19, false);
+        box(g, 0.19, 0.14, 0.19, SH.dark, sx * 3.0, 0.55, sz * 1.19, false); box(g, 0.19, 0.14, 0.19, SH.dark, sx * 3.0, 3.02, sz * 1.19, false);
+      }
+      for (i = 0; i < 6; i++) {                                                                          // usile modulelor: balamale, bare de inchidere, aerisiri
+        var dx = -2.5 + i * 1.0;
+        box(g, 0.94, 2.14, 0.04, SH.white, dx, 1.6, 1.235, false);
+        cyl(g, 0.018, 0.018, 2.1, SH.steel, dx + 0.3, 1.6, 1.275, 5, null, false); box(g, 0.05, 0.16, 0.05, SH.dark, dx + 0.3, 1.5, 1.29, false);
+        box(g, 0.04, 0.12, 0.03, SH.steel, dx - 0.44, 2.3, 1.262, false); box(g, 0.04, 0.12, 0.03, SH.steel, dx - 0.44, 0.9, 1.262, false);
+        if (i % 2 === 0) box(g, 0.5, 0.3, 0.02, SH.louver, dx - 0.05, 0.85, 1.262, false); else box(g, 0.2, 0.2, 0.012, SH.hazard, dx - 0.1, 2.25, 1.262, false);
+      }
+      for (i = 0; i <= 6; i++) box(g, 0.035, 2.2, 0.05, SH.dark, -3.0 + i * 1.0, 1.6, 1.232, false);   // rosturile dintre usi
+      box(g, 0.6, 0.16, 0.012, SH.white, -2.45, 2.5, 1.262, false); box(g, 0.3, 0.05, 0.02, SH.led, 2.3, 2.6, 1.262, false);     // eticheta si lumina de stare
+      for (i = -1; i <= 1; i += 2) {                                                                     // aparatele de aer conditionat de la capete
+        box(g, 0.45, 1.3, 1.5, SH.silver, i * 3.27, 1.5, 0); box(g, 0.02, 0.36, 1.2, SH.louver, i * 3.5, 1.0, 0, false);
+        cyl(g, 0.4, 0.4, 0.03, SH.dark, i * 3.495, 1.72, 0, 16, [0, 0, Math.PI / 2], false); vdisc(g, 0.36, SH.fan, i * 3.515, 1.72, 0, true);
+        box(g, 0.5, 0.06, 1.56, SH.steel, i * 3.27, 0.82, 0, false);
+      }
+      for (i = -1; i <= 1; i++) { box(g, 1.2, 0.12, 1.0, SH.white, i * 1.9, 3.12, 0, false); box(g, 1.3, 0.03, 1.1, SH.steel, i * 1.9, 3.045, 0, false); }      // clapete de siguranta pe acoperis
+      box(g, 0.5, 0.5, 0.22, SH.steel, 2.3, 0.72, -1.33, false); for (i = -1; i <= 1; i++) cyl(g, 0.04, 0.04, 0.3, SH.dark, 2.3 + i * 0.14, 0.4, -1.36, 6, null, false);   // intrarea cablurilor
+      box(g, 0.5, 0.7, 0.26, SH.red, -2.5, 1.3, -1.35, false); cyl(g, 0.03, 0.03, 1.2, SH.red, -2.5, 2.2, -1.3, 6, null, false);                                   // stingere a incendiilor
+      ao(g, 6.8, 3.0, 0, 0.02, 0, 1.45);
+    });
+  }
+
+  function pvTableTpl() {                     // o masa de panouri: 52 de module pe structura metalica, inclinata 25 de grade spre sud
+    var a = 0.436, ca = Math.cos(a), sa = Math.sin(a), yc = 1.9, rot = [a, 0, 0], np = Q.lite ? 4 : 7;
+    return tpl(function (g) {
+      addGeo(g, unit('flat', function () { var gg = new T.PlaneGeometry(1, 1); gg.rotateX(-Math.PI / 2); return gg; }), SH.panel, 0, yc + 0.02 * ca, 0.02 * sa, 30, 1, 4.6, rot, true);                 // fata cu celule
+      addGeo(g, unit('flatDown', function () { var gg = new T.PlaneGeometry(1, 1); gg.rotateX(Math.PI / 2); return gg; }), SH.panelBack, 0, yc - 0.02 * ca, -0.02 * sa, 30, 1, 4.6, rot, true);     // spatele alb
+      [-2.3, 2.3].forEach(function (zl) { box(g, 30, 0.07, 0.05, SH.frame, 0, yc - zl * sa, zl * ca, false, rot); });
+      [-1.25, 1.25].forEach(function (zl) { box(g, 30, 0.1, 0.07, SH.frame, 0, yc - 0.07 * ca - zl * sa, -0.07 * sa + zl * ca, false, rot); });
+      for (var i = 0; i < np; i++) {
+        var px = -13.5 + i * 27 / (np - 1);
+        [-1.25, 1.25].forEach(function (zl) { var top = yc - 0.12 * ca - zl * sa; box(g, 0.1, top, 0.12, SH.steel, px, top / 2, zl * ca, true); });
+        if (!Q.lite) beam(g, SH.steel, px, 0.25, 1.25 * ca, px, yc - 0.12 * ca + 1.25 * sa - 0.25, -1.25 * ca, 0.06, false);
+      }
+    });
+  }
+  function inverterStation(parent, x, z) {    // statie de invertoare cu transformator, pe placa de beton
+    var i, sd;
+    box(parent, 6.8, 0.3, 3.2, SH.concrete, x, 0.15, z, false);
+    box(parent, 5.04, 0.14, 2.44, SH.dark, x - 0.6, 0.37, z, false);
+    box(parent, 5.0, 2.4, 2.4, SH.cont, x - 0.6, 1.64, z);
+    box(parent, 5.2, 0.1, 2.6, SH.trim, x - 0.6, 2.89, z);                                              // acoperis cu streasina
+    box(parent, 1.6, 1.6, 0.04, SH.louver, x - 1.8, 1.55, z + 1.22, false); box(parent, 1.4, 0.9, 0.04, SH.louver, x - 1.6, 1.9, z - 1.22, false);
+    box(parent, 0.9, 2.0, 0.04, SH.white, x + 0.4, 1.46, z + 1.22, false); box(parent, 1.0, 2.1, 0.02, SH.dark, x + 0.4, 1.48, z + 1.205, false);   // usa cu toc
+    box(parent, 0.03, 0.5, 0.03, SH.steel, x + 0.7, 1.4, z + 1.25, false); box(parent, 0.22, 0.22, 0.012, SH.hazard, x + 0.3, 1.95, z + 1.245, false);
+    box(parent, 0.3, 0.2, 0.012, SH.white, x + 1.3, 2.2, z + 1.21, false);
+    box(parent, 0.7, 0.6, 0.3, SH.silver, x - 1.9, 1.1, z - 1.36, false); vdisc(parent, 0.22, SH.fan, x - 1.9, 1.1, z - 1.52, false);                // aer conditionat
+    box(parent, 1.1, 1.5, 1.4, SH.trafo, x + 2.7, 1.05, z); box(parent, 1.2, 0.08, 1.5, SH.trafo, x + 2.7, 1.84, z, false);                        // transformatorul de ridicare
+    for (sd = -1; sd <= 1; sd += 2) for (i = 0; i < 4; i++) box(parent, 0.06, 1.1, 0.26, SH.trafoFin, x + 2.3 + i * 0.26, 1.0, z + sd * 0.84);
+    for (i = 0; i < 3; i++) { cyl(parent, 0.05, 0.08, 0.4, SH.ceramic, x + 2.7, 2.08, z - 0.4 + i * 0.4, 8, null, false); cyl(parent, 0.025, 0.025, 0.1, SH.silver, x + 2.7, 2.32, z - 0.4 + i * 0.4, 6, null, false); }
+    box(parent, 0.5, 0.03, 0.8, SH.steel, x + 2.05, 0.315, z, false);                                   // capacul canalului de cabluri
+    for (sd = -1; sd <= 1; sd += 2) cyl(parent, 0.07, 0.07, 0.9, SH.stripe, x + sd * 3.2, 0.75, z + 1.45, 8, null, false);     // stalpisori de protectie
+    ao(parent, 6.8, 3.2, x, 0.03, z, 1.4);
+  }
+
+  function person(parent, x, y, z) {
+    var sd;
+    for (sd = -1; sd <= 1; sd += 2) {
+      box(parent, 0.13, 0.1, 0.25, SH.tire, x + sd * 0.09, y + 0.05, z + 0.03, false);                 // bocanci
+      box(parent, 0.13, 0.78, 0.15, SH.pants, x + sd * 0.09, y + 0.47, z, false);                      // picioare
+      box(parent, 0.1, 0.52, 0.12, SH.person, x + sd * 0.275, y + 1.17, z, false);                     // maneci
+      box(parent, 0.085, 0.09, 0.1, SH.skin, x + sd * 0.275, y + 0.865, z, false);                     // maini
+      box(parent, 0.045, 0.5, 0.235, SH.white, x + sd * 0.1, y + 1.18, z, false);                      // bretelele reflectorizante ale vestei
+    }
+    box(parent, 0.34, 0.14, 0.2, SH.pants, x, y + 0.9, z, false);
+    taper(parent, 0.38, 0.5, 0.22, SH.person, x, y + 1.2, z, 1.14, 1, 0, true);                        // vesta, mai lata in umeri
+    box(parent, 0.39, 0.05, 0.232, SH.white, x, y + 1.04, z, false);                                   // banda reflectorizanta
+    cyl(parent, 0.05, 0.055, 0.09, SH.skin, x, y + 1.49, z, 6, null, false);
+    sph(parent, 0.108, SH.skin, x, y + 1.62, z, false, 1.12);
+    sph(parent, 0.132, SH.helmet, x, y + 1.685, z, false, 0.62); cyl(parent, 0.16, 0.16, 0.018, SH.helmet, x, y + 1.665, z + 0.03, 10, null, false);   // casca cu bor
+  }
+  function car(parent, x, z, ci) {            // lung pe z, cu botul spre sud; trei caroserii: berlina, SUV, break
+    var p = SH.carPaint[ci % SH.carPaint.length], v = ci % 3, suv = v === 1, sd, e;
+    var by = suv ? 0.52 : 0.47, bh = suv ? 0.62 : 0.52, bt = by + bh, wr = suv ? 0.37 : 0.33, wy = 0.23 + wr;
+    var cl = v === 0 ? 2.4 : 3.0, czz = z - (v === 0 ? 0.25 : 0.52), ch = suv ? 0.5 : 0.45, ckx = 0.8, ckz = v === 0 ? 0.62 : 0.8, coz = v === 0 ? -0.03 : -0.045, cw = suv ? 1.7 : 1.64;
+    box(parent, 1.72, 0.16, 4.1, SH.dark, x, by - 0.02, z, false);                                                  // praguri si podea
+    taper(parent, 1.82, bh, 4.3, p, x, by + bh / 2, z, 0.93, 0.965, 0, true);                                       // caroseria
+    taper(parent, cw, ch, cl, SH.carGlass, x, bt + ch / 2, czz, ckx, ckz, coz, true);                               // geamurile
+    var tw = cw * ckx, tl = cl * ckz, tzc = czz + coz * cl;
+    box(parent, tw + 0.04, 0.05, tl + 0.04, p, x, bt + ch + 0.02, tzc, false);                                      // plafonul
+    for (sd = -1; sd <= 1; sd += 2) {
+      [[cl / 2, tl / 2], [-cl / 2, -tl / 2], [v === 0 ? 0.05 : 0.35, v === 0 ? 0.02 : 0.3]].forEach(function (q, n) {     // stalpii dintre geamuri
+        beam(parent, p, x + sd * cw / 2, bt, czz + q[0], x + sd * tw / 2, bt + ch, tzc + q[1], n === 2 ? 0.07 : 0.085, false);
+      });
+      wheel(parent, x + sd * 0.8, wy, z + 1.36, wr, 0.24, sd); wheel(parent, x + sd * 0.8, wy, z - 1.36, wr, 0.24, sd);
+      cyl(parent, wr + 0.08, wr + 0.08, 0.05, SH.dark, x + sd * 0.888, wy, z + 1.36, 14, [0, 0, Math.PI / 2], false); cyl(parent, wr + 0.08, wr + 0.08, 0.05, SH.dark, x + sd * 0.888, wy, z - 1.36, 14, [0, 0, Math.PI / 2], false);   // pasajele rotilor
+      box(parent, 0.34, 0.11, 0.06, SH.light, x + sd * 0.66, by + bh * 0.72, z + 2.085, false);                    // faruri
+      box(parent, 0.3, 0.1, 0.06, SH.red, x + sd * 0.68, by + bh * 0.76, z - 2.085, false);                        // stopuri
+      box(parent, 0.17, 0.1, 0.09, p, x + sd * 0.95, bt + 0.06, czz + cl / 2 - 0.2, false);                        // oglinzi
+      box(parent, 0.012, 0.03, 0.16, SH.dark, x + sd * 0.895, bt - 0.12, z + 0.2, false); box(parent, 0.012, 0.03, 0.16, SH.dark, x + sd * 0.895, bt - 0.12, z - 0.75, false);   // manere
+      if (suv) box(parent, 0.05, 0.05, tl * 0.9, SH.dark, x + sd * (tw / 2 - 0.08), bt + ch + 0.07, tzc, false);   // bare pe plafon
+    }
+    for (e = -1; e <= 1; e += 2) { box(parent, 1.76, 0.2, 0.14, SH.dark, x, by + 0.06, z + e * 2.1, false); box(parent, 0.44, 0.1, 0.02, SH.white, x, by + 0.08, z + e * 2.18, false); }   // bare de protectie si numere
+    box(parent, 0.86, 0.13, 0.05, SH.dark, x, by + bh * 0.66, z + 2.1, false);                                      // grila
     ao(parent, 2.0, 4.5, x, 0.262, z, 1.35);
   }
   function truck(parent, x, z) {              // camion cu cutie, cu spatele spre nord
-    box(parent, 2.4, 2.6, 6.2, SH.white, x, 2.25, z - 1.0); box(parent, 2.3, 1.9, 1.9, SH.carPaint[2], x, 1.7, z + 3.2); box(parent, 2.1, 0.8, 0.05, SH.carGlass, x, 2.1, z + 4.16, false);
-    box(parent, 2.2, 0.25, 8.0, SH.dark, x, 0.87, z, false);
-    [[-1.05, 3.1], [1.05, 3.1], [-1.05, -2.4], [1.05, -2.4], [-1.05, -3.4], [1.05, -3.4]].forEach(function (w) { cyl(parent, 0.5, 0.5, 0.3, SH.tire, x + w[0], 0.76, z + w[1], 12, [0, 0, Math.PI / 2], false); });
+    var p = SH.carPaint[2], sd, e;
+    box(parent, 1.0, 0.24, 8.1, SH.dark, x, 0.92, z, false);                                                         // sasiu
+    box(parent, 2.46, 2.6, 6.2, SH.white, x, 2.34, z - 1.0);                                                         // cutia
+    box(parent, 2.5, 0.1, 6.24, SH.steel, x, 1.06, z - 1.0, false); box(parent, 2.5, 0.07, 6.24, SH.steel, x, 3.65, z - 1.0, false);
+    for (sd = -1; sd <= 1; sd += 2) {
+      for (e = -1; e <= 1; e += 2) box(parent, 0.08, 2.6, 0.08, SH.steel, x + sd * 1.21, 2.34, z - 1.0 + e * 3.08, false);
+      box(parent, 1.14, 2.4, 0.04, SH.white, x + sd * 0.59, 2.34, z - 4.115, false);                                 // usile din spate, cu bare de zavorare
+      cyl(parent, 0.025, 0.025, 2.4, SH.steel, x + sd * 0.25, 2.34, z - 4.15, 6, null, false); cyl(parent, 0.025, 0.025, 2.4, SH.steel, x + sd * 0.92, 2.34, z - 4.15, 6, null, false);
+      box(parent, 0.26, 0.12, 0.05, SH.red, x + sd * 1.0, 0.92, z - 4.07, false);
+      wheel(parent, x + sd * 1.02, 0.74, z + 3.1, 0.5, 0.32, sd); wheel(parent, x + sd * 1.02, 0.74, z - 2.4, 0.5, 0.32, sd); wheel(parent, x + sd * 1.02, 0.74, z - 3.5, 0.5, 0.32, sd);
+      box(parent, 0.4, 0.06, 2.4, SH.dark, x + sd * 1.02, 1.3, z - 2.95, false); box(parent, 0.38, 0.5, 0.03, SH.tire, x + sd * 1.02, 0.6, z - 4.06, false);       // aparatori de noroi
+      cyl(parent, 0.62, 0.62, 0.05, SH.dark, x + sd * 1.135, 0.74, z + 3.1, 14, [0, 0, Math.PI / 2], false);          // pasajul rotii din fata
+      box(parent, 0.04, 0.62, 1.0, SH.carGlass, x + sd * 1.135, 2.32, z + 3.35, false);                               // geamurile laterale
+      box(parent, 0.1, 0.42, 0.18, SH.dark, x + sd * 1.3, 2.3, z + 4.0, false); box(parent, 0.2, 0.04, 0.04, SH.dark, x + sd * 1.2, 2.45, z + 4.0, false);       // oglinzi
+      box(parent, 0.12, 0.08, 0.5, SH.steel, x + sd * 1.13, 0.6, z + 3.75, false);                                    // trepte
+      box(parent, 0.32, 0.15, 0.06, SH.light, x + sd * 0.86, 0.86, z + 4.21, false);                                  // faruri
+    }
+    box(parent, 2.3, 0.14, 0.12, SH.dark, x, 0.62, z - 4.02, false);                                                 // bara anti-impanare
+    box(parent, 2.3, 1.05, 1.9, p, x, 1.325, z + 3.2);                                                               // cabina: partea de jos
+    taper(parent, 2.3, 0.95, 1.9, p, x, 2.325, z + 3.2, 0.97, 0.86, -0.06, true);                                    // cabina: partea cu geamuri
+    box(parent, 2.02, 0.74, 0.04, SH.carGlass, x, 2.32, z + 4.062, false, [-0.22, 0, 0]);                            // parbrizul inclinat
+    taper(parent, 2.1, 0.6, 1.3, p, x, 3.1, z + 2.95, 0.92, 0.3, -0.33, false);                                      // deflector pe cabina
+    box(parent, 1.7, 0.5, 0.05, SH.dark, x, 1.32, z + 4.16, false); box(parent, 2.34, 0.3, 0.2, SH.dark, x, 0.84, z + 4.12, false); box(parent, 0.5, 0.11, 0.02, SH.white, x, 0.84, z + 4.225, false);
+    cyl(parent, 0.28, 0.28, 1.1, SH.silver, x - 0.82, 0.86, z + 1.2, 12, [Math.PI / 2, 0, 0], false);               // rezervor
     ao(parent, 2.6, 8.4, x, 0.262, z, 1.3);
   }
-  function treeTpl(kind) {
+  function lampTpl() {                        // stalp de iluminat cu brat si corp LED
     return tpl(function (g) {
-      if (kind === 'poplar') { cyl(g, 0.18, 0.3, 4, SH.trunk, 0, 2, 0, 6); sph(g, 1.45, SH.leaf, 0, 9.4, 0, true, 4.4); sph(g, 1.2, SH.leaf, 0.35, 6.4, 0.2, true, 2.8); sph(g, 1.05, SH.leaf, -0.4, 8.2, -0.3, true, 3.2); sph(g, 0.8, SH.leaf, 0.25, 13.2, 0.3, true, 2.9); }
-      else if (kind === 'conifer') { cyl(g, 0.2, 0.3, 2, SH.trunk, 0, 1, 0, 6); cyl(g, 0.01, 2.4, 4, SH.leaf, 0, 3.6, 0, 8); cyl(g, 0.01, 1.9, 3.4, SH.leaf, 0, 5.6, 0, 8); cyl(g, 0.01, 1.3, 2.8, SH.leaf, 0, 7.4, 0, 8); }
-      else { cyl(g, 0.24, 0.36, 3.4, SH.trunk, 0, 1.7, 0, 6); sph(g, 2.5, SH.leaf, 0, 5.4, 0, true, 0.95); sph(g, 1.9, SH.leaf, 1.5, 4.6, 0.5, true, 0.9); sph(g, 1.8, SH.leaf, -1.3, 4.9, -0.7, true, 0.9); sph(g, 1.6, SH.leaf, 0.2, 6.6, -0.5, true, 0.9); }
+      box(g, 0.34, 0.04, 0.34, SH.dark, 0, 0.02, 0, false); cyl(g, 0.1, 0.13, 0.5, SH.dark, 0, 0.27, 0, 8, null, false);
+      cyl(g, 0.06, 0.1, 6.6, SH.steel, 0, 3.75, 0, 8);
+      beam(g, SH.steel, 0, 6.95, 0, 0, 7.12, 0.95, 0.075, false);
+      box(g, 0.3, 0.09, 0.72, SH.dark, 0, 7.12, 1.25, false); box(g, 0.24, 0.02, 0.56, SH.lampHead, 0, 7.065, 1.27, false);
     });
   }
-  function lampTpl() { return tpl(function (g) { cyl(g, 0.07, 0.11, 7, SH.steel, 0, 3.5, 0, 8); box(g, 0.08, 0.08, 1.3, SH.steel, 0, 7.0, 0.6, false); box(g, 0.34, 0.1, 0.7, SH.lampHead, 0, 6.96, 1.25, false); }); }
   function fenceRun(parent, posts, x0, z0, x1, z1, hgt) {   // plasa intre doua puncte + stalpii ei
     var dx = x1 - x0, dz = z1 - z0, len = Math.sqrt(dx * dx + dz * dz), n = Math.max(1, Math.round(len / 3)), ang = Math.atan2(-dz, dx);
     addGeo(parent, unit('vplane', function () { return new T.PlaneGeometry(1, 1); }), SH.fence, (x0 + x1) / 2, hgt / 2 + 0.05, (z0 + z1) / 2, len, hgt, 1, [0, ang, 0], false);
     box(parent, len, 0.05, 0.05, SH.steel, (x0 + x1) / 2, hgt + 0.05, (z0 + z1) / 2, false, [0, ang, 0]);
     for (var i = 0; i <= n; i++) posts.push([x0 + dx * i / n, z0 + dz * i / n, hgt]);
+  }
+
+  function treeTpl(kind) {                    // coroane cu denivelari, nu sfere netede; sub 450 de triunghiuri fiecare
+    return tpl(function (g) {
+      if (kind === 'poplar') {
+        cyl(g, 0.16, 0.3, 3.4, SH.trunk, 0, 1.7, 0, 6);
+        lump(g, SH.leaf, 0, 9.2, 0, 1.75, 6.9, 1.7, 0.4, 2, 1.3); lump(g, SH.leaf, 0.3, 5.2, 0.25, 1.45, 3.0, 1.4, 2.1, 1, 4.1);
+      } else if (kind === 'conifer') {
+        cyl(g, 0.18, 0.3, 2.2, SH.trunk, 0, 1.1, 0, 6);
+        [[2.3, 2.6, 2.7, 0.1, 0], [2.0, 2.4, 4.0, -0.08, 0.08], [1.7, 2.3, 5.2, 0.06, -0.06], [1.35, 2.1, 6.4, -0.04, 0.03], [1.0, 2.0, 7.5, 0.03, 0.02], [0.6, 1.9, 8.6, 0, 0]].forEach(function (q, n) {
+          cyl(g, 0.01, q[0], q[1], SH.leaf, q[3], q[2], q[4], 9, [0, n * 0.7, 0]);
+        });
+      } else {
+        cyl(g, 0.22, 0.38, 3.4, SH.trunk, 0, 1.7, 0, 6);
+        beam(g, SH.trunk, 0, 2.6, 0, 1.3, 4.2, 0.5, 0.2, false);
+        lump(g, SH.leaf, 0, 5.9, 0, 3.0, 2.5, 2.8, 0.5, 2, 2.4); lump(g, SH.leaf, 1.5, 4.7, 0.9, 1.9, 1.5, 1.8, 1.4, 1, 5.2);
+      }
+    });
   }
 
 
@@ -1848,9 +2024,29 @@ var Scene3D = (function () {
   }
   function fencePosts(parent, posts) { posts.forEach(function (q) { cyl(parent, 0.04, 0.04, q[2] + 0.12, SH.steel, q[0], (q[2] + 0.12) / 2 + 0.03, q[1], 5, null, false); }); }
 
+  /* materiale si piese mici folosite doar de campus (gard viu, tigla, steag, stalpisori, case) */
+  function campusMats() {
+    if (SH.hedge) return;
+    SH.hedge = M(0x4f6a2e, { map: TEX.leaf, roughness: 1, uv: 2.5, env: 0.3 });
+    SH.tileRoof = M(0x9a4c38, { roughness: 0.9, env: 0.6 });
+    SH.flagEU = M(0x1c3f94, { roughness: 0.8 });
+    [[SH.hedge, 0x141c50], [SH.tileRoof, 0x283082], [SH.flagEU, 0x2a3080]].forEach(function (e) { THERM.push({ m: e[0], hot: e[1], base: e[0].color.getHex(), map: e[0].map || null }); });
+  }
+  function bollard(g, x, z) { cyl(g, 0.08, 0.08, 0.9, SH.stripe, x, 0.65, z, 8, null, false); cyl(g, 0.086, 0.086, 0.14, SH.dark, x, 0.92, z, 8, null, false); }
+  var _qGx = null, _qGz = null;
+  function gable(g, m, x, yb, z, len, dep, rise, alongZ) {      // acoperis in doua ape: prisma triunghiulara culcata
+    if (!_qGx) { _qGx = new T.Quaternion().setFromEuler(new T.Euler(-Math.PI / 2, 0, Math.PI / 2)); _qGz = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2).multiply(_qGx); }
+    addGeo(g, unit('cyl|1|3', function () { return new T.CylinderGeometry(1, 1, 1, 3); }), m, x, yb + rise / 3, z, dep / 1.732, len, rise / 1.5, alongZ ? _qGz : _qGx, true);
+  }
+  function house(g, x, z, len, dep, hw, wallM, roofM, alongZ) {
+    if (alongZ) box(g, dep, hw, len, wallM, x, hw / 2, z); else box(g, len, hw, dep, wallM, x, hw / 2, z);
+    gable(g, roofM, x, hw, z, len + 0.6, dep + 0.7, dep * 0.32, alongZ);
+  }
+
   function build(p) {
     if (!ok) return null;
     if (root) { scene.remove(root); disposeTree(root); }
+    campusMats();
     root = new T.Group(); scene.add(root);
     pickObjs = []; tags = []; flows = {}; clouds = []; puffGen = puffHeat = null; batch = new Batch();
     var R = rng(11), i, j, sd;
@@ -1908,6 +2104,26 @@ var Scene3D = (function () {
     for (i = 0; i < nBayD; i++) box(wg, 0.1, 1.6, Math.min(2.4, D / nBayD - 1), SH.louver, -W / 2 - 0.04, H - 2.7, -D / 2 + (i + 0.5) * D / nBayD, false);
     for (i = 0; i < nBay; i++) if (i % 2) box(wg, 1.8, 1.2, 0.1, SH.louver, -W / 2 + (i + 0.5) * W / nBay, 2.6, -D / 2 - 0.04, false);
     box(wg, 1.0, 2.1, 0.08, SH.white, xE - 1.6, 1.35, -D / 2 - 0.04, false); box(wg, 0.5, 0.1, 0.18, SH.light, xE - 1.6, 2.6, -D / 2 - 0.1, false);
+    // lumini de perete, scara cu colivie spre acoperis, pat de cabluri pe fatada de vest, tampoane la rampa, firma si pe est
+    for (i = 0; i < nBay; i++) {
+      var wlx = -W / 2 + (i + 0.5) * W / nBay;
+      box(wg, 0.3, 0.09, 0.14, SH.light, wlx, 3.5, -D / 2 - 0.1, false);
+      if (wlx < xO - 1 && Math.abs(wlx - xD) > 3) box(wg, 0.3, 0.09, 0.14, SH.light, wlx, 3.5, D / 2 + 0.1, false);
+    }
+    var ldx = -W / 2 + 2.2, ldz = -D / 2 - 0.28;
+    box(wg, 0.05, H + 0.9, 0.05, SH.steel, ldx - 0.25, (H + 0.9) / 2 + 0.3, ldz, false); box(wg, 0.05, H + 0.9, 0.05, SH.steel, ldx + 0.25, (H + 0.9) / 2 + 0.3, ldz, false);
+    for (i = 0; i < Math.floor((H + 0.5) / 0.32); i++) box(wg, 0.5, 0.03, 0.03, SH.steel, ldx, 0.6 + i * 0.32, ldz, false);
+    for (i = 0; i < Math.floor((H - 2.2) / 0.9) + 1; i++) {
+      var hy = 2.6 + i * 0.9;
+      box(wg, 0.03, 0.04, 0.6, SH.steel, ldx - 0.33, hy, ldz - 0.3, false); box(wg, 0.03, 0.04, 0.6, SH.steel, ldx + 0.33, hy, ldz - 0.3, false); box(wg, 0.69, 0.04, 0.03, SH.steel, ldx, hy, ldz - 0.6, false);
+    }
+    for (j = -1; j <= 1; j++) box(wg, 0.03, H - 1.9, 0.03, SH.steel, ldx + j * 0.33, 2.6 + (H - 1.9) / 2, ldz - 0.6, false);
+    var ctz = -D / 2 + D / nBayD + 0.55;
+    box(wg, 0.09, H - 1.0, 0.5, SH.steel, -W / 2 - 0.09, 0.9 + (H - 1.0) / 2, ctz, false);
+    for (i = 0; i < 6; i++) box(wg, 0.13, 0.05, 0.58, SH.dark, -W / 2 - 0.1, 1.4 + i * (H - 1.9) / 5, ctz, false);
+    box(wg, 0.3, 0.5, 0.16, SH.tire, xD - 1.3, 0.75, D / 2 + 0.14, false); box(wg, 0.3, 0.5, 0.16, SH.tire, xD + 1.3, 0.75, D / 2 + 0.14, false);
+    var esz = D / 2 - gl - 1.5 - sw / 2;
+    if (esz - sw / 2 > -D / 2 + 0.6) { box(wg, 0.08, sw / 4 + 0.3, sw + 0.3, SH.trim, W / 2 + 0.05, H - 2.25, esz, false); vpl(wg, sw, sw / 4, SH.sign, W / 2 + 0.1, H - 2.25, esz, Math.PI / 2); }
 
     // interior: sala electrica (vest), sala de date (mijloc), birouri (est)
     var partG = grp(bld), elec = grp(bld), itg = grp(bld), itx = grp(itg);
@@ -1934,6 +2150,7 @@ var Scene3D = (function () {
       box(elec, 1.5, 0.12, 2.0, SH.dark, xE - 1.5, 0.36, tzI, false); box(elec, 1.3, 1.9, 1.8, SH.trafo, xE - 1.5, 1.37, tzI); box(elec, 0.04, 1.3, 1.4, SH.louver, xE - 2.17, 1.4, tzI, false);
       for (j = -1; j <= 1; j++) cyl(elec, 0.05, 0.08, 0.3, SH.ceramic, xE - 1.5, 2.45, tzI + j * 0.5, 8, null, false);
     }
+
     // rackuri: perechi de randuri spate in spate (culoar cald la mijloc)
     var nGpu = Math.ceil(p.it * 1000 / 45), nAll = nGpu + Math.ceil(nGpu * 0.3);
     var hallW = xO - xE - 3, hallD = D - 5, perRowMax = Math.max(2, Math.min(24, Math.floor(hallD / 0.62)));
@@ -1977,6 +2194,7 @@ var Scene3D = (function () {
       box(itx, 1.2, 0.14, 1.0, SH.wood, xD, 0.37, D / 2 - 2.2, false); box(itx, 1.05, 0.9, 0.9, SH.box, xD, 0.89, D / 2 - 2.2);
       box(itx, 1.2, 0.14, 1.0, SH.wood, xD + 1.6, 0.37, D / 2 - 2.0, false); box(itx, 0.7, 2.0, 0.85, SH.rackAlt, xD + 1.6, 1.44, D / 2 - 2.0);
     }
+
     // birourile: mese cu ecrane, dulapuri
     var ocx = xO + offW / 2, dw = Math.max(2, Math.min(4.4, offW - 3)), nDesk = Math.max(1, Math.min(4, Math.floor(D / 9)));
     for (j = 0; j < nDesk; j++) {
@@ -1989,6 +2207,32 @@ var Scene3D = (function () {
       box(elec, 0.5, 0.1, 0.5, SH.dark, ocx - 0.5, 0.75, dz0 + 0.8, false); box(elec, 0.5, 0.55, 0.08, SH.dark, ocx - 0.5, 1.1, dz0 + 1.05, false); cyl(elec, 0.04, 0.2, 0.42, SH.steel, ocx - 0.5, 0.5, dz0 + 0.8, 6, null, false);
     }
     box(elec, 0.5, 1.9, Math.min(3, D * 0.2), SH.white, W / 2 - 0.75, 1.25, -D / 4);
+    // sala de sedinte, chicineta, canapea si plante la intrare
+    var zM = -D / 2 + (D > 30 ? 5 : 2.9), mtw = Math.min(2.6, offW - 2.6);
+    function meet(zc) {
+      box(elec, mtw, 0.06, 1.1, SH.wood, ocx - 0.2, 1.05, zc, false); box(elec, 0.1, 0.74, 0.7, SH.dark, ocx - 0.2 - mtw * 0.3, 0.67, zc, false); box(elec, 0.1, 0.74, 0.7, SH.dark, ocx - 0.2 + mtw * 0.3, 0.67, zc, false);
+      for (var q = 0; q < 3; q++) for (var s2 = -1; s2 <= 1; s2 += 2) {
+        var chx = ocx - 0.2 + (q - 1) * mtw * 0.33;
+        box(elec, 0.45, 0.08, 0.45, SH.contDark, chx, 0.76, zc + s2 * 0.85, false); box(elec, 0.45, 0.5, 0.07, SH.contDark, chx, 1.05, zc + s2 * 1.08, false); box(elec, 0.06, 0.42, 0.06, SH.steel, chx, 0.51, zc + s2 * 0.85, false);
+      }
+    }
+    meet(zM); if (D > 30) meet(D / 2 - 6);
+    box(elec, 2.2, 0.9, 0.6, SH.white, xO + 1.5, 0.75, -D / 2 + 0.75); box(elec, 2.26, 0.05, 0.66, SH.dark, xO + 1.5, 1.22, -D / 2 + 0.75, false); box(elec, 0.6, 1.8, 0.6, SH.silver, xO + 3.0, 1.2, -D / 2 + 0.75);
+    box(elec, 0.75, 0.42, 1.8, SH.contDark, xO + 0.72, 0.52, D / 2 - 3.0, false); box(elec, 0.2, 0.5, 1.8, SH.contDark, xO + 0.45, 0.95, D / 2 - 3.0, false);
+    [[xEnt - 2.1, D / 2 - 0.9], [xEnt + 2.1, D / 2 - 0.9], [ocx + mtw / 2 + 0.3, zM + 1.3]].forEach(function (c) {
+      if (c[0] > W / 2 - 0.7) return;
+      cyl(elec, 0.22, 0.17, 0.45, SH.base, c[0], 0.52, c[1], 10, null, false); sph(elec, 0.4, SH.hedge, c[0], 1.15, c[1], false, 1.25);
+    });
+    // sala electrica: dulapuri de baterii langa perete, linii galbene de siguranta, paturi de cabluri sus
+    var nBat = Math.max(3, Math.min(8, Math.floor((D - 9) / 0.85)));
+    for (i = 0; i < nBat; i++) { var bzz = -D / 2 + 1.4 + i * 0.85; box(elec, 0.6, 1.9, 0.8, SH.dark, xE - 0.55, 1.25, bzz); vpl(elec, 0.76, 1.84, SH.cabF, xE - 0.853, 1.25, bzz, -Math.PI / 2); }
+    flat(elec, 0.08, D - 4, SH.stripe, -W / 2 + 2.6, 0.306, -0.6); flat(elec, nSw * 0.8 + 0.4, 0.08, SH.stripe, -W / 2 + 0.8 + nSw * 0.4, 0.306, D / 2 - 2.2);
+    box(elec, xE + W / 2 - 1.6, 0.05, 0.4, SH.steel, (xE - W / 2) / 2, 2.86, -D / 4, false); box(elec, xE + W / 2 - 1.6, 0.05, 0.4, SH.steel, (xE - W / 2) / 2, 2.86, D / 4, false);
+    // zona de receptie a marfii, marcata pe podea
+    if (D / 2 - 2.4 > rowLen / 2 + 1.5) {
+      var sx0 = xD - 1.1, sx1 = xD + 2.9, sz0 = D / 2 - 3.5, sz1 = D / 2 - 0.9;
+      flat(itx, sx1 - sx0, 0.1, SH.stripe, (sx0 + sx1) / 2, 0.306, sz0); flat(itx, sx1 - sx0, 0.1, SH.stripe, (sx0 + sx1) / 2, 0.306, sz1); flat(itx, 0.1, sz1 - sz0, SH.stripe, sx0, 0.306, (sz0 + sz1) / 2); flat(itx, 0.1, sz1 - sz0, SH.stripe, sx1, 0.306, (sz0 + sz1) / 2);
+    }
 
     // acoperisul (se ridica): membrana, atic, aparate
     roofGroup = grp(bld);
@@ -2005,6 +2249,21 @@ var Scene3D = (function () {
     }
     for (i = 0; i <= nU; i++) { var vx = -W / 2 + (i + 0.5) * W / (nU + 1); box(roofGroup, 1.3, 0.28, 1.3, SH.roofTrim, vx, H + 0.44, D / 4, false); box(roofGroup, 1.1, 0.1, 1.1, SH.roofUnit, vx, H + 0.62, D / 4, false); }
     box(roofGroup, W * 0.8, 0.12, 0.4, SH.roofTrim, 0, H + 0.4, 0.6, false);
+    // balustrada pe atic, poteci de intretinere, condensatoare, antena
+    var nRp = Math.round(W / 2.4), nRd = Math.round(D / 2.4);
+    for (sd = -1; sd <= 1; sd += 2) {
+      box(roofGroup, W, 0.04, 0.04, SH.roofTrim, 0, H + 1.5, sd * (D / 2 + 0.02), false); box(roofGroup, W, 0.03, 0.03, SH.roofTrim, 0, H + 1.12, sd * (D / 2 + 0.02), false);
+      box(roofGroup, 0.04, 0.04, D, SH.roofTrim, sd * (W / 2 + 0.02), H + 1.5, 0, false); box(roofGroup, 0.03, 0.03, D, SH.roofTrim, sd * (W / 2 + 0.02), H + 1.12, 0, false);
+      for (i = 0; i <= nRp; i++) box(roofGroup, 0.04, 0.8, 0.04, SH.roofTrim, -W / 2 + i * W / nRp, H + 1.12, sd * (D / 2 + 0.02), false);
+      for (i = 1; i < nRd; i++) box(roofGroup, 0.04, 0.8, 0.04, SH.roofTrim, sd * (W / 2 + 0.02), H + 1.12, -D / 2 + i * D / nRd, false);
+    }
+    box(roofGroup, W * 0.84, 0.04, 0.7, SH.roofUnit, 0, H + 0.32, -D / 4 + 2.0, false);
+    box(roofGroup, 0.7, 0.04, D / 4 + 1.6, SH.roofUnit, -W / 2 + 2.2, H + 0.32, (-D / 2 + 0.4 - D / 4 + 2) / 2, false);
+    for (i = 0; i < Math.max(2, Math.round(offW / 2.5)); i++) {
+      var cdx = xO + 1.2 + i * 1.6; if (cdx > W / 2 - 1) break;
+      box(roofGroup, 1.1, 0.9, 0.8, SH.roofUnit, cdx, H + 0.85, D / 4 + 2.4); cyl(roofGroup, 0.3, 0.3, 0.05, SH.roofTrim, cdx, H + 1.32, D / 4 + 2.4, 12, null, false); box(roofGroup, 1.2, 0.1, 0.9, SH.roofTrim, cdx, H + 0.35, D / 4 + 2.4, false);
+    }
+    cyl(roofGroup, 0.04, 0.06, 4, SH.roofTrim, W / 2 - 1.5, H + 2.3, -D / 2 + 1.5, 6); box(roofGroup, 0.5, 0.5, 0.08, SH.roofUnit, W / 2 - 1.5, H + 3.7, -D / 2 + 1.58, false);
     roofK = roofOpen ? 1 : 0;
     tag(bld, 'building');
 
@@ -2060,7 +2319,24 @@ var Scene3D = (function () {
       prev = poleMV(sub, gx, zSub, 9);
       for (j = 0; j < 3; j++) wire(sub, prev[j], tr1[j], 0.4);
     }
+    // descarcatoare langa transformatoare, canal de cabluri, paratrasnet
+    [tr1, tr2].forEach(function (tr) {
+      if (!tr) return;
+      var trx = tr[1].x, trzc = tr[1].z + 0.35 * subS, ax = trx - 2.75 * subS;
+      for (var q = -1; q <= 1; q++) {
+        var az = trzc + q * 0.85 * subS;
+        box(sub, 0.12, 2.0 * subS, 0.12, SH.steel, ax, 0.32 + subS, az, false); cyl(sub, 0.07 * subS, 0.11 * subS, 1.1 * subS, SH.ceramic, ax, 0.32 + 2.55 * subS, az, 8, null, false); cyl(sub, 0.13 * subS, 0.13 * subS, 0.06, SH.silver, ax, 0.32 + 3.12 * subS, az, 10, null, false);
+      }
+      box(sub, 0.1, 0.1, 2.0 * subS, SH.steel, ax, 0.32 + 2.0 * subS, trzc, false);
+    });
+    if (big) {
+      var tcz = zSub + subD * 0.03, tcx1 = xSub + subW * 0.2 - 2.5 * subS;
+      flat(sub, tcx1 - cbx, 0.6, SH.concrete, (tcx1 + cbx) / 2, 0.335, tcz); flat(sub, 0.6, cbz - cbd / 2 - tcz, SH.concrete, cbx, 0.335, (cbz - cbd / 2 + tcz) / 2);
+    }
+    var smh = 10 + 6 * subS;
+    cyl(sub, 0.03, 0.13, smh, SH.steel, xSub + subW / 2 - 1.0, 0.32 + smh / 2, zSub - subD / 2 + 1.0, 8);
     var subF = grp(sub); subF.position.y = 0.2; fenceBox(subF, xSub - subW / 2, xSub + subW / 2, zSub - subD / 2, zSub + subD / 2, 2.2);
+    for (j = -1; j <= 1; j++) { vpl(subF, 0.5, 0.5, SH.stripe, xSub + j * subW * 0.3, 1.45, zSub + subD / 2 + 0.03); vpl(subF, 0.1, 0.3, SH.dark, xSub + j * subW * 0.3, 1.45, zSub + subD / 2 + 0.045); }
     var span = huge ? 150 : big ? 70 : 55, lineG = grp(root);
     for (i = 1; i <= 5; i++) {
       var pyG = grp(lineG), tx0 = gx - i * span + (i === 1 ? span * 0.45 : 0);
@@ -2077,6 +2353,15 @@ var Scene3D = (function () {
       for (i = 0; i < nB; i++) { mtx.compose(pos.set(xB0 + (i % perRowB) * 8 + 3.05, 0.2, zB0 - Math.floor(i / perRowB) * 6), q0, one); bessI.setMatrixAt(i, mtx); }
       box(bess, 3.0, 0.14, 2.6, SH.concrete, xB0 - 2.6, 0.27, zB0, false); box(bess, 2.4, 2.3, 2.0, SH.cont, xB0 - 2.6, 1.5, zB0);        // statia de conversie
       box(bess, 0.05, 1.4, 1.4, SH.louver, xB0 - 3.83, 1.6, zB0, false); box(bess, 1.0, 1.9, 0.05, SH.white, xB0 - 2.6, 1.4, zB0 + 1.02, false);
+      // pat de pietris, gard propriu, transformator auxiliar
+      var bxa = xB0 - 5.0, bxb = xB0 + Math.min(nB, perRowB) * 8 + 0.9, bza = zB0 - (rowsB - 1) * 6 - 2.5, bzb = zB0 + 2.45;
+      flat(bess, bxb - bxa, bzb - bza, SH.gravel, (bxa + bxb) / 2, 0.212, (bza + bzb) / 2);
+      var bF = grp(bess); bF.position.y = 0.2; fenceBox(bF, bxa, bxb, bza, bzb, 2.0);
+      if (rowsB > 1) {
+        box(bess, 1.8, 0.14, 1.6, SH.concrete, xB0 - 2.6, 0.27, zB0 - 6, false); box(bess, 1.3, 1.3, 1.0, SH.trafo, xB0 - 2.6, 0.99, zB0 - 6);
+        box(bess, 1.1, 1.0, 0.25, SH.trafoFin, xB0 - 2.6, 0.95, zB0 - 6.65, false); box(bess, 1.1, 1.0, 0.25, SH.trafoFin, xB0 - 2.6, 0.95, zB0 - 5.35, false);
+        for (j = -1; j <= 1; j++) cyl(bess, 0.05, 0.08, 0.35, SH.ceramic, xB0 - 2.6 + j * 0.4, 1.8, zB0 - 6, 8, null, false);
+      }
       tag(bess, 'bess');
     }
     var bN = Math.min(nB, perRowB), xBc = xB0 + bN * 4, zBc = zB0 - (Math.max(1, rowsB) - 1) * 3;
@@ -2096,6 +2381,18 @@ var Scene3D = (function () {
       for (i = 4; i < nc; i += 4) flat(pvG, 4, fieldD + 4, SH.gravel, colX(i) - 4 - fieldW / 2, 0.075, zPV0 - fieldD / 2);
       flat(pvG, fieldW + 10, 3.5, SH.gravel, 0, 0.07, zPV0 - fieldD - 3.2); flat(pvG, 3.5, fieldD + 8, SH.gravel, -fieldW / 2 - 4, 0.07, zPV0 - fieldD / 2); flat(pvG, 3.5, fieldD + 8, SH.gravel, fieldW / 2 + 4, 0.07, zPV0 - fieldD / 2);
       for (i = 0; i < nr; i++) flat(pvG, fieldW, 1.6, SH.soil, 0, 0.065, zPV0 - i * pitch - 6.9);
+      // cutii de jonctiune la capatul randurilor, statie meteo, container de piese de schimb
+      for (i = 0; i < nr; i++) for (j = 0; j < nc; j += 4) {
+        if (i * nc + j >= nT) continue;
+        var jbx = colX(j) - fieldW / 2 - 0.9, jbz = zPV0 - i * pitch - 2.3;
+        box(pvG, 0.08, 1.3, 0.08, SH.steel, jbx, 0.65, jbz, false); box(pvG, 0.5, 0.6, 0.22, SH.silver, jbx, 1.25, jbz, false);
+      }
+      var wmx = -fieldW / 2 - 1.2, wmz = zPV0 + 1.2;
+      cyl(pvG, 0.04, 0.06, 5, SH.steel, wmx, 2.5, wmz, 8); box(pvG, 1.3, 0.05, 0.05, SH.steel, wmx, 4.6, wmz, false); sph(pvG, 0.11, SH.silver, wmx - 0.6, 4.75, wmz, false, 1, 0);
+      box(pvG, 0.4, 0.03, 0.3, SH.panel, wmx + 0.55, 4.7, wmz, false, [0.436, 0, 0]); box(pvG, 0.35, 0.45, 0.2, SH.white, wmx, 1.5, wmz + 0.12, false);
+      var spx = fieldW / 2 + 8.4, spz = zPV0 - 9;
+      box(pvG, 2.44, 2.6, 6.06, SH.contDark, spx, 1.33, spz); box(pvG, 2.2, 2.3, 0.05, SH.cont, spx, 1.3, spz + 3.04, false); box(pvG, 0.04, 1.6, 0.04, SH.steel, spx - 0.3, 1.3, spz + 3.08, false); box(pvG, 0.04, 1.6, 0.04, SH.steel, spx + 0.3, 1.3, spz + 3.08, false);
+      ao(pvG, 2.6, 6.2, spx, 0.08, spz, 1.4);
     }
     var zPVmid = zPV0 - fieldD / 2, zPVend = zPV0 - fieldD;
 
@@ -2113,6 +2410,7 @@ var Scene3D = (function () {
 
     var gr = new T.Mesh(new T.CircleGeometry(RR * 16, 64), SH.ground); gr.rotation.x = -Math.PI / 2; gr.position.set(cx, -0.05, cz); gr.receiveShadow = true; root.add(gr);
     TEX.grass.repeat.set(RR * 32 / 34, RR * 32 / 34);
+
     // pete mari, mai inchise si mai uscate, ca iarba si culturile sa nu arate uniform
     for (i = 0; i < 120; i++) {
       var pa = R() * 6.28, prd = RR * (i < 40 ? R() * 1.2 : 0.4 + R() * 4.2), psz = (i < 40 ? 14 + R() * 40 : 40 + R() * 110) * k;
@@ -2135,6 +2433,7 @@ var Scene3D = (function () {
     var zA = platZ1 - 4, zB = zRoad - 4.2;
     box(siteG, 7, 0.22, zB - zA, SH.asphalt, xGate, 0.11, (zA + zB) / 2, false);
     flat(siteG, 0.14, zB - zA - 1, SH.paint, xGate - 3.2, 0.226, (zA + zB) / 2); flat(siteG, 0.14, zB - zA - 1, SH.paint, xGate + 3.2, 0.226, (zA + zB) / 2); flat(siteG, 3.0, 0.4, SH.paint, xGate + 1.6, 0.226, zB - 1.2);
+
     // cabina de paza si bariera
     box(siteG, 3, 2.5, 3, SH.paint, xGate + 6, 1.45, platZ1 - 3); box(siteG, 3.6, 0.16, 3.6, SH.trim, xGate + 6, 2.78, platZ1 - 3); box(siteG, 3.04, 0.9, 3.04, SH.carGlass, xGate + 6, 1.75, platZ1 - 3, false);
     box(siteG, 0.3, 1.1, 0.3, SH.white, xGate + 3.9, 0.75, platZ1 + 0.8); box(siteG, 6.6, 0.1, 0.1, SH.red, xGate + 0.6, 1.2, platZ1 + 0.8, false);
@@ -2163,6 +2462,59 @@ var Scene3D = (function () {
       mtx.compose(pos.set(lp[i][0], 0.27 + (i % 7) * 0.004, lp[i][1] + (i % 2 ? 2.2 : -2.2)), qFlat, one); glows.setMatrixAt(i, mtx);
     }
     glows.frustumCulled = false; glows.renderOrder = 2; lampG.add(glows);
+    /* --- detalii de curte --- */
+    // legatura cu drumul de acces, linia din mijloc, trecere de pietoni, alee spre intrare
+    box(siteG, 7, 0.03, 5.6, SH.asphalt, xGate, 0.215, D / 2 + 17.3, false);
+    for (var dxl = xL0 + 3; dxl < xL1 - 5; dxl += 5) if (Math.abs(dxl + 1 - xEnt) > 3 && Math.abs(dxl + 1 - xD) > 3.4 && Math.abs(dxl + 1 - xR) > 4) flat(siteG, 2, 0.12, SH.paint, dxl + 1, 0.237, D / 2 + 11.6);
+    for (i = 0; i < 6; i++) flat(siteG, 3, 0.5, SH.paint, xEnt, 0.238, D / 2 + 9.1 + i * 1.0);
+    flat(siteG, 2.2, 4.4, SH.floor, xEnt, 0.218, D / 2 + 6.4); flat(siteG, 2.2, 1.7, SH.floor, xEnt, 0.218, D / 2 + 15.45);
+    if (xEnt - 1.1 > xP1 + 0.2) flat(siteG, xEnt - 1.1 - xP1, 1.4, SH.floor, (xEnt - 1.1 + xP1) / 2, 0.218, D / 2 + 15.6);
+    [[-1.35, 8.3], [1.35, 8.3], [-1.35, 14.9], [1.35, 14.9]].forEach(function (c) { bollard(siteG, xEnt + c[0], D / 2 + c[1]); });
+    var zcB = Math.min(perCol, nCool) * 2 + 1.2, bxE = W / 2 + 4 + coolW - 0.9;
+    [-1, -0.5, 0, 0.5, 1].forEach(function (f) { bollard(siteG, bxE, f * zcB); });
+    // parcare: opritoare de roti, doua statii de incarcare pentru masini electrice, indicator
+    for (i = 0; i < nBay2; i++) box(siteG, 1.7, 0.12, 0.18, SH.base, xP1 - (i + 0.5) * 2.9, 0.29, zP + 2.65, false);
+    for (i = 0; i < 2; i++) {
+      var evx = xP1 - (i + 1) * 2.9;
+      box(siteG, 0.28, 1.35, 0.2, SH.white, evx, 0.9, zP + 3.2); box(siteG, 0.3, 0.12, 0.22, SH.green, evx, 1.62, zP + 3.2, false); box(siteG, 0.16, 0.2, 0.02, SH.screen, evx, 1.3, zP + 3.09, false);
+    }
+    box(siteG, 0.06, 2.6, 0.06, SH.steel, xP1 + 0.4, 1.5, D / 2 + 16.7, false); box(siteG, 0.6, 0.6, 0.04, SH.blue, xP1 + 0.4, 2.6, D / 2 + 16.7, false);
+    // rampa: placa de nivel, containere de deseuri
+    box(siteG, 2.6, 0.03, 1.6, SH.steel, xD, 0.245, D / 2 + 1.0, false);
+    if (xD - 7.6 > -W / 2 + 0.6) {
+      box(siteG, 1.3, 1.1, 1.0, SH.green, xD - 5.3, 0.8, D / 2 + 1.1); box(siteG, 1.36, 0.08, 1.06, SH.dark, xD - 5.3, 1.38, D / 2 + 1.1, false);
+      box(siteG, 1.3, 1.1, 1.0, SH.contDark, xD - 6.9, 0.8, D / 2 + 1.1); box(siteG, 1.36, 0.08, 1.06, SH.dark, xD - 6.9, 1.38, D / 2 + 1.1, false);
+    }
+    // trei steaguri langa intrare
+    for (i = 0; i < 3; i++) {
+      var fpx = xEnt + 4.2 + i * 1.7, fpz = D / 2 + 5.6;
+      cyl(siteG, 0.035, 0.055, 8, SH.steel, fpx, 4.2, fpz, 8); sph(siteG, 0.08, SH.silver, fpx, 8.25, fpz, false, 1, 0);
+      if (i === 0) { box(siteG, 0.5, 0.9, 0.02, SH.blue, fpx + 0.3, 7.55, fpz, false); box(siteG, 0.5, 0.9, 0.02, SH.stripe, fpx + 0.8, 7.55, fpz, false); box(siteG, 0.5, 0.9, 0.02, SH.red, fpx + 1.3, 7.55, fpz, false); }
+      else if (i === 1) {
+        box(siteG, 1.5, 0.9, 0.02, SH.flagEU, fpx + 0.8, 7.55, fpz, false);
+        for (j = 0; j < 12; j++) for (sd = -1; sd <= 1; sd += 2) box(siteG, 0.06, 0.06, 0.004, SH.stripe, fpx + 0.8 + Math.cos(j * 0.5236) * 0.28, 7.55 + Math.sin(j * 0.5236) * 0.28, fpz + sd * 0.013, false);
+      } else { box(siteG, 1.5, 0.9, 0.02, SH.white, fpx + 0.8, 7.55, fpz, false); box(siteG, 1.5, 0.2, 0.024, SH.stripe, fpx + 0.8, 7.25, fpz, false); }
+    }
+    // totem cu numele la iesirea in drumul national, indicator de oprire
+    box(siteG, 0.12, 2.2, 0.12, SH.steel, xGate - 8.3, 1.1, zB - 1.5, false); box(siteG, 0.12, 2.2, 0.12, SH.steel, xGate - 5.7, 1.1, zB - 1.5, false);
+    box(siteG, 3.3, 0.95, 0.12, SH.trim, xGate - 7, 2.55, zB - 1.5); vpl(siteG, 3.1, 0.78, SH.sign, xGate - 7, 2.55, zB - 1.43);
+    cyl(siteG, 0.035, 0.035, 2.4, SH.steel, xGate + 4.4, 1.3, zB - 2.2, 6, null, false); cyl(siteG, 0.38, 0.38, 0.04, SH.red, xGate + 4.4, 2.3, zB - 2.2, 8, [Math.PI / 2, 0, 0], false);
+    // instalatii in curte (apar odata cu etapa "instalatii"): rezerva de apa pentru incendiu cu casa pompelor, camere video, paratrasnete
+    var tkR = huge ? 3.4 : big ? 2.6 : 1.8, tkH = huge ? 7 : big ? 5.5 : 4.2, tkx = platX1 - 4.2, tkz = -D / 2 + 1, phz = tkz + tkR + 2.4;
+    cyl(lampG, tkR, tkR, tkH, SH.cont, tkx, 0.2 + tkH / 2, tkz, 28); cyl(lampG, 0.25, tkR + 0.08, 0.7, SH.steel, tkx, 0.2 + tkH + 0.35, tkz, 28, null, false);
+    cyl(lampG, tkR + 0.15, tkR + 0.15, 0.25, SH.base, tkx, 0.32, tkz, 28, null, false);
+    for (i = 1; i < 4; i++) cyl(lampG, tkR + 0.03, tkR + 0.03, 0.06, SH.steel, tkx, 0.2 + i * tkH / 4, tkz, 28, null, false);
+    box(lampG, 0.06, tkH, 0.4, SH.steel, tkx - tkR - 0.05, 0.2 + tkH / 2, tkz, false); ao(lampG, tkR * 2, tkR * 2, tkx, 0.215, tkz, 1.5);
+    box(lampG, 3.0, 2.5, 2.6, SH.paint, tkx, 1.45, phz); box(lampG, 3.3, 0.14, 2.9, SH.trim, tkx, 2.77, phz); box(lampG, 0.9, 1.9, 0.05, SH.red, tkx - 0.6, 1.2, phz + 1.31, false); box(lampG, 0.7, 0.5, 0.05, SH.louver, tkx + 0.8, 2.0, phz + 1.31, false);
+    cyl(lampG, 0.1, 0.1, 2.0, SH.red, tkx, 0.6, tkz + tkR + 0.3, 8, [Math.PI / 2, 0, 0], false);
+    cyl(lampG, 0.09, 0.09, 0.7, SH.red, tkx + 2.0, 0.55, phz + 1.0, 8, null, false); cyl(lampG, 0.12, 0.12, 0.12, SH.red, tkx + 2.0, 0.93, phz + 1.0, 8, null, false);
+    [[platX0 + 1.5, platZ0 + 1.5], [platX1 - 1.5, platZ0 + 1.5], [platX0 + 1.5, platZ1 - 1.5], [platX1 - 1.5, platZ1 - 1.5], [xGate - 5.2, platZ1 - 1.2]].forEach(function (c) {
+      var dir = c[0] > (platX0 + platX1) / 2 ? -1 : 1;
+      cyl(lampG, 0.05, 0.07, 5, SH.steel, c[0], 2.7, c[1], 8); box(lampG, 0.5, 0.05, 0.05, SH.steel, c[0] + dir * 0.2, 5.1, c[1], false); box(lampG, 0.34, 0.14, 0.14, SH.white, c[0] + dir * 0.4, 4.98, c[1], false);
+    });
+    var lmH = huge ? 26 : big ? 20 : 14;
+    [[platX0 + 2.2, platZ0 + 7], [platX1 - 2.2, platZ0 + 7]].forEach(function (c) { cyl(lampG, 0.03, 0.14, lmH, SH.steel, c[0], 0.2 + lmH / 2, c[1], 8); });
+
     // copaci: plopi de-a lungul drumului, palcuri prin camp, cativa langa curte
     var trees = [[], [], []];
     function addTree(kind, x, z, s) { if (x > x0 - 4 && x < x1 + 4 && z > z0 - 4 && z < z1 + 3) return; trees[kind].push([x, z, s, R() * 6.28, R()]); }
@@ -2178,6 +2530,30 @@ var Scene3D = (function () {
       for (j = 0; j < nn; j++) addTree(kind, gxx + (R() - 0.5) * 22 * k, gzz + (R() - 0.5) * 22 * k, (0.8 + R() * 0.6) * Math.sqrt(k));
     }
     for (i = 0; i < 5; i++) addTree(2, x1 + 7 + (R() - 0.5) * 3, z1 - 6 - i * 7, 0.8 + R() * 0.3);
+    // gard viu in spatele gardului dinspre drum
+    function hedgeRun(xa, xb) { for (var hx = xa; hx < xb - 2; hx += 9) { var hl = Math.min(8.4, xb - hx), hh = 1.1 + R() * 0.4; box(fenceG, hl, hh, 0.9 + R() * 0.2, SH.hedge, hx + hl / 2, hh / 2, z1 - 1.0); } }
+    hedgeRun(x0 + 2, xGate - 14); hedgeRun(xGate + 6, x1 - 2);
+    // drumuri de pamant printre parcele, o perdea de plopi, o ferma si un sat in departare
+    var tkz2 = z0 - 26, fmx = cx - RR * 0.95 - 30, fmz = z0 - RR * 0.8 - 30, vx0 = cx + RR * 1.05, vz0 = z0 - RR * 1.3 - 40, wallMs = [SH.paint, SH.wallIn, SH.box, SH.white];
+    quad(root, SH.soil, cx, 0.085, tkz2, RR * 5, 3.5, RR * 5 / 6, 0.6, false);
+    quad(root, SH.soil, x0 - 16, 0.085, (tkz2 + zRoad - 5) / 2, 3.5, zRoad - 5 - tkz2, 0.6, (zRoad - 5 - tkz2) / 6, false);
+    quad(root, SH.soil, fmx + 42, 0.085, (tkz2 + fmz) / 2, 3.5, tkz2 - fmz, 0.6, (tkz2 - fmz) / 6, false);
+    quad(root, SH.soil, vx0 - 88, 0.085, (tkz2 + vz0) / 2, 3.5, tkz2 - vz0, 0.6, (tkz2 - vz0) / 6, false);
+    for (var tlx = cx - RR * 1.2; tlx < cx + RR * 0.35; tlx += 11 * Math.sqrt(k)) addTree(0, tlx + (R() - 0.5) * 2, tkz2 - 5, (0.85 + R() * 0.4) * Math.sqrt(k));
+    quad(root, SH.soil, fmx, 0.085, fmz, 80, 56, 80 / 6, 56 / 6, false);
+    house(root, fmx - 12, fmz - 12, 30, 12, 5, SH.cont, SH.tileRoof, false); house(root, fmx + 22, fmz + 2, 22, 10, 4.5, SH.contDark, SH.trim, true); house(root, fmx - 22, fmz + 16, 10, 7.5, 3, SH.paint, SH.tileRoof, false);
+    for (i = 0; i < 2; i++) { cyl(root, 2.3, 2.3, 9, SH.silver, fmx + 4 + i * 5.6, 4.5, fmz + 18, 16); cyl(root, 0.2, 2.35, 1.6, SH.silver, fmx + 4 + i * 5.6, 9.8, fmz + 18, 16, null, false); }
+    for (i = 0; i < 6; i++) addTree(1, fmx - 36 + R() * 72, fmz + (R() > 0.5 ? 31 : -31) + R() * 4, 0.8 + R() * 0.4);
+    quad(root, SH.soil, vx0, 0.085, vz0, 176, 5, 176 / 6, 0.8, false);
+    for (i = 0; i < 16; i++) {
+      var hsx = vx0 - 75 + i * 10 + (R() - 0.5) * 3, hsz = vz0 + (i % 2 ? 10 : -10) + (R() - 0.5) * 3;
+      house(root, hsx, hsz, 8 + R() * 3, 6 + R() * 2, 2.8 + R() * 0.6, wallMs[Math.floor(R() * 4)], R() > 0.3 ? SH.tileRoof : SH.trim, R() > 0.5);
+      if (R() > 0.4) addTree(1, hsx + 5 + R() * 3, hsz + (i % 2 ? 8 : -8), 0.7 + R() * 0.4);
+    }
+    box(root, 5, 11, 5, SH.paint, vx0 + 12, 5.5, vz0 - 28); cyl(root, 0.1, 3.4, 6, SH.trim, vx0 + 12, 14, vz0 - 28, 4, [0, Math.PI / 4, 0]); house(root, vx0 + 12, vz0 - 39, 16, 8, 6, SH.paint, SH.tileRoof, true);
+    // masini pe drumul national (merg spre est)
+    var roadG = grp(root); roadG.rotation.y = Math.PI / 2; roadG.position.y = -0.1;
+    car(roadG, -(zRoad + 2.4), cx - RR * 0.7, 4); car(roadG, -(zRoad + 2.4), cx + RR * 0.38, 1); truck(roadG, -(zRoad + 2.4), cx + RR * 0.95);
     ['poplar', 'broad', 'conifer'].forEach(function (name, kd) {
       var list = trees[kd]; if (!list.length) return;
       var im = inst(root, treeTpl(name), list.length);
@@ -2218,6 +2594,7 @@ var Scene3D = (function () {
     flows.gen = new Flow(fg, [[xGen, zGm], [-W / 2, zGm]], COL.gen, k, 6);
     puffGen = new Puffs(root, genO, SH.smoke, 0.8 * genS, 9, 4); puffGen.on = outage === 2 ? 1 : 0;
     puffHeat = new Puffs(root, coolO, SH.heat, 1.5, 11, 3); puffHeat.on = thermal ? 1 : 0;
+
 
     L = {
       W: W, D: D, H: H, k: k, R: RR, cx: cx, cz: cz, spanX: spanX, spanZ: spanZ,
@@ -2276,7 +2653,7 @@ var Scene3D = (function () {
   }
   function setThermal(on) {
     thermal = !!on; if (!ok) return;
-    THERM.forEach(function (e) { e.m.color.setHex(thermal ? e.hot : e.base); if (e.map) e.m.map = thermal ? TEX.white : e.map; });
+    THERM.forEach(function (e) { e.m.color.setHex(thermal ? e.hot : e.base); if (e.map) e.m.map = thermal ? TEX.white : e.map; if (e.metal !== undefined) e.m.metalness = thermal ? 0 : e.metal; });
     SH.rackFront.emissive.setHex(thermal ? 0xffa030 : 0xffffff); SH.rackFront.emissiveIntensity = thermal ? 0.8 : 1.6; SH.cabF.emissiveIntensity = thermal ? 0 : 1;
     SH.hot.opacity = thermal ? 0.5 : 0.16; SH.cold.opacity = thermal ? 0.42 : 0.12; SH.ao.opacity = thermal ? 0 : 0.5; SH.patchA.opacity = thermal ? 0 : 0.4; SH.patchB.opacity = thermal ? 0 : 0.4;
     if (puffHeat) puffHeat.on = thermal ? 1 : 0;
@@ -2290,12 +2667,13 @@ var Scene3D = (function () {
 
   /* ---------- cerul: gradient, soare, nori, stele, totul calculat pe placa video ---------- */
   var SKY_V = 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  var SKY_FAR = 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position.z = gl_Position.w; }';   // la adancimea maxima: se deseneaza doar pixelii de cer care chiar se vad
   function makeSky() {
     var mat = new T.ShaderMaterial({
-      side: T.BackSide, depthWrite: false, depthTest: false, fog: false, toneMapped: false,
+      side: T.BackSide, depthWrite: false, fog: false, toneMapped: false,
       uniforms: { uSun: { value: new T.Vector3(0, 1, 0) }, uTop: { value: new T.Color() }, uHor: { value: new T.Color() }, uSunCol: { value: new T.Color() }, uCloudCol: { value: new T.Color() }, uCloudSh: { value: new T.Color() },
         uCloud: { value: 0.2 }, uTime: { value: 0 }, uNight: { value: 0 }, uSunVis: { value: 1 } },
-      vertexShader: SKY_V,
+      vertexShader: SKY_FAR,
       fragmentShader: [
         'uniform vec3 uSun; uniform vec3 uTop; uniform vec3 uHor; uniform vec3 uSunCol; uniform vec3 uCloudCol; uniform vec3 uCloudSh;',
         'uniform float uCloud; uniform float uTime; uniform float uNight; uniform float uSunVis; varying vec3 vDir;',
@@ -2323,20 +2701,22 @@ var Scene3D = (function () {
         '  #include <encodings_fragment>',
         '}'].join('\n')
     });
-    sky = new T.Mesh(new T.SphereGeometry(1, 40, 20), mat); sky.renderOrder = -100; sky.frustumCulled = false; sky.matrixAutoUpdate = true; scene.add(sky);
+    sky = new T.Mesh(new T.SphereGeometry(1, 40, 20), mat); sky.renderOrder = 1000; sky.frustumCulled = false; sky.matrixAutoUpdate = true; scene.add(sky);
   }
+  var envRT = null;
   function makeEnv() {      // cerul pe care il oglindesc sticla, panourile si tabla
     try {
+      if (envRT) { envRT.dispose(); envRT = null; }
       var pm = new T.PMREMGenerator(renderer), es = new T.Scene();
       var m = new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, depthTest: false, vertexShader: SKY_V,
         fragmentShader: 'varying vec3 vDir; void main() { vec3 d = normalize(vDir); float h = d.y; vec3 sk = mix(vec3(0.95, 0.98, 1.02), vec3(0.3, 0.5, 0.92), pow(clamp(h, 0.0, 1.0), 0.5)); vec3 gd = mix(vec3(0.5, 0.48, 0.4), vec3(0.2, 0.21, 0.15), clamp(-h * 2.5, 0.0, 1.0)); gl_FragColor = vec4(h > 0.0 ? sk : gd, 1.0); }' });
       es.add(new T.Mesh(new T.SphereGeometry(40, 32, 16), m));
-      scene.environment = pm.fromScene(es, 0.02).texture; pm.dispose();
+      envRT = pm.fromScene(es, 0.02); scene.environment = envRT.texture; pm.dispose(); m.dispose();
     } catch (e) { scene.environment = null; }
   }
 
   /* ---------- soare, cer, noapte ---------- */
-  var sunState = { el: 1.0, az: 0, wx: 0 }, sunDir = null, cA = null, cB = null, cTmp = null;
+  var sunState = { el: 1.0, az: 0, wx: 0 }, sunDir = null, cA = null, cB = null, cTmp = null, sunOk = false;
   var EXPO = 1.0, SUN_I = 1.65, HEMI_D = 0.36, HEMI_N = 0.09, ENV_I = 0.3;
   function srgbOf(c, hex) { return c.setHex(hex).convertLinearToSRGB(); }
   function applySun() {
@@ -2347,7 +2727,7 @@ var Scene3D = (function () {
     var el = Math.max(s.el, 0.07);
     sunDir.set(-Math.sin(s.az) * Math.cos(el), Math.sin(el), Math.cos(s.az) * Math.cos(el));
     var warm = Math.max(0, Math.min(1, sinEl / 0.5)), u = sky.material.uniforms;
-    nightK = 1 - day; shF.x = 1e9; shadowDirty = true;
+    nightK = 1 - day; shF.x = 1e9; shadowDirty = true; sunOk = true;
     u.uSun.value.copy(sunDir); if (s.el < 0.07) u.uSun.value.set(-Math.sin(s.az) * Math.cos(s.el), sinEl, Math.cos(s.az) * Math.cos(s.el));
     SH.lampHead.color.setHex(0x8a8f8c).lerp(cTmp.setHex(0xfff0c0), nightK); SH.glow.opacity = 0.5 * nightK;
     if (parts) parts.cloudG.visible = s.wx === 1 && day > 0.3 && !thermal; SH.cloud.opacity = 0.26 * day;
@@ -2379,7 +2759,10 @@ var Scene3D = (function () {
     }
     for (var i = 0; i < MATS.length; i++) MATS[i].envMapIntensity = MATS[i].userData.env * envK;
   }
-  function setSun(el, az, wx) { sunState.el = el; sunState.az = az; sunState.wx = wx; applySun(); }
+  function setSun(el, az, wx) {
+    if (sunOk && el === sunState.el && az === sunState.az && wx === sunState.wx) return;      // pagina il cheama des; umbrele se refac doar cand soarele chiar s-a miscat
+    sunState.el = el; sunState.az = az; sunState.wx = wx; applySun();
+  }
 
   /* ---------- umbre: harta de umbre urmareste zona la care te uiti, ca sa fie clare si de aproape ---------- */
   function focusShadow() {
@@ -2419,9 +2802,9 @@ var Scene3D = (function () {
 
   function bindControls() {
     var ptrs = {}, n = 0, last = null, moved = 0, pinch0 = 0, downAt = null;
-    function touched() { goal = null; auto = false; if (handlers.touched) handlers.touched(); }
+    function touched() { goal = null; auto = false; lastInput = performance.now(); if (handlers.touched) handlers.touched(); }
     canvas.addEventListener('pointerdown', function (e) {
-      canvas.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; n = Object.keys(ptrs).length;
+      canvas.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; n = Object.keys(ptrs).length; touching = n; lastInput = performance.now(); wake();
       last = { x: e.clientX, y: e.clientY }; moved = 0; downAt = { x: e.clientX, y: e.clientY, b: e.button, shift: e.shiftKey }; pinch0 = 0;
     });
     canvas.addEventListener('pointermove', function (e) {
@@ -2446,7 +2829,7 @@ var Scene3D = (function () {
     });
     function up(e) {
       if (!ptrs[e.pointerId]) return;
-      delete ptrs[e.pointerId]; pinch0 = 0;
+      delete ptrs[e.pointerId]; pinch0 = 0; touching = Object.keys(ptrs).length; lastInput = performance.now();
       if (moved < 5 && downAt && downAt.b === 0) { var id = pickAt(e.clientX, e.clientY); if (id && handlers.pick) handlers.pick(id); }
     }
     canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
@@ -2457,7 +2840,7 @@ var Scene3D = (function () {
     }, { passive: false });
   }
   function clampDist(d) { return L ? Math.max(rackOpen ? 2.2 : 6, Math.min(L.R * 7, d)) : d; }
-  function zoom(f) { cam.dist = clampDist(cam.dist * f); goal = null; }
+  function zoom(f) { cam.dist = clampDist(cam.dist * f); goal = null; lastInput = performance.now(); }
 
   var ray = null, v2 = null, hoverT = 0;
   function pickAt(x, y) {
@@ -2527,7 +2910,8 @@ var Scene3D = (function () {
   }
 
   /* ---------- calitatea se regleaza singura: daca aparatul nu tine 27 de cadre pe secunda, coboram o treapta ---------- */
-  var QSTEPS = [[2, 1], [1.5, 1], [1.25, 0.5], [1, 0.5], [0.8, 0]], gov = { t: 0, n: 0, wait: 3 }, inView = true;
+  var QSTEPS = [[2, 1], [1.5, 1], [1.25, 0.5], [1, 0.5], [0.8, 0]], gov = { t: 0, n: 0, wait: 3, bad: 0 }, inView = true;
+  var scheduled = false, lost = false, drew = false, prevT = 0, lastInput = 0, touching = 0;
   function pickQuality() {
     var touch = (navigator.maxTouchPoints || 0) > 0, small = Math.min(window.screen.width || 9999, window.screen.height || 9999);
     Q.lite = (touch && small < 820) || Math.min(window.innerWidth, window.innerHeight) < 480;
@@ -2545,22 +2929,30 @@ var Scene3D = (function () {
     }
     resize();
   }
-  function govern(dt) {
-    if (Q.fixed || dt > 0.4) return;
+  function govern(dt) {      // dt = cat a trecut pana la cadrul urmator, masurat doar dupa un cadru desenat (deci cat costa desenul)
+    if (Q.fixed) return;
     if (gov.wait > 0) { gov.wait -= dt; gov.t = 0; gov.n = 0; return; }
-    gov.t += dt; gov.n++;
-    if (gov.t < 1.5) return;
-    var fps = gov.n / gov.t; gov.t = 0; gov.n = 0;
-    if (fps < 27 && Q.step < QSTEPS.length - 1) { Q.step++; applyQuality(); gov.wait = 1.2; }
+    gov.t += Math.min(dt, 2); gov.n++;                       // si cadrele foarte lente conteaza: un aparat care face un cadru pe secunda trebuie ajutat primul
+    if (gov.t < 1.2 && gov.n < 40) return;
+    var slow = gov.t / gov.n > 1 / 27; gov.t = 0; gov.n = 0;
+    gov.bad = slow ? gov.bad + 1 : 0;                        // doua ferestre lente la rand, ca o poticnire singura sa nu coboare calitatea
+    if (gov.bad >= 2 && Q.step < QSTEPS.length - 1) { Q.step++; gov.bad = 0; applyQuality(); gov.wait = 1.2; }
+  }
+  function wake() {          // porneste bucla daca macheta se vede; cand nu se vede, bucla sta de tot
+    if (scheduled || !ok || lost || document.hidden || !inView) return;
+    scheduled = true; running = true; drew = false; lastT = prevT = performance.now(); requestAnimationFrame(frame);
   }
 
   /* ---------- bucla ---------- */
   function frame(t) {
-    if (!running) return;
-    requestAnimationFrame(frame);
-    var real = (t - lastT) / 1000 || 0.016, dt = Math.min(0.05, real); lastT = t;
-    if (!inView) return;                       // macheta nu se vede (ai derulat mai jos): nu consumam bateria
-    govern(real);
+    scheduled = false;
+    if (lost || document.hidden || !inView) { running = false; return; }      // macheta nu se vede (alta fila sau ai derulat mai jos): nu consumam bateria
+    scheduled = true; requestAnimationFrame(frame);
+    if (drew) govern((t - prevT) / 1000);
+    prevT = t; drew = false;
+    var busy = goal || touching > 0 || t - lastInput < 700 || shadowDirty || Math.abs(roofK - (roofOpen ? 1 : 0)) > 0.001 || Math.abs(rackK - (rackOpen ? 1 : 0)) > 0.001;
+    if (Q.lite && !busy && t - lastT < 24) return;      // pe telefon, cat timp nimic nu se misca repede, ajung 30 de cadre pe secunda
+    var dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t; drew = true;
     stepCamera(dt);
     for (var id in flows) flows[id].update(dt, camera.position);
     var i;
@@ -2580,6 +2972,10 @@ var Scene3D = (function () {
       var op = 1 - roofK; for (i = 0; i < ROOFM.length; i++) ROOFM[i].opacity = op;
       roofGroup.position.y = roofK * (L.H * 1.2 + 3); roofGroup.visible = roofK < 0.97 && buildK[2] >= 0.92;
       if (wallGroup) wallGroup.scale.y = Math.max(0.02, (1 - 0.6 * roofK - 0.25 * rackK) * (parts ? parts.shell : 1));
+      if (parts) {             // sub acoperisul inchis nu se vede nimic: nu desenam interiorul
+        var showIn = roofK > 0.01 || rackK > 0.01 || !roofGroup.visible;
+        parts.elec.visible = parts.partG.visible = showIn && buildK[3] > 0.01; parts.itg.visible = showIn && buildK[4] > 0.01;
+      }
       var shade = roofK < 0.04;
       if (roofGroup.userData.shade !== shade) { roofGroup.userData.shade = shade; roofGroup.traverse(function (o) { if (o.isMesh) o.castShadow = shade; }); shadowDirty = true; }
     }
@@ -2618,16 +3014,16 @@ var Scene3D = (function () {
     initShared(); makeSky(); makeEnv(); ok = true;
     applyQuality(); bindControls();
     if (window.ResizeObserver) new ResizeObserver(resize).observe(host); else window.addEventListener('resize', resize);
-    if (window.IntersectionObserver) new IntersectionObserver(function (es) { inView = es[es.length - 1].isIntersecting; if (inView) gov.wait = Math.max(gov.wait, 0.8); }).observe(host);
-    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); running = false; });
-    canvas.addEventListener('webglcontextrestored', function () { shadowDirty = true; if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(frame); } });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && !running) { running = true; lastT = performance.now(); gov.wait = 1.5; requestAnimationFrame(frame); } else if (document.hidden) running = false; });
-    requestAnimationFrame(frame);
+    if (window.IntersectionObserver) new IntersectionObserver(function (es) { inView = es[es.length - 1].isIntersecting; if (inView) { gov.wait = Math.max(gov.wait, 0.8); wake(); } }).observe(host);
+    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); lost = true; });
+    canvas.addEventListener('webglcontextrestored', function () { lost = false; makeEnv(); shF.x = 1e9; shadowDirty = true; applySun(); gov.wait = 2; wake(); });      // telefonul a luat memoria video: refacem ce se pierde
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { gov.wait = Math.max(gov.wait, 1.5); wake(); } });
+    wake();
     return true;
   }
 
   return {
-    init: init, build: build, go: go, setSun: setSun, zoom: zoom, makeLabels: makeLabels, setLabelText: setLabelText,
+    init: init, build: function (p) { var r = build(p); gov.wait = Math.max(gov.wait, 1.5); wake(); return r; }, go: go, setSun: setSun, zoom: zoom, makeLabels: makeLabels, setLabelText: setLabelText,
     setRoof: function (o) { roofOpen = !!o; },
     setRack: function (o) { rackOpen = !!o; },
     setBuild: function (arr) { buildK = arr ? arr.slice(0, 8) : [1, 1, 1, 1, 1, 1, 1, 1]; applyBuild(); },
@@ -3338,7 +3734,7 @@ var Scene3D = (function () {
       playRaf = requestAnimationFrame(loop);
     })(playLast);
   }
-  function stopPlay() { if (!st.playing) return; st.playing = false; cancelAnimationFrame(playRaf); $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ O zi întreagă'; }
+  function stopPlay() { if (!st.playing) return; st.playing = false; cancelAnimationFrame(playRaf); $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Rulează 24 de ore'; }
 
   init();
 })();

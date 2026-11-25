@@ -692,7 +692,7 @@
       playRaf = requestAnimationFrame(loop);
     })(playLast);
   }
-  function stopPlay() { if (!st.playing) return; st.playing = false; cancelAnimationFrame(playRaf); $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ O zi întreagă'; }
+  function stopPlay() { if (!st.playing) return; st.playing = false; cancelAnimationFrame(playRaf); $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Rulează 24 de ore'; }
 
   init();
 })();

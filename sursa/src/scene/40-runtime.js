@@ -16,7 +16,7 @@
   }
   function setThermal(on) {
     thermal = !!on; if (!ok) return;
-    THERM.forEach(function (e) { e.m.color.setHex(thermal ? e.hot : e.base); if (e.map) e.m.map = thermal ? TEX.white : e.map; });
+    THERM.forEach(function (e) { e.m.color.setHex(thermal ? e.hot : e.base); if (e.map) e.m.map = thermal ? TEX.white : e.map; if (e.metal !== undefined) e.m.metalness = thermal ? 0 : e.metal; });
     SH.rackFront.emissive.setHex(thermal ? 0xffa030 : 0xffffff); SH.rackFront.emissiveIntensity = thermal ? 0.8 : 1.6; SH.cabF.emissiveIntensity = thermal ? 0 : 1;
     SH.hot.opacity = thermal ? 0.5 : 0.16; SH.cold.opacity = thermal ? 0.42 : 0.12; SH.ao.opacity = thermal ? 0 : 0.5; SH.patchA.opacity = thermal ? 0 : 0.4; SH.patchB.opacity = thermal ? 0 : 0.4;
     if (puffHeat) puffHeat.on = thermal ? 1 : 0;
@@ -30,12 +30,13 @@
 
   /* ---------- cerul: gradient, soare, nori, stele, totul calculat pe placa video ---------- */
   var SKY_V = 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  var SKY_FAR = 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position.z = gl_Position.w; }';   // la adancimea maxima: se deseneaza doar pixelii de cer care chiar se vad
   function makeSky() {
     var mat = new T.ShaderMaterial({
-      side: T.BackSide, depthWrite: false, depthTest: false, fog: false, toneMapped: false,
+      side: T.BackSide, depthWrite: false, fog: false, toneMapped: false,
       uniforms: { uSun: { value: new T.Vector3(0, 1, 0) }, uTop: { value: new T.Color() }, uHor: { value: new T.Color() }, uSunCol: { value: new T.Color() }, uCloudCol: { value: new T.Color() }, uCloudSh: { value: new T.Color() },
         uCloud: { value: 0.2 }, uTime: { value: 0 }, uNight: { value: 0 }, uSunVis: { value: 1 } },
-      vertexShader: SKY_V,
+      vertexShader: SKY_FAR,
       fragmentShader: [
         'uniform vec3 uSun; uniform vec3 uTop; uniform vec3 uHor; uniform vec3 uSunCol; uniform vec3 uCloudCol; uniform vec3 uCloudSh;',
         'uniform float uCloud; uniform float uTime; uniform float uNight; uniform float uSunVis; varying vec3 vDir;',
@@ -63,20 +64,22 @@
         '  #include <encodings_fragment>',
         '}'].join('\n')
     });
-    sky = new T.Mesh(new T.SphereGeometry(1, 40, 20), mat); sky.renderOrder = -100; sky.frustumCulled = false; sky.matrixAutoUpdate = true; scene.add(sky);
+    sky = new T.Mesh(new T.SphereGeometry(1, 40, 20), mat); sky.renderOrder = 1000; sky.frustumCulled = false; sky.matrixAutoUpdate = true; scene.add(sky);
   }
+  var envRT = null;
   function makeEnv() {      // cerul pe care il oglindesc sticla, panourile si tabla
     try {
+      if (envRT) { envRT.dispose(); envRT = null; }
       var pm = new T.PMREMGenerator(renderer), es = new T.Scene();
       var m = new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, depthTest: false, vertexShader: SKY_V,
         fragmentShader: 'varying vec3 vDir; void main() { vec3 d = normalize(vDir); float h = d.y; vec3 sk = mix(vec3(0.95, 0.98, 1.02), vec3(0.3, 0.5, 0.92), pow(clamp(h, 0.0, 1.0), 0.5)); vec3 gd = mix(vec3(0.5, 0.48, 0.4), vec3(0.2, 0.21, 0.15), clamp(-h * 2.5, 0.0, 1.0)); gl_FragColor = vec4(h > 0.0 ? sk : gd, 1.0); }' });
       es.add(new T.Mesh(new T.SphereGeometry(40, 32, 16), m));
-      scene.environment = pm.fromScene(es, 0.02).texture; pm.dispose();
+      envRT = pm.fromScene(es, 0.02); scene.environment = envRT.texture; pm.dispose(); m.dispose();
     } catch (e) { scene.environment = null; }
   }
 
   /* ---------- soare, cer, noapte ---------- */
-  var sunState = { el: 1.0, az: 0, wx: 0 }, sunDir = null, cA = null, cB = null, cTmp = null;
+  var sunState = { el: 1.0, az: 0, wx: 0 }, sunDir = null, cA = null, cB = null, cTmp = null, sunOk = false;
   var EXPO = 1.0, SUN_I = 1.65, HEMI_D = 0.36, HEMI_N = 0.09, ENV_I = 0.3;
   function srgbOf(c, hex) { return c.setHex(hex).convertLinearToSRGB(); }
   function applySun() {
@@ -87,7 +90,7 @@
     var el = Math.max(s.el, 0.07);
     sunDir.set(-Math.sin(s.az) * Math.cos(el), Math.sin(el), Math.cos(s.az) * Math.cos(el));
     var warm = Math.max(0, Math.min(1, sinEl / 0.5)), u = sky.material.uniforms;
-    nightK = 1 - day; shF.x = 1e9; shadowDirty = true;
+    nightK = 1 - day; shF.x = 1e9; shadowDirty = true; sunOk = true;
     u.uSun.value.copy(sunDir); if (s.el < 0.07) u.uSun.value.set(-Math.sin(s.az) * Math.cos(s.el), sinEl, Math.cos(s.az) * Math.cos(s.el));
     SH.lampHead.color.setHex(0x8a8f8c).lerp(cTmp.setHex(0xfff0c0), nightK); SH.glow.opacity = 0.5 * nightK;
     if (parts) parts.cloudG.visible = s.wx === 1 && day > 0.3 && !thermal; SH.cloud.opacity = 0.26 * day;
@@ -119,7 +122,10 @@
     }
     for (var i = 0; i < MATS.length; i++) MATS[i].envMapIntensity = MATS[i].userData.env * envK;
   }
-  function setSun(el, az, wx) { sunState.el = el; sunState.az = az; sunState.wx = wx; applySun(); }
+  function setSun(el, az, wx) {
+    if (sunOk && el === sunState.el && az === sunState.az && wx === sunState.wx) return;      // pagina il cheama des; umbrele se refac doar cand soarele chiar s-a miscat
+    sunState.el = el; sunState.az = az; sunState.wx = wx; applySun();
+  }
 
   /* ---------- umbre: harta de umbre urmareste zona la care te uiti, ca sa fie clare si de aproape ---------- */
   function focusShadow() {
@@ -159,9 +165,9 @@
 
   function bindControls() {
     var ptrs = {}, n = 0, last = null, moved = 0, pinch0 = 0, downAt = null;
-    function touched() { goal = null; auto = false; if (handlers.touched) handlers.touched(); }
+    function touched() { goal = null; auto = false; lastInput = performance.now(); if (handlers.touched) handlers.touched(); }
     canvas.addEventListener('pointerdown', function (e) {
-      canvas.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; n = Object.keys(ptrs).length;
+      canvas.setPointerCapture(e.pointerId); ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; n = Object.keys(ptrs).length; touching = n; lastInput = performance.now(); wake();
       last = { x: e.clientX, y: e.clientY }; moved = 0; downAt = { x: e.clientX, y: e.clientY, b: e.button, shift: e.shiftKey }; pinch0 = 0;
     });
     canvas.addEventListener('pointermove', function (e) {
@@ -186,7 +192,7 @@
     });
     function up(e) {
       if (!ptrs[e.pointerId]) return;
-      delete ptrs[e.pointerId]; pinch0 = 0;
+      delete ptrs[e.pointerId]; pinch0 = 0; touching = Object.keys(ptrs).length; lastInput = performance.now();
       if (moved < 5 && downAt && downAt.b === 0) { var id = pickAt(e.clientX, e.clientY); if (id && handlers.pick) handlers.pick(id); }
     }
     canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
@@ -197,7 +203,7 @@
     }, { passive: false });
   }
   function clampDist(d) { return L ? Math.max(rackOpen ? 2.2 : 6, Math.min(L.R * 7, d)) : d; }
-  function zoom(f) { cam.dist = clampDist(cam.dist * f); goal = null; }
+  function zoom(f) { cam.dist = clampDist(cam.dist * f); goal = null; lastInput = performance.now(); }
 
   var ray = null, v2 = null, hoverT = 0;
   function pickAt(x, y) {
@@ -267,7 +273,8 @@
   }
 
   /* ---------- calitatea se regleaza singura: daca aparatul nu tine 27 de cadre pe secunda, coboram o treapta ---------- */
-  var QSTEPS = [[2, 1], [1.5, 1], [1.25, 0.5], [1, 0.5], [0.8, 0]], gov = { t: 0, n: 0, wait: 3 }, inView = true;
+  var QSTEPS = [[2, 1], [1.5, 1], [1.25, 0.5], [1, 0.5], [0.8, 0]], gov = { t: 0, n: 0, wait: 3, bad: 0 }, inView = true;
+  var scheduled = false, lost = false, drew = false, prevT = 0, lastInput = 0, touching = 0;
   function pickQuality() {
     var touch = (navigator.maxTouchPoints || 0) > 0, small = Math.min(window.screen.width || 9999, window.screen.height || 9999);
     Q.lite = (touch && small < 820) || Math.min(window.innerWidth, window.innerHeight) < 480;
@@ -285,22 +292,30 @@
     }
     resize();
   }
-  function govern(dt) {
-    if (Q.fixed || dt > 0.4) return;
+  function govern(dt) {      // dt = cat a trecut pana la cadrul urmator, masurat doar dupa un cadru desenat (deci cat costa desenul)
+    if (Q.fixed) return;
     if (gov.wait > 0) { gov.wait -= dt; gov.t = 0; gov.n = 0; return; }
-    gov.t += dt; gov.n++;
-    if (gov.t < 1.5) return;
-    var fps = gov.n / gov.t; gov.t = 0; gov.n = 0;
-    if (fps < 27 && Q.step < QSTEPS.length - 1) { Q.step++; applyQuality(); gov.wait = 1.2; }
+    gov.t += Math.min(dt, 2); gov.n++;                       // si cadrele foarte lente conteaza: un aparat care face un cadru pe secunda trebuie ajutat primul
+    if (gov.t < 1.2 && gov.n < 40) return;
+    var slow = gov.t / gov.n > 1 / 27; gov.t = 0; gov.n = 0;
+    gov.bad = slow ? gov.bad + 1 : 0;                        // doua ferestre lente la rand, ca o poticnire singura sa nu coboare calitatea
+    if (gov.bad >= 2 && Q.step < QSTEPS.length - 1) { Q.step++; gov.bad = 0; applyQuality(); gov.wait = 1.2; }
+  }
+  function wake() {          // porneste bucla daca macheta se vede; cand nu se vede, bucla sta de tot
+    if (scheduled || !ok || lost || document.hidden || !inView) return;
+    scheduled = true; running = true; drew = false; lastT = prevT = performance.now(); requestAnimationFrame(frame);
   }
 
   /* ---------- bucla ---------- */
   function frame(t) {
-    if (!running) return;
-    requestAnimationFrame(frame);
-    var real = (t - lastT) / 1000 || 0.016, dt = Math.min(0.05, real); lastT = t;
-    if (!inView) return;                       // macheta nu se vede (ai derulat mai jos): nu consumam bateria
-    govern(real);
+    scheduled = false;
+    if (lost || document.hidden || !inView) { running = false; return; }      // macheta nu se vede (alta fila sau ai derulat mai jos): nu consumam bateria
+    scheduled = true; requestAnimationFrame(frame);
+    if (drew) govern((t - prevT) / 1000);
+    prevT = t; drew = false;
+    var busy = goal || touching > 0 || t - lastInput < 700 || shadowDirty || Math.abs(roofK - (roofOpen ? 1 : 0)) > 0.001 || Math.abs(rackK - (rackOpen ? 1 : 0)) > 0.001;
+    if (Q.lite && !busy && t - lastT < 24) return;      // pe telefon, cat timp nimic nu se misca repede, ajung 30 de cadre pe secunda
+    var dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t; drew = true;
     stepCamera(dt);
     for (var id in flows) flows[id].update(dt, camera.position);
     var i;
@@ -320,6 +335,10 @@
       var op = 1 - roofK; for (i = 0; i < ROOFM.length; i++) ROOFM[i].opacity = op;
       roofGroup.position.y = roofK * (L.H * 1.2 + 3); roofGroup.visible = roofK < 0.97 && buildK[2] >= 0.92;
       if (wallGroup) wallGroup.scale.y = Math.max(0.02, (1 - 0.6 * roofK - 0.25 * rackK) * (parts ? parts.shell : 1));
+      if (parts) {             // sub acoperisul inchis nu se vede nimic: nu desenam interiorul
+        var showIn = roofK > 0.01 || rackK > 0.01 || !roofGroup.visible;
+        parts.elec.visible = parts.partG.visible = showIn && buildK[3] > 0.01; parts.itg.visible = showIn && buildK[4] > 0.01;
+      }
       var shade = roofK < 0.04;
       if (roofGroup.userData.shade !== shade) { roofGroup.userData.shade = shade; roofGroup.traverse(function (o) { if (o.isMesh) o.castShadow = shade; }); shadowDirty = true; }
     }
@@ -358,16 +377,16 @@
     initShared(); makeSky(); makeEnv(); ok = true;
     applyQuality(); bindControls();
     if (window.ResizeObserver) new ResizeObserver(resize).observe(host); else window.addEventListener('resize', resize);
-    if (window.IntersectionObserver) new IntersectionObserver(function (es) { inView = es[es.length - 1].isIntersecting; if (inView) gov.wait = Math.max(gov.wait, 0.8); }).observe(host);
-    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); running = false; });
-    canvas.addEventListener('webglcontextrestored', function () { shadowDirty = true; if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(frame); } });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && !running) { running = true; lastT = performance.now(); gov.wait = 1.5; requestAnimationFrame(frame); } else if (document.hidden) running = false; });
-    requestAnimationFrame(frame);
+    if (window.IntersectionObserver) new IntersectionObserver(function (es) { inView = es[es.length - 1].isIntersecting; if (inView) { gov.wait = Math.max(gov.wait, 0.8); wake(); } }).observe(host);
+    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); lost = true; });
+    canvas.addEventListener('webglcontextrestored', function () { lost = false; makeEnv(); shF.x = 1e9; shadowDirty = true; applySun(); gov.wait = 2; wake(); });      // telefonul a luat memoria video: refacem ce se pierde
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { gov.wait = Math.max(gov.wait, 1.5); wake(); } });
+    wake();
     return true;
   }
 
   return {
-    init: init, build: build, go: go, setSun: setSun, zoom: zoom, makeLabels: makeLabels, setLabelText: setLabelText,
+    init: init, build: function (p) { var r = build(p); gov.wait = Math.max(gov.wait, 1.5); wake(); return r; }, go: go, setSun: setSun, zoom: zoom, makeLabels: makeLabels, setLabelText: setLabelText,
     setRoof: function (o) { roofOpen = !!o; },
     setRack: function (o) { rackOpen = !!o; },
     setBuild: function (arr) { buildK = arr ? arr.slice(0, 8) : [1, 1, 1, 1, 1, 1, 1, 1]; applyBuild(); },

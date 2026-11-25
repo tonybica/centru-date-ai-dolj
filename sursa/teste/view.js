@@ -1,3 +1,5 @@
+// look=tx,ty,tz,dist,az,pol pune camera oriunde (tinta, distanta, unghi in jurul axei verticale, unghi fata de verticala: 1.5 = aproape de sol)
+// ANCH=1 tipareste si ancorele etichetelor, ca sa stii unde sunt obiectele
 // capturi doar cu macheta: node view.js 1200 760 "nume|ch1;wait=500" "nume2|eval=Scene3D._cam.pol=1.3"
 const { chromium, devices } = require('playwright');
 const path = require('path');
@@ -20,6 +22,7 @@ const path = require('path');
       else if (a.startsWith('wx=')) await page.evaluate(v => document.querySelector(`#wx button[data-w="${v}"]`).click(), a.slice(3));
       else if (a.startsWith('click=')) await page.evaluate(sel => document.querySelector(sel).click(), a.slice(6));
       else if (a.startsWith('range=')) { const [id, v] = a.slice(6).split('@'); await page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }, [id, v]); }
+      else if (a.startsWith('look=')) await page.evaluate(v => { Scene3D.setAuto(false); Scene3D.zoom(1); const c = Scene3D._cam; c.tx = v[0]; c.ty = v[1]; c.tz = v[2]; c.dist = v[3]; c.az = v[4]; c.pol = v[5]; }, a.slice(5).split(',').map(Number));
       else if (a.startsWith('eval=')) await page.evaluate(a.slice(5));
       else if (a.startsWith('wait=')) await page.waitForTimeout(+a.slice(5));
     }
@@ -28,6 +31,7 @@ const path = require('path');
     await el.screenshot({ path: path.join(__dirname, '..', 'shots', name + '.png') });
   }
   console.log(JSON.stringify(await page.evaluate(() => Scene3D._info())));
+  if (process.env.ANCH) console.log(JSON.stringify(await page.evaluate(() => { const l = Scene3D.layout(); return l && (l.anchors || l); })));
   console.log(errs.length ? errs.join('\n') : 'no console errors');
   await browser.close();
 })();
