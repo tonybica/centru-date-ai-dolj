@@ -4,7 +4,7 @@ const { chromium, devices } = require('playwright'); const path = require('path'
   const d = Object.assign({}, devices['Galaxy S8']); delete d.defaultBrowserType; d.deviceScaleFactor = 1;
   const ctx = await b.newContext(d); const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push('PAGEERROR ' + e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto('file://' + path.join(__dirname, 'out/centru-date-ai-dolj.html')); await p.waitForTimeout(1500);
+  await p.goto('file://' + path.join(__dirname, '..', 'out/centru-date-ai-dolj.html') + '#q=max'); await p.waitForTimeout(1500);
   const bad = [];
   for (const scen of ['pilot', 'mediu', 'mare']) {
     await p.evaluate(s => document.querySelector(`#scen button[data-s="${s}"]`).click(), scen);

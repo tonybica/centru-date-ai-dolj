@@ -3,7 +3,7 @@ const { chromium } = require('playwright'); const path = require('path');
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 1716, height: 800 }, deviceScaleFactor: 1 });
-  await p.goto('file://' + path.join(__dirname, 'out/centru-date-ai-dolj.html')); await p.waitForTimeout(2500);
+  await p.goto('file://' + path.join(__dirname, 'out/centru-date-ai-dolj.html') + '#q=max'); await p.waitForTimeout(2500);
   await p.evaluate(() => { document.getElementById('hint').style.display = 'none'; document.querySelector('.hud').style.display = 'none'; document.querySelector('.zoom').style.display = 'none'; document.querySelector('.north').style.display = 'none'; });
   await p.waitForTimeout(1200);
   const r = await p.evaluate(() => { const v = document.getElementById('view').getBoundingClientRect(); return { x: v.x, y: v.y, w: v.width, h: v.height }; });

@@ -2,7 +2,9 @@ const fs = require('fs'), path = require('path');
 const src = f => fs.readFileSync(path.join(__dirname, 'src', f), 'utf8');
 const three = fs.readFileSync(path.join(__dirname, 'package/build/three.min.js'), 'utf8').replace(/<\/script/gi, '<\\/script');
 const css = src('style.css'), body = src('body.html');
-const js = [src('model.js'), src('scene.js'), src('app.js')].join('\n').replace(/<\/script/gi, '<\\/script');
+// macheta 3D este impartita in bucati (src/scene/10-..., 20-...), lipite aici in ordinea numelui
+const sceneJs = fs.readdirSync(path.join(__dirname, 'src/scene')).filter(f => f.endsWith('.js')).sort().map(f => src('scene/' + f)).join('\n');
+const js = [src('model.js'), sceneJs, src('app.js')].join('\n').replace(/<\/script/gi, '<\\/script');
 const fonts = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">';
 const title = '<title>Centrul de date AI Dolj</title>';
 // varianta locala are fonturile inauntru (src/fonts.css, facut cu node fonts.js), ca sa arate la fel si fara internet

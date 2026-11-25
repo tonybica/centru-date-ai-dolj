@@ -8,7 +8,7 @@ const path = require('path');
   const errs = [];
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ': ' + m.text()); });
   page.on('pageerror', e => errs.push('PAGEERROR: ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n')));
-  await page.goto('file://' + path.join(__dirname, 'out/centru-date-ai-dolj.html'));
+  await page.goto('file://' + path.join(__dirname, '..', 'out/centru-date-ai-dolj.html') + '#q=max');
   await page.waitForTimeout(1500);
   for (const s of steps) {
     const [name, ...acts] = s.split(':');
@@ -28,7 +28,7 @@ const path = require('path');
       else if (a.startsWith('scroll=')) { await page.evaluate(v => { const s = document.getElementById('scroll'); s.scrollTop = +v; }, a.slice(7)); }
     }
     await page.waitForTimeout(2600);
-    await page.screenshot({ path: path.join(__dirname, 'shots', name + '.png'), fullPage: w < 900 && !process.env.VIEWPORT_ONLY });
+    await page.screenshot({ path: path.join(__dirname, '..', 'shots', name + '.png'), fullPage: w < 900 && !process.env.VIEWPORT_ONLY });
   }
   const info = await page.evaluate(() => ({ hasGL: !document.querySelector('.nogl'), overflowX: document.documentElement.scrollWidth - window.innerWidth, labels: [...document.querySelectorAll('.lbl')].map(l => l.textContent + (l.hidden ? ' (h)' : '')) }));
   console.log(JSON.stringify(info));

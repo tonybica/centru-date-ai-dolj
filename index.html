@@ -367,7 +367,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
       <nav class="toc" id="toc" aria-label="Capitole"></nav>
       <div class="scroll" id="scroll">
 
-        <article class="chapter" data-title="Ideea" data-view="overview">
+        <article class="chapter" data-title="Ideea" data-view="hero">
           <p class="eyebrow"></p>
           <h2>O fabrică de calcul, alimentată în parte de soare</h2>
           <p>Un centru de date AI este o clădire plină de calculatoare foarte puternice. Firmele care fac inteligență artificială au nevoie de ele, dar rareori le cumpără. Le închiriază, cu ora sau pe contract.</p>
@@ -1125,128 +1125,426 @@ var Model = (function () {
 if (typeof module !== 'undefined') module.exports = Model;
 
 /* ================= SCENA 3D: macheta campusului =================
-   Axe: x = est, z = sud, y = sus. Panourile privesc spre sud (+z), drumul trece pe la sud. Unitati: metri. */
+   Axe: x = est, z = sud, y = sus. Panourile privesc spre sud (+z), drumul trece pe la sud. Unitati: metri.
+   Fisierele din src/scene/ se lipesc in ordine intr-o singura functie (vezi build.js): 10 baza si materiale,
+   20 piese (transformator, container, copac...), 30 campusul, 40 lumina, camera si bucla de desen. */
 var Scene3D = (function () {
   'use strict';
   var T = window.THREE;
-  var host, canvas, labelHost, renderer, scene, camera, root = null, sunLight, moonLight, hemi;
+  if (T && T.ColorManagement) T.ColorManagement.legacyMode = false;      // culorile scrise in cod apar pe ecran exact asa
+  var host, canvas, labelHost, renderer, scene, camera, root = null, sunLight, moonLight, hemi, sky = null;
   var L = null;
   var cam = { tx: 0, ty: 0, tz: 0, dist: 300, az: 0.6, pol: 1.0 }, goal = null;
-  var flows = {}, fans = [], labelEls = {}, pickObjs = [];
+  var flows = {}, labelEls = {}, pickObjs = [], tags = [];
   var roofGroup = null, wallGroup = null, roofOpen = false, roofK = 0;
   var handlers = { pick: null, hover: null, north: null, touched: null };
   var auto = false, lastT = 0, ok = false, nightK = 0, running = true;
   var parts = null, buildK = [1, 1, 1, 1, 1, 1, 1, 1], outage = 0, rackOpen = false, rackK = 0, thermal = false, labelOn = {}, clouds = [], puffGen = null, puffHeat = null, THERM = [];
   var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  var SH = null;
+  var SH = null, MATS = [], TEX = {}, ROOFM = [];
   var COL = { sun: 0xf2a600, batt: 0x00b894, grid: 0x257de0, fiber: 0x7a5cf0, gen: 0xe4572e };
+  // calitatea: se alege la pornire dupa ecran si scade singura, in trepte, daca aparatul nu tine pasul
+  var Q = { lite: false, step: 0, prMax: 2, pr: 1, shadow: 2048, fixed: false, noShadow: false };
+  var shadowDirty = true, shF = { x: 1e9, z: 0, ext: 0 };
 
   function M(c, o) {
     o = o || {}; o.color = c;
     if (o.roughness === undefined) o.roughness = 0.85;
-    if (o.metalness === undefined) o.metalness = 0.02;
-    return new T.MeshStandardMaterial(o);
+    if (o.metalness === undefined) o.metalness = 0;
+    var uv = o.uv, env = o.env; delete o.uv; delete o.env;
+    var m = new T.MeshStandardMaterial(o);
+    if (uv) m.userData.uv = uv;                      // metri pe o repetare a texturii: fetele primesc coordonate dupa marimea reala
+    m.userData.env = env === undefined ? 1 : env;    // cat de tare oglindeste cerul
+    MATS.push(m); return m;
   }
-  function canvasTex(w, h, draw) {
-    var c = document.createElement('canvas'); c.width = w; c.height = h;
-    draw(c.getContext('2d'), w, h);
-    var t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; t.anisotropy = 8; return t;
+  function B(c, o) { o = o || {}; o.color = c; o.toneMapped = false; return new T.MeshBasicMaterial(o); }   // culoare care nu depinde de lumina (LED-uri, cabluri colorate)
+  function canvasTex(w, h, draw, o) {
+    o = o || {};
+    var s = Q.lite && !o.keep ? 0.5 : 1, c = document.createElement('canvas');
+    c.width = Math.max(4, Math.round(w * s)); c.height = Math.max(4, Math.round(h * s));
+    var g = c.getContext('2d'); g.scale(c.width / w, c.height / h); draw(g, w, h);
+    var t = new T.CanvasTexture(c); t.encoding = o.data ? T.LinearEncoding : T.sRGBEncoding; t.anisotropy = Q.lite ? 4 : 8;
+    if (o.repeat !== false) t.wrapS = t.wrapT = T.RepeatWrapping;
+    return t;
   }
   function rng(seed) {
     var a = seed >>> 0;
     return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   }
+  // puncte marunte si pete moi, desenate asa incat textura sa se lege la margini
+  function speckle(g, w, h, R, n, cols, smin, smax, amin, amax) {
+    for (var i = 0; i < n; i++) {
+      g.globalAlpha = amin + R() * (amax - amin); g.fillStyle = cols[Math.floor(R() * cols.length)];
+      var s = smin + R() * (smax - smin), x = R() * w, y = R() * h;
+      g.fillRect(x, y, s, s); if (x + s > w) g.fillRect(x - w, y, s, s); if (y + s > h) g.fillRect(x, y - h, s, s);
+    }
+    g.globalAlpha = 1;
+  }
+  function blotch(g, w, h, R, n, rgb, rmin, rmax, a) {
+    for (var i = 0; i < n; i++) {
+      var x = R() * w, y = R() * h, r = rmin + R() * (rmax - rmin);
+      for (var ox = -1; ox <= 1; ox++) for (var oy = -1; oy <= 1; oy++) {
+        var cx = x + ox * w, cy = y + oy * h; if (cx + r < 0 || cx - r > w || cy + r < 0 || cy - r > h) continue;
+        var gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)');
+        g.fillStyle = gr; g.fillRect(cx - r, cy - r, 2 * r, 2 * r);
+      }
+    }
+  }
 
-  function initShared() {
-    SH = {};
-    SH.wall = M(0xf3f4f0); SH.wallIn = M(0xe3e6e1); SH.base = M(0x2b3430); SH.stripe = M(0xf2a600, { roughness: 0.6 });
-    SH.roof = new T.MeshStandardMaterial({ color: 0xdde1da, roughness: 0.9, transparent: true, opacity: 1 });
-    SH.floor = M(0xb9beb8); SH.concrete = M(0xcdd1ca); SH.gravel = M(0xa9aca4); SH.asphalt = M(0x383e41);
-    SH.ground = M(0x9aad68, { roughness: 1 }); SH.white = M(0xfafafa); SH.steel = M(0x8d969b, { metalness: 0.5, roughness: 0.5 });
-    SH.dark = M(0x23282c); SH.silver = M(0xcfd5d8, { metalness: 0.45, roughness: 0.45 }); SH.trafo = M(0x5f6f66); SH.trafoFin = M(0x4a5750);
-    SH.ceramic = M(0xb8693f); SH.frame = M(0xb4bcc4, { metalness: 0.5, roughness: 0.5 }); SH.panelBack = M(0x9aa3ab);
-    SH.green = M(0x00b894, { roughness: 0.6 }); SH.blue = M(0x2f7fe0); SH.red = M(0xd9534a);
-    SH.tree = M(0x4f7a3a, { roughness: 1 }); SH.tree2 = M(0x6a9148, { roughness: 1 }); SH.trunk = M(0x6b4f3a);
-    SH.glass = new T.MeshStandardMaterial({ color: 0x9cc3d8, roughness: 0.2, metalness: 0.1, emissive: 0xffd28a, emissiveIntensity: 0 });
-    SH.windowGlow = new T.MeshStandardMaterial({ color: 0x35424a, roughness: 0.3, emissive: 0xffd9a0, emissiveIntensity: 0 });
-    SH.wire = new T.LineBasicMaterial({ color: 0x3a4246 });
-    SH.lattice = new T.MeshBasicMaterial({ color: 0x69747a, wireframe: true });
-    SH.fence = new T.MeshStandardMaterial({ color: 0x3d4a44, transparent: true, opacity: 0.32, roughness: 1 });
-    SH.hot = new T.MeshBasicMaterial({ color: 0xe8573f, transparent: true, opacity: 0.28 });
-    SH.cold = new T.MeshBasicMaterial({ color: 0x3f8fe8, transparent: true, opacity: 0.22 });
-    SH.screen = new T.MeshBasicMaterial({ color: 0x7fd6ff });
-    SH.led = new T.MeshBasicMaterial({ color: 0x35e08a });
-    SH.zone = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
-
-    SH.copper = M(0xc8793a, { metalness: 0.6, roughness: 0.35 }); SH.pcb = M(0x1f6b45, { roughness: 0.6 }); SH.person = M(0xf2a600, { roughness: 0.7 }); SH.skin = M(0xd9a47a);
-    SH.upsLed = new T.MeshBasicMaterial({ color: 0x35e08a });
-    var shadeTex = canvasTex(128, 128, function (g, w, h) {
+  /* ---------- texturi desenate in cod: nimic de descarcat ---------- */
+  function initTextures() {
+    var R = rng(5);
+    TEX.white = canvasTex(4, 4, function (g, w, h) { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); }, { keep: true });
+    TEX.grass = canvasTex(1024, 1024, function (g, w, h) {
+      g.fillStyle = '#687c40'; g.fillRect(0, 0, w, h);
+      blotch(g, w, h, R, 60, '86,106,50', 30, 110, 0.3); blotch(g, w, h, R, 50, '134,140,78', 24, 90, 0.26); blotch(g, w, h, R, 30, '126,112,72', 14, 50, 0.22);
+      speckle(g, w, h, R, 30000, ['#536a2e', '#788c4c', '#8a9a58', '#4a602c', '#98a062', '#5e743a'], 1.2, 3.6, 0.25, 0.65);
+      speckle(g, w, h, R, 2600, ['#b3ad6e', '#3f5a26'], 1, 2.4, 0.3, 0.7);
+    });
+    TEX.patch = canvasTex(64, 64, function (g, w, h) {
+      var gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }, { repeat: false, keep: true });
+    function fieldTex(base, row, gap, cols) {
+      return canvasTex(256, 256, function (g, w, h) {
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        blotch(g, w, h, R, 8, '0,0,0', 30, 90, 0.1); blotch(g, w, h, R, 8, '255,255,220', 30, 90, 0.1);
+        g.fillStyle = row; for (var y = 0; y < h; y += gap) g.fillRect(0, y, w, gap * 0.45);
+        speckle(g, w, h, R, 2600, cols, 1, 3, 0.2, 0.5);
+      });
+    }
+    TEX.fields = [
+      fieldTex('#c7b171', '#b39a59', 16, ['#d8c588', '#a88f50', '#bfa767']),      // miriste de grau
+      fieldTex('#7d9a49', '#6a883c', 16, ['#8fab58', '#5f7c36', '#9ab463']),      // cultura verde
+      fieldTex('#7a6348', '#644f37', 8, ['#8b7356', '#5a4631', '#937c5f']),       // aratura
+      fieldTex('#bdb64d', '#98a647', 16, ['#d2c958', '#a9a843', '#8c9c40']),      // rapita
+      fieldTex('#5f8440', '#557a3a', 32, ['#6f9549', '#4c6f33', '#7aa052']),      // lucerna
+      fieldTex('#a8a36b', '#97925d', 16, ['#b8b47c', '#8d8856', '#c2bd86'])       // parloaga uscata
+    ];
+    function asph(g, w, h, base) {
+      g.fillStyle = base || '#3b3f42'; g.fillRect(0, 0, w, h);
+      blotch(g, w, h, R, 10, '20,22,24', 30, 90, 0.35); blotch(g, w, h, R, 8, '92,94,96', 20, 80, 0.2);
+      speckle(g, w, h, R, 6500, ['#2c3033', '#4b5054', '#5a5f63', '#24272a'], 1, 2.2, 0.3, 0.7);
+    }
+    TEX.asphalt = canvasTex(256, 256, function (g, w, h) { asph(g, w, h); });
+    TEX.road = canvasTex(256, 256, function (g, w, h) {            // 12 m in lung, 10 m in lat: benzi, linie intrerupta, acostamente
+      asph(g, w, h, '#404447');
+      g.fillStyle = 'rgba(25,27,29,.22)'; g.fillRect(0, 62, w, 30); g.fillRect(0, 164, w, 30);
+      g.fillStyle = '#8f8a7c'; g.fillRect(0, 0, w, 20); g.fillRect(0, h - 20, w, 20); speckle(g, w, 20, R, 500, ['#7b766b', '#a8a294', '#6c675d'], 1, 3, 0.4, 0.8);
+      g.save(); g.translate(0, h - 20); speckle(g, w, 20, R, 500, ['#7b766b', '#a8a294', '#6c675d'], 1, 3, 0.4, 0.8); g.restore();
+      g.fillStyle = 'rgba(238,238,228,.92)'; g.fillRect(0, 24, w, 3.5); g.fillRect(0, h - 27.5, w, 3.5); g.fillRect(0, h / 2 - 1.8, 86, 3.6);
+    });
+    TEX.concrete = canvasTex(512, 512, function (g, w, h) {        // 12 m pe repetare, rosturi la 6 m
+      g.fillStyle = '#a3a59e'; g.fillRect(0, 0, w, h);
+      blotch(g, w, h, R, 16, '108,108,100', 40, 140, 0.3); blotch(g, w, h, R, 10, '200,200,190', 40, 120, 0.28);
+      speckle(g, w, h, R, 7000, ['#8f918a', '#b5b7af', '#85877f'], 1, 2, 0.2, 0.5);
+      g.strokeStyle = 'rgba(70,72,68,.6)'; g.lineWidth = 2.5; g.strokeRect(0, 0, w, h);
+      g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+    });
+    TEX.gravel = canvasTex(256, 256, function (g, w, h) {
+      g.fillStyle = '#a19c90'; g.fillRect(0, 0, w, h); blotch(g, w, h, R, 8, '90,86,78', 30, 80, 0.25);
+      speckle(g, w, h, R, 5200, ['#8d887c', '#b8b3a6', '#7b766b', '#c9c4b6', '#6b665c'], 1.5, 3.5, 0.5, 0.9);
+    });
+    TEX.soil = canvasTex(256, 256, function (g, w, h) {
+      g.fillStyle = '#9a8a6c'; g.fillRect(0, 0, w, h); blotch(g, w, h, R, 10, '110,96,70', 30, 90, 0.35); blotch(g, w, h, R, 8, '170,158,128', 20, 70, 0.3);
+      speckle(g, w, h, R, 4200, ['#8b7b5e', '#ad9d7f', '#7d6e53', '#6f8a45'], 1, 3, 0.3, 0.7);
+    });
+    TEX.panel = canvasTex(256, 256, function (g, w, h) {           // panouri sandwich: 4 m pe repetare, imbinari la 1 m
+      g.fillStyle = '#ecede8'; g.fillRect(0, 0, w, h);
+      var x; for (x = 0; x < w; x += 8) { g.fillStyle = 'rgba(0,0,0,.04)'; g.fillRect(x, 0, 1, h); g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x + 1, 0, 1, h); }
+      for (x = 0; x < w; x += 64) { g.fillStyle = 'rgba(40,46,44,.55)'; g.fillRect(x, 0, 1.6, h); g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(x + 1.6, 0, 1, h); }
+      g.fillStyle = 'rgba(40,46,44,.3)'; g.fillRect(0, 0, w, 1.5); blotch(g, w, h, R, 6, '120,120,110', 40, 110, 0.07);
+    });
+    TEX.roof = canvasTex(256, 256, function (g, w, h) {            // membrana de acoperis, fasii de 2 m
+      g.fillStyle = '#b3b6b0'; g.fillRect(0, 0, w, h); blotch(g, w, h, R, 12, '136,138,132', 30, 100, 0.3); blotch(g, w, h, R, 8, '206,208,202', 30, 90, 0.3);
+      g.fillStyle = 'rgba(80,84,80,.35)'; for (var x = 0; x < w; x += 64) g.fillRect(x, 0, 1.5, h);
+      speckle(g, w, h, R, 1500, ['#b3b6b0', '#d4d6d0'], 1, 2, 0.2, 0.5);
+    });
+    TEX.corr = canvasTex(64, 64, function (g, w, h) {              // tabla cutata (containere): 1,2 m pe repetare
+      for (var x = 0; x < w; x++) { var v = Math.round(212 + 43 * Math.sin(x / 16 * Math.PI * 2)); g.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')'; g.fillRect(x, 0, 1, h); }
+    });
+    TEX.louver = canvasTex(64, 64, function (g, w, h) {            // jaluzele de aerisire
+      for (var y = 0; y < h; y += 8) { var gr = g.createLinearGradient(0, y, 0, y + 8); gr.addColorStop(0, '#f2f2f2'); gr.addColorStop(0.6, '#a9a9a9'); gr.addColorStop(0.62, '#2a2a2a'); gr.addColorStop(1, '#3a3a3a'); g.fillStyle = gr; g.fillRect(0, y, w, 8); }
+    });
+    TEX.coil = canvasTex(64, 64, function (g, w, h) {              // lamelele dese ale racitoarelor
+      g.fillStyle = '#8d9498'; g.fillRect(0, 0, w, h); g.fillStyle = '#c3c9cc'; for (var x = 0; x < w; x += 4) g.fillRect(x, 0, 1.6, h);
+      g.fillStyle = 'rgba(40,44,48,.5)'; g.fillRect(0, 0, w, 2); g.fillRect(0, h / 2, w, 1.5);
+    });
+    TEX.fins = canvasTex(64, 64, function (g, w, h) {              // radiatoarele transformatorului
+      for (var x = 0; x < w; x += 8) { var gr = g.createLinearGradient(x, 0, x + 8, 0); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.55, '#b9b9b9'); gr.addColorStop(0.6, '#3c3c3c'); gr.addColorStop(1, '#5a5a5a'); g.fillStyle = gr; g.fillRect(x, 0, 8, h); }
+    });
+    TEX.insul = canvasTex(32, 64, function (g, w, h) {             // izolator ceramic cu fuste
+      for (var y = 0; y < h; y += 8) { var gr = g.createLinearGradient(0, y, 0, y + 8); gr.addColorStop(0, '#a85f38'); gr.addColorStop(0.7, '#8a4a2a'); gr.addColorStop(1, '#4d2614'); g.fillStyle = gr; g.fillRect(0, y, w, 8); }
+    }, { repeat: false });
+    TEX.chain = canvasTex(64, 64, function (g, w, h) {             // plasa de gard
+      g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(58,66,62,.95)'; g.lineWidth = 2;
+      for (var i = -64; i < 128; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 64, 64); g.stroke(); g.beginPath(); g.moveTo(i + 64, 0); g.lineTo(i, 64); g.stroke(); }
+    });
+    TEX.pv = canvasTex(2048, 512, function (g, w, h) {             // o masa: 26 x 2 module, fiecare cu rama, celule si bare subtiri
+      g.fillStyle = '#c9cfd4'; g.fillRect(0, 0, w, h);
+      var mw = w / 26, mh = h / 2;
+      for (var i = 0; i < 26; i++) for (var j = 0; j < 2; j++) {
+        var x0 = i * mw + 2.5, y0 = j * mh + 3, ww = mw - 5, hh = mh - 6;
+        g.fillStyle = '#0a1120'; g.fillRect(x0, y0, ww, hh);
+        var cw = (ww - 4) / 6, ch = (hh - 8) / 24;
+        for (var a = 0; a < 6; a++) for (var b = 0; b < 24; b++) {
+          var cx = x0 + 2 + a * cw, cy = y0 + 2 + b * ch + (b >= 12 ? 4 : 0);
+          g.fillStyle = (a + b) % 2 ? '#13264c' : '#102144'; g.fillRect(cx + 0.4, cy + 0.4, cw - 0.8, ch - 0.8);
+        }
+        g.fillStyle = 'rgba(190,205,230,.2)'; for (a = 0; a < 6; a++) for (var q = 1; q < 4; q++) g.fillRect(x0 + 2 + a * cw + q * cw / 4, y0 + 2, 0.5, hh - 4);
+      }
+    }, { repeat: false });
+    function rackDraw(emis) {
+      return function (g, w, h) {
+        g.fillStyle = emis ? '#000' : '#15191d'; g.fillRect(0, 0, w, h);
+        var r = rng(7), cols = ['#35e08a', '#35e08a', '#35e08a', '#58b7ff', '#ffb53c'], x, y;
+        if (!emis) {
+          g.fillStyle = '#0b0e11'; for (y = 6; y < h - 6; y += 4) for (x = 6 + (y % 8 ? 2 : 0); x < w - 6; x += 4) g.fillRect(x, y, 2, 2);      // usa perforata
+          g.strokeStyle = '#2b3238'; g.lineWidth = 3; g.strokeRect(3, 3, w - 6, h - 6); g.fillStyle = '#4a535b'; g.fillRect(w - 16, h / 2 - 22, 6, 44);
+        }
+        for (y = 22; y < h - 20; y += 20) {
+          if (!emis) { g.fillStyle = 'rgba(42,50,56,.85)'; g.fillRect(12, y, w - 32, 14); }
+          for (x = 16; x < w - 26; x += 7) if (r() > 0.4) { g.fillStyle = cols[Math.floor(r() * cols.length)]; g.fillRect(x, y + 5, 3, 3); }
+        }
+      };
+    }
+    TEX.rack = canvasTex(128, 512, rackDraw(false), { repeat: false, keep: true }); TEX.rackE = canvasTex(128, 512, rackDraw(true), { repeat: false, keep: true });
+    TEX.tile = canvasTex(128, 128, function (g, w, h) {            // podea tehnica: placi de 60 cm
+      g.fillStyle = '#c3c6c1'; g.fillRect(0, 0, w, h); speckle(g, w, h, R, 900, ['#b4b7b2', '#d2d4cf', '#a9aca7'], 1, 2, 0.3, 0.6);
+      g.fillStyle = 'rgba(70,74,72,.7)'; g.fillRect(0, 0, w, 1.2); g.fillRect(0, 64, w, 1.2); g.fillRect(0, 0, 1.2, h); g.fillRect(64, 0, 1.2, h);
+    });
+    function cabDraw(emis) {
+      return function (g, w, h) {      // usa de dulap electric: afisaj, aparate, maner, aerisire
+        g.fillStyle = emis ? '#000' : '#c9cdce'; g.fillRect(0, 0, w, h);
+        if (!emis) { g.strokeStyle = '#8b9194'; g.lineWidth = 2; g.strokeRect(2, 2, w - 4, h - 4); g.fillStyle = '#5c6367'; g.fillRect(w - 10, h * 0.45, 4, 18); g.fillStyle = '#9aa0a3'; for (var y = h - 26; y < h - 8; y += 4) g.fillRect(10, y, w - 20, 2); g.fillStyle = '#1b2126'; g.fillRect(12, 14, 26, 16); }
+        g.fillStyle = emis ? '#2fd6ff' : '#1d6f8a'; g.fillRect(14, 16, 22, 12);
+        g.fillStyle = '#35e08a'; g.fillRect(44, 18, 4, 4); g.fillStyle = emis ? '#000' : '#e0b030'; g.fillRect(44, 26, 4, 4);
+      };
+    }
+    TEX.cab = canvasTex(64, 128, cabDraw(false), { repeat: false, keep: true }); TEX.cabE = canvasTex(64, 128, cabDraw(true), { repeat: false, keep: true });
+    function glassDraw(emis) {
+      return function (g, w, h) {      // perete cortina: 4 m pe repetare, montanti la 1,33 m, o banda opaca la planseu
+        var r = rng(31), x, y;
+        if (emis) { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); } else { var gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#5f7f96'); gr.addColorStop(1, '#3a5468'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }
+        for (x = 0; x < 3; x++) for (y = 0; y < 2; y++) {
+          var lit = r() > 0.45;
+          if (emis) { if (lit) { g.fillStyle = r() > 0.5 ? '#ffd9a0' : '#e8f0ff'; g.globalAlpha = 0.55 + r() * 0.45; g.fillRect(x * 85.33 + 4, y * 128 + 30, 78, 92); g.globalAlpha = 1; } }
+          else if (r() > 0.5) { g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(x * 85.33 + 4, y * 128 + 30, 78, 92); }
+        }
+        g.fillStyle = emis ? '#000' : '#2a3035';
+        for (x = 0; x <= w; x += 85.33) g.fillRect(x - 1.5, 0, 3, h);
+        for (y = 0; y <= h; y += 128) { g.fillRect(0, y - 2, w, 4); g.fillStyle = emis ? '#000' : '#39424a'; g.fillRect(0, y + 2, w, 22); g.fillStyle = emis ? '#000' : '#2a3035'; }
+      };
+    }
+    TEX.glass = canvasTex(256, 256, glassDraw(false)); TEX.glassE = canvasTex(256, 256, glassDraw(true));
+    TEX.leaf = canvasTex(128, 128, function (g, w, h) {            // frunzis: alb cu pete, culoarea vine de la fiecare copac
+      g.fillStyle = '#c9c9c9'; g.fillRect(0, 0, w, h); blotch(g, w, h, R, 14, '70,70,70', 10, 34, 0.5); blotch(g, w, h, R, 12, '255,255,255', 8, 26, 0.55);
+      speckle(g, w, h, R, 1400, ['#8a8a8a', '#ffffff', '#6f6f6f', '#e6e6e6'], 2, 5, 0.25, 0.6);
+    });
+    TEX.fan = canvasTex(128, 128, function (g, w, h) {             // elicea unui ventilator, vazuta de sus
+      g.clearRect(0, 0, w, h); g.translate(w / 2, h / 2);
+      g.fillStyle = 'rgba(18,20,22,.55)'; g.beginPath(); g.arc(0, 0, 60, 0, 7); g.fill();
+      g.fillStyle = '#c8ced2';
+      for (var i = 0; i < 6; i++) { g.rotate(Math.PI / 3); g.beginPath(); g.moveTo(6, -4); g.quadraticCurveTo(38, -26, 58, -8); g.lineTo(56, 8); g.quadraticCurveTo(34, 2, 6, 6); g.closePath(); g.fill(); }
+      g.fillStyle = '#5a6166'; g.beginPath(); g.arc(0, 0, 11, 0, 7); g.fill();
+    }, { repeat: false }); TEX.fan.center.set(0.5, 0.5);
+    TEX.grille = canvasTex(64, 64, function (g, w, h) {            // grila de protectie peste ventilator
+      g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(70,76,80,.9)'; g.lineWidth = 1.4; g.translate(w / 2, h / 2);
+      for (var r = 6; r < 32; r += 5) { g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke(); }
+      for (var i = 0; i < 8; i++) { g.rotate(Math.PI / 4); g.beginPath(); g.moveTo(0, 0); g.lineTo(31, 0); g.stroke(); }
+    }, { repeat: false });
+    TEX.ao = canvasTex(128, 128, function (g, w, h) {              // umbra moale de sub obiecte
+      g.clearRect(0, 0, w, h); var gr = g.createRadialGradient(64, 64, 18, 64, 64, 62); gr.addColorStop(0, 'rgba(0,0,0,.85)'); gr.addColorStop(0.55, 'rgba(0,0,0,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }, { repeat: false });
+    TEX.hazard = canvasTex(64, 16, function (g, w, h) {            // dungi galben cu negru
+      g.fillStyle = '#f2b705'; g.fillRect(0, 0, w, h); g.fillStyle = '#17191b';
+      for (var x = -16; x < w; x += 16) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 8, h); g.lineTo(x + 24, 0); g.lineTo(x + 16, 0); g.closePath(); g.fill(); }
+    });
+    TEX.sign = canvasTex(512, 128, function (g, w, h) {
+      g.fillStyle = '#20262a'; g.fillRect(0, 0, w, h); g.fillStyle = '#f2a600'; g.fillRect(22, 30, 14, 68);
+      var fam = 'px "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif', txt = 'DATA CENTER DOLJ'; g.font = '600 62' + fam; var fs = Math.min(62, 62 * (w - 78) / g.measureText(txt).width);
+      g.fillStyle = '#f4f5f2'; g.font = '600 ' + fs.toFixed(1) + fam; g.textBaseline = 'middle'; g.fillText(txt, 54, 66);
+    }, { repeat: false, keep: true });
+    TEX.shade = canvasTex(128, 128, function (g, w, h) {
       var gr = g.createRadialGradient(64, 64, 6, 64, 64, 64); gr.addColorStop(0, 'rgba(20,30,40,1)'); gr.addColorStop(0.55, 'rgba(20,30,40,.75)'); gr.addColorStop(1, 'rgba(20,30,40,0)');
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    });
-    SH.cloud = new T.MeshBasicMaterial({ map: shadeTex, transparent: true, opacity: 0.3, depthWrite: false, fog: false });
-    SH.lampHead = new T.MeshBasicMaterial({ color: 0x8a8f8c });
-    SH.smoke = new T.MeshBasicMaterial({ color: 0x6f6f6f, transparent: true, opacity: 0.34, depthWrite: false });
-    SH.heat = new T.MeshBasicMaterial({ color: 0xff9a3c, transparent: true, opacity: 0.3, depthWrite: false });
-    var glowTex = canvasTex(64, 64, function (g, w, h) {
+    }, { repeat: false });
+    TEX.glow = canvasTex(64, 64, function (g, w, h) {
       var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,226,160,1)'); gr.addColorStop(0.5, 'rgba(255,214,140,.35)'); gr.addColorStop(1, 'rgba(255,214,140,0)');
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
-    });
-    SH.glow = new T.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending });
+    }, { repeat: false });
+  }
 
-    var panelTex = canvasTex(520, 92, function (g, w, h) {
-      g.fillStyle = '#aab4bf'; g.fillRect(0, 0, w, h);
-      for (var i = 0; i < 26; i++) for (var j = 0; j < 2; j++) {
-        var gr = g.createLinearGradient(0, j * 46, 0, j * 46 + 46);
-        gr.addColorStop(0, '#1f447d'); gr.addColorStop(1, '#142d57');
-        g.fillStyle = gr; g.fillRect(i * 20 + 1, j * 46 + 1, 18, 44);
-        g.strokeStyle = 'rgba(160,190,235,.22)'; g.lineWidth = 0.6;
-        g.beginPath(); g.moveTo(i * 20 + 10, j * 46 + 1); g.lineTo(i * 20 + 10, j * 46 + 45); g.moveTo(i * 20 + 1, j * 46 + 23); g.lineTo(i * 20 + 19, j * 46 + 23); g.stroke();
-      }
-    });
-    SH.panel = new T.MeshStandardMaterial({ map: panelTex, roughness: 0.32, metalness: 0.35 });
+  /* ---------- materiale ---------- */
+  function initShared() {
+    SH = {}; MATS = []; initTextures();
+    SH.ground = M(0xffffff, { map: TEX.grass, roughness: 1, env: 0.3 });
+    SH.crops = TEX.fields.map(function (t) { return M(0xffffff, { map: t, roughness: 1, env: 0.25 }); });
+    SH.soil = M(0xffffff, { map: TEX.soil, roughness: 1, uv: 6, env: 0.3 });
+    SH.asphalt = M(0xffffff, { map: TEX.asphalt, roughness: 0.92, uv: 8, env: 0.5 });
+    SH.road = M(0xffffff, { map: TEX.road, roughness: 0.92, env: 0.5 });
+    SH.concrete = M(0xffffff, { map: TEX.concrete, roughness: 0.95, uv: 12, env: 0.5 });
+    SH.gravel = M(0xffffff, { map: TEX.gravel, roughness: 1, uv: 5, env: 0.3 });
+    SH.wall = M(0xffffff, { map: TEX.panel, roughness: 0.5, metalness: 0.15, uv: 4, env: 0.8 });
+    SH.wallIn = M(0xe4e6e1, { roughness: 0.9 });
+    SH.base = M(0x4a504d, { roughness: 0.95 });
+    SH.trim = M(0x2b3134, { roughness: 0.45, metalness: 0.5 });
+    SH.stripe = M(0xf2a600, { roughness: 0.5 });
+    SH.roof = M(0xffffff, { map: TEX.roof, roughness: 0.9, uv: 8, transparent: true, opacity: 1, env: 0.5 });
+    SH.floor = M(0xffffff, { map: TEX.tile, roughness: 0.4, uv: 1.2, env: 0.7 });
+    SH.roofTrim = M(0x2b3134, { roughness: 0.5, metalness: 0.4, transparent: true });
+    SH.roofUnit = M(0xd0d5d7, { roughness: 0.45, metalness: 0.6, transparent: true });
+    ROOFM = [SH.roof, SH.roofTrim, SH.roofUnit];
+    SH.white = M(0xf1f2ee, { roughness: 0.55 });
+    SH.paint = M(0xf2f2ea, { roughness: 0.8 });
+    SH.steel = M(0x9aa2a6, { metalness: 0.85, roughness: 0.45, env: 2 });
+    SH.dark = M(0x23282c, { roughness: 0.55, metalness: 0.25 });
+    SH.silver = M(0xd3d8db, { metalness: 0.9, roughness: 0.32, env: 2 });
+    SH.cont = M(0xf3f4f0, { map: TEX.corr, roughness: 0.45, metalness: 0.25, uv: 1.2 });
+    SH.contDark = M(0x56635d, { map: TEX.corr, roughness: 0.5, metalness: 0.3, uv: 1.2 });
+    SH.louver = M(0xc4c9cb, { map: TEX.louver, roughness: 0.55, metalness: 0.5, uv: 0.8 });
+    SH.door = M(0xdfe2e0, { map: TEX.louver, roughness: 0.6, metalness: 0.3, uv: 3.2 });
+    SH.coil = M(0xffffff, { map: TEX.coil, roughness: 0.4, metalness: 0.7, uv: 0.5, env: 2 });
+    SH.trafo = M(0x74837a, { roughness: 0.5, metalness: 0.35 });
+    SH.trafoFin = M(0x7f8e85, { map: TEX.fins, roughness: 0.5, metalness: 0.4, uv: 0.6 });
+    SH.ceramic = M(0xffffff, { map: TEX.insul, roughness: 0.3, env: 1.2 });
+    SH.frame = M(0xbcc3c8, { metalness: 0.85, roughness: 0.4, env: 2 });
+    SH.panelBack = M(0xdfe2e2, { roughness: 0.7 });
+    SH.panel = M(0xffffff, { map: TEX.pv, roughness: 0.16, metalness: 0.2, env: 2.6 });
+    SH.green = M(0x00a887, { roughness: 0.45, metalness: 0.2 });
+    SH.blue = M(0x2f7fe0, { roughness: 0.4, metalness: 0.3 }); SH.red = M(0xd9534a, { roughness: 0.4, metalness: 0.3 });
+    SH.leaf = M(0xffffff, { map: TEX.leaf, roughness: 1, env: 0.35 });
+    SH.trunk = M(0x5b4636, { roughness: 1 });
+    SH.glass = M(0xffffff, { map: TEX.glass, roughness: 0.06, metalness: 0.65, uv: 6, env: 3.2, emissive: 0xffe2b8, emissiveMap: TEX.glassE, emissiveIntensity: 0 });
+    SH.carGlass = M(0x1b2830, { roughness: 0.08, metalness: 0.75, env: 3 });
+    SH.tire = M(0x15171a, { roughness: 0.95 });
+    SH.wood = M(0xb08a5a, { roughness: 0.8 });
+    SH.box = M(0xb89a6a, { roughness: 0.95 });
+    SH.contain = M(0xbfe0ee, { roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, env: 1.4 });
+    SH.cabF = M(0xffffff, { map: TEX.cab, roughness: 0.5, metalness: 0.4, emissive: 0xffffff, emissiveMap: TEX.cabE, emissiveIntensity: 1 });
+    SH.rackFront = M(0xffffff, { map: TEX.rack, roughness: 0.55, metalness: 0.4, emissive: 0xffffff, emissiveMap: TEX.rackE, emissiveIntensity: 1.6 });
+    SH.rackBody = M(0x1b2024, { roughness: 0.5, metalness: 0.5 });
+    SH.rackAlt = M(0x3d464e, { roughness: 0.5, metalness: 0.5 });
+    SH.copper = M(0xc8793a, { metalness: 0.9, roughness: 0.3 }); SH.pcb = M(0x1f6b45, { roughness: 0.55 });
+    SH.person = M(0xf2a600, { roughness: 0.75 }); SH.pants = M(0x27374d, { roughness: 0.9 }); SH.skin = M(0xd9a47a, { roughness: 0.8 }); SH.helmet = M(0xf4f4f0, { roughness: 0.4 });
+    SH.hazard = M(0xffffff, { map: TEX.hazard, roughness: 0.7, uv: 1.2 });
+    SH.sign = M(0xffffff, { map: TEX.sign, roughness: 0.6 });
+    SH.light = B(0xfff6e0);
+    SH.fan = new T.MeshStandardMaterial({ map: TEX.fan, transparent: true, alphaTest: 0.3, roughness: 0.5, metalness: 0.6, side: T.DoubleSide }); MATS.push(SH.fan); SH.fan.userData.env = 1;
+    SH.grille = new T.MeshBasicMaterial({ map: TEX.grille, transparent: true, depthWrite: false, side: T.DoubleSide });
+    SH.fence = new T.MeshStandardMaterial({ map: TEX.chain, transparent: true, depthWrite: false, side: T.DoubleSide, roughness: 0.6, metalness: 0.6 }); SH.fence.userData.uv = 0.7; SH.fence.userData.env = 1; MATS.push(SH.fence);
+    SH.patchA = M(0x3a5222, { map: TEX.patch, transparent: true, opacity: 0.4, depthWrite: false, roughness: 1, env: 0.2 }); SH.patchB = M(0xbcae70, { map: TEX.patch, transparent: true, opacity: 0.4, depthWrite: false, roughness: 1, env: 0.2 });
+    SH.ao = new T.MeshBasicMaterial({ map: TEX.ao, color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    SH.wire = new T.LineBasicMaterial({ color: 0x2c3236 });
+    SH.hot = B(0xe8573f, { transparent: true, opacity: 0.16, depthWrite: false }); SH.cold = B(0x3f8fe8, { transparent: true, opacity: 0.12, depthWrite: false });
+    SH.screen = B(0x7fd6ff); SH.led = B(0x35e08a); SH.upsLed = B(0x35e08a);
+    SH.zone = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
+    SH.cloud = new T.MeshBasicMaterial({ map: TEX.shade, transparent: true, opacity: 0.3, depthWrite: false, fog: false });
+    SH.lampHead = B(0x8a8f8c);
+    SH.smoke = new T.MeshBasicMaterial({ color: 0x6f6f6f, transparent: true, opacity: 0.34, depthWrite: false, toneMapped: false });
+    SH.heat = B(0xff9a3c, { transparent: true, opacity: 0.3, depthWrite: false });
+    SH.glow = new T.MeshBasicMaterial({ map: TEX.glow, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false });
+    SH.carPaint = [0xb5332b, 0xeef0f0, 0x2b5596, 0x30353a, 0xcfc9bb, 0x7d868c].map(function (c) { return M(c, { roughness: 0.28, metalness: 0.55, env: 2.2 }); });
 
-    var rackTex = canvasTex(48, 160, function (g, w, h) {
-      g.fillStyle = '#14181c'; g.fillRect(0, 0, w, h);
-      var r = rng(7), cols = ['#35e08a', '#35e08a', '#35e08a', '#58b7ff', '#ffb53c'];
-      for (var y = 8; y < h - 6; y += 9) {
-        g.fillStyle = '#20262b'; g.fillRect(4, y, w - 8, 6);
-        for (var x = 7; x < w - 8; x += 6) { if (r() > 0.35) { g.fillStyle = cols[Math.floor(r() * cols.length)]; g.fillRect(x, y + 2, 2, 2); } }
-      }
-    });
-    SH.rackFront = new T.MeshStandardMaterial({ map: rackTex, emissiveMap: rackTex, emissive: 0xffffff, emissiveIntensity: 1.1, roughness: 0.6 });
-    SH.rackBody = M(0x1b2024, { roughness: 0.6 });
-    SH.rackAlt = M(0x39424a, { roughness: 0.6 });
-
-    var stripes = canvasTex(64, 64, function (g, w, h) {
-      g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-      g.fillStyle = '#dcdcdc'; for (var y = 0; y < h; y += 16) g.fillRect(0, y, w, 8);
-    });
-    stripes.wrapS = stripes.wrapT = T.RepeatWrapping;
-    SH.stripesTex = stripes;
-    SH.crops = [0xc8b45c, 0x8faa55, 0xa9b867, 0xd6c268, 0x7b9a50, 0xb39b5e, 0x9db56a, 0xc2ad62].map(function (c) {
-      return new T.MeshStandardMaterial({ color: c, map: stripes, roughness: 1 });
-    });
     // vedere termica: ce culoare ia fiecare material cand aratam "temperatura"
-    function disp(hex) { return new T.Color(hex).convertSRGBToLinear().getHex(); }     // culoarea tinta de pe ecran -> valoarea materialului
-    THERM = [[SH.wall, 0x2c3484], [SH.wallIn, 0x3a3a96], [SH.base, 0x20245f], [SH.stripe, 0x2c3484], [SH.roof, 0x2a3080], [SH.floor, 0x3b3a9a], [SH.concrete, 0x1e2462], [SH.gravel, 0x1e2462], [SH.asphalt, 0x262a6e], [SH.ground, 0x141a4a],
-      [SH.white, 0x4a3da6], [SH.steel, 0x343a8c], [SH.dark, 0x46389e], [SH.silver, 0xf0823a], [SH.trafo, 0xe2603c], [SH.trafoFin, 0xee7440], [SH.ceramic, 0x6a48ae], [SH.frame, 0x6a48ae], [SH.panelBack, 0x6a48ae],
-      [SH.green, 0x5a40a8], [SH.blue, 0x2fb4ff], [SH.red, 0xff6a2a], [SH.tree, 0x162058], [SH.tree2, 0x1a2460], [SH.trunk, 0x162058], [SH.glass, 0x3a3a96], [SH.windowGlow, 0x5a40a8], [SH.rackBody, 0xffb040], [SH.rackAlt, 0xf2883a], [SH.rackFront, 0xffe070],
-      [SH.copper, 0xfff2a8], [SH.pcb, 0xff9a3c], [SH.person, 0xf29a3c], [SH.skin, 0xf29a3c]].map(function (e) { return { m: e[0], hot: disp(e[1]), base: e[0].color.getHex() }; });
-    THERM.push({ m: SH.panel, hot: 0xb070d8, base: SH.panel.color.getHex() });
-    SH.crops.forEach(function (m) { THERM.push({ m: m, hot: disp(0x161c50), base: m.color.getHex() }); });
+    var cool = 0x25307e, cold = 0x161d58, warm = 0x6a48ae, hot = 0xf0823a, vhot = 0xffb040;
+    THERM = [[SH.ground, 0x10163e], [SH.soil, 0x141a48], [SH.asphalt, 0x1c2260], [SH.road, 0x1c2260], [SH.concrete, cold], [SH.gravel, cold], [SH.wall, cool], [SH.wallIn, 0x34389a], [SH.base, 0x1e2360], [SH.trim, 0x222868],
+      [SH.stripe, cool], [SH.roof, 0x283082], [SH.roofTrim, 0x222868], [SH.roofUnit, warm], [SH.floor, 0x3b3a9a], [SH.white, 0x4a3da6], [SH.paint, 0x2a3080], [SH.steel, 0x343a8c], [SH.dark, 0x46389e], [SH.silver, hot], [SH.cont, 0x4a3da6], [SH.contDark, 0x46389e],
+      [SH.louver, warm], [SH.door, cool], [SH.coil, 0xf2883a], [SH.trafo, 0xe2603c], [SH.trafoFin, 0xee7440], [SH.ceramic, warm], [SH.frame, warm], [SH.panelBack, warm], [SH.panel, 0xa868d0], [SH.green, 0x5a40a8],
+      [SH.blue, 0x2fb4ff], [SH.red, 0xff6a2a], [SH.leaf, 0x141c50], [SH.trunk, 0x141c50], [SH.glass, 0x34389a], [SH.carGlass, 0x34389a], [SH.tire, 0x2a2a70], [SH.wood, 0x3a3a96], [SH.box, 0x3a3a96], [SH.contain, 0xf2a060],
+      [SH.cabF, 0xe07038], [SH.rackFront, 0xffe070], [SH.rackBody, vhot], [SH.rackAlt, 0xf2883a], [SH.copper, 0xfff2a8], [SH.pcb, 0xff9a3c], [SH.person, 0xf29a3c], [SH.pants, 0xe08a3c], [SH.skin, 0xf2a03c], [SH.helmet, 0xf29a3c],
+      [SH.hazard, cool], [SH.sign, cool], [SH.fan, 0xf2883a]].map(function (e) { return { m: e[0], hot: e[1], base: e[0].color.getHex(), map: e[0].map || null }; });
+    SH.crops.forEach(function (m) { THERM.push({ m: m, hot: 0x121844, base: m.color.getHex(), map: m.map }); });
+    SH.carPaint.forEach(function (m) { THERM.push({ m: m, hot: 0x3a3a96, base: m.color.getHex(), map: null }); });
   }
 
-  function box(parent, w, h, d, m, x, y, z, cast) {
-    var me = new T.Mesh(new T.BoxGeometry(w, h, d), m);
-    me.position.set(x, y, z); me.castShadow = cast !== false; me.receiveShadow = true; parent.add(me); return me;
+  /* ---------- geometrie lipita: piesele mici devin o singura plasa pe material, ca aparatul sa deseneze putine obiecte ---------- */
+  var UNIT = {}, batch = null, _m4, _n3, _v, _q, _e, _s;
+  function unit(key, make) { return UNIT[key] || (UNIT[key] = make()); }
+  function Batch() { this.items = {}; this.list = []; }
+  Batch.prototype.acc = function (parent, mat, cast) {
+    var key = parent.id + '|' + mat.id + '|' + (cast ? 1 : 0), a = this.items[key];
+    if (!a) { a = this.items[key] = { parent: parent, mat: mat, cast: cast, pos: [], nor: [], uv: [], idx: [], n: 0 }; this.list.push(a); }
+    return a;
+  };
+  Batch.prototype.flush = function () {
+    for (var i = 0; i < this.list.length; i++) {
+      var a = this.list[i]; if (!a.n) continue;
+      var g = new T.BufferGeometry();
+      g.setAttribute('position', new T.Float32BufferAttribute(a.pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(a.nor, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(a.uv, 2));
+      g.setIndex(a.n > 65535 ? new T.Uint32BufferAttribute(a.idx, 1) : new T.Uint16BufferAttribute(a.idx, 1));
+      var me = new T.Mesh(g, a.mat); me.castShadow = a.cast; me.receiveShadow = true; a.parent.add(me);
+    }
+    this.items = {}; this.list = [];
+  };
+  function addGeo(parent, geo, mat, x, y, z, sx, sy, sz, rot, cast) {
+    var a = batch.acc(parent, mat, cast !== false);
+    if (rot && rot.isQuaternion) _q.copy(rot); else { _e.set(rot ? rot[0] : 0, rot ? rot[1] : 0, rot ? rot[2] : 0); _q.setFromEuler(_e); }
+    _m4.compose(_v.set(x, y, z), _q, _s.set(sx, sy, sz)); _n3.getNormalMatrix(_m4);
+    var P = geo.attributes.position, N = geo.attributes.normal, U = geo.attributes.uv, I = geo.index, n0 = a.n, uvS = mat.userData.uv, i;
+    for (i = 0; i < P.count; i++) {
+      var px = P.getX(i), py = P.getY(i), pz = P.getZ(i), nx = N.getX(i), ny = N.getY(i), nz = N.getZ(i);
+      _v.set(px, py, pz).applyMatrix4(_m4); a.pos.push(_v.x, _v.y, _v.z);
+      if (uvS) {       // textura curge dupa metri reali, pe fata pe care sta
+        var lx = px * sx + x, ly = py * sy + y, lz = pz * sz + z, ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+        if (ay >= ax && ay >= az) a.uv.push(lx / uvS, lz / uvS); else if (ax >= az) a.uv.push(lz / uvS, ly / uvS); else a.uv.push(lx / uvS, ly / uvS);
+      } else a.uv.push(U.getX(i), U.getY(i));
+      _v.set(nx, ny, nz).applyMatrix3(_n3).normalize(); a.nor.push(_v.x, _v.y, _v.z);
+    }
+    if (I) for (i = 0; i < I.count; i++) a.idx.push(I.getX(i) + n0); else for (i = 0; i < P.count; i++) a.idx.push(n0 + i);
+    a.n += P.count;
   }
-  function cyl(parent, rt, rb, h, m, x, y, z, seg) {
-    var me = new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 12), m);
-    me.position.set(x, y, z); me.castShadow = true; me.receiveShadow = true; parent.add(me); return me;
+  function tpl(fn) {         // o piesa repetata: se construieste o data si se deseneaza de multe ori (instante)
+    var saved = batch, g = new T.Group(); batch = new Batch(); fn(g);
+    var list = batch.list.filter(function (a) { return a.n; }), pos = [], nor = [], uv = [], idx = [], mats = [], n = 0, geo = new T.BufferGeometry();
+    list.forEach(function (a, k) {
+      var start = idx.length, i;
+      for (i = 0; i < a.pos.length; i++) { pos.push(a.pos[i]); nor.push(a.nor[i]); }
+      for (i = 0; i < a.uv.length; i++) uv.push(a.uv[i]);
+      for (i = 0; i < a.idx.length; i++) idx.push(a.idx[i] + n);
+      geo.addGroup(start, a.idx.length, k); mats.push(a.mat); n += a.n;
+    });
+    geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+    geo.setIndex(n > 65535 ? new T.Uint32BufferAttribute(idx, 1) : new T.Uint16BufferAttribute(idx, 1));
+    batch = saved; return { geo: geo, mats: mats.length === 1 ? mats[0] : mats };
   }
-  function tag(obj, id) { obj.traverse(function (o) { if (o.isMesh) { o.userData.pick = id; pickObjs.push(o); } }); }
-  function zone(parent, id, xa, xb, za, zb, h) {     // zona invizibila, ca obiectele mici sa fie usor de apasat
+  function inst(parent, t, n, cast) {
+    var me = new T.InstancedMesh(t.geo, t.mats, Math.max(1, n)); me.count = n; me.frustumCulled = false; me.castShadow = cast !== false; me.receiveShadow = true; parent.add(me); return me;
+  }
+
+  function box(parent, w, h, d, m, x, y, z, cast, rot) { addGeo(parent, unit('box', function () { return new T.BoxGeometry(1, 1, 1); }), m, x, y, z, w, h, d, rot, cast); }
+  function cyl(parent, rt, rb, h, m, x, y, z, seg, rot, cast) {
+    seg = seg || 12; var ratio = Math.round(rt / rb * 100) / 100;
+    addGeo(parent, unit('cyl|' + ratio + '|' + seg, function () { return new T.CylinderGeometry(ratio, 1, 1, seg); }), m, x, y, z, rb, h, rb, rot, cast);
+  }
+  function sph(parent, r, m, x, y, z, cast, sy, det) {
+    det = det === undefined ? 1 : det;
+    addGeo(parent, unit('ico' + det, function () { return new T.IcosahedronGeometry(1, det); }), m, x, y, z, r, r * (sy || 1), r, null, cast);
+  }
+  function flat(parent, w, d, m, x, y, z, rotY) {      // placa subtire culcata pe sol: marcaje, umbre, pete
+    addGeo(parent, unit('flat', function () { var g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); return g; }), m, x, y, z, w, 1, d, rotY ? [0, rotY, 0] : null, false);
+  }
+  function disc(parent, r, m, x, y, z) {
+    addGeo(parent, unit('disc', function () { var g = new T.CircleGeometry(1, 20); g.rotateX(-Math.PI / 2); return g; }), m, x, y, z, r, 1, r, null, false);
+  }
+  var _a = null, _b = null, _up = null;
+  function beam(parent, m, x0, y0, z0, x1, y1, z1, t, cast) {      // bara intre doua puncte
+    _a.set(x0, y0, z0); _b.set(x1, y1, z1); var len = _a.distanceTo(_b), qq = new T.Quaternion().setFromUnitVectors(_up, _b.clone().sub(_a).normalize());
+    box(parent, t, len, t, m, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, cast, qq);
+  }
+  function ao(parent, w, d, x, y, z, k) {              // umbra de contact: leaga obiectul de sol si pe vreme inchisa
+    flat(parent, w * (k || 1.9), d * (k || 1.9), SH.ao, x, y, z);
+  }
+  function mesh(parent, geo, m, x, y, z, cast) {       // obiect separat, pentru piesele care se misca singure
+    var me = new T.Mesh(geo, m); me.position.set(x, y, z); me.castShadow = cast !== false; me.receiveShadow = true; parent.add(me); return me;
+  }
+  function tag(obj, id) { tags.push([obj, id]); }
+  function applyTags() {
+    tags.forEach(function (e) { e[0].traverse(function (o) { if (o.isMesh && o.material !== SH.ao && o.material !== SH.grille) { o.userData.pick = e[1]; pickObjs.push(o); } }); });
+    tags = [];
+  }
+  function zone(parent, id, xa, xb, za, zb, h) {       // zona invizibila, ca obiectele mici sa fie usor de apasat
     var me = new T.Mesh(new T.BoxGeometry(Math.abs(xb - xa), h, Math.abs(zb - za)), SH.zone);
     me.position.set((xa + xb) / 2, h / 2, (za + zb) / 2); me.userData.pick = id; me.renderOrder = -1; parent.add(me); pickObjs.push(me);
   }
@@ -1258,14 +1556,14 @@ var Scene3D = (function () {
     this.seg = []; this.len = 0;
     for (var i = 1; i < this.pts.length; i++) { var d = this.pts[i].distanceTo(this.pts[i - 1]); this.seg.push(d); this.len += d; }
     this.k = k; this.n = n || 10; this.phase = 0; this.dir = 1; this.power = 0; this.active = 0;
-    var cm = new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.35 });
+    var cm = B(color, { transparent: true, opacity: 0.35 });
     this.cableMat = cm; this.group = new T.Group(); parent.add(this.group);
     for (i = 1; i < this.pts.length; i++) {
       var a = this.pts[i - 1], b = this.pts[i], mid = a.clone().add(b).multiplyScalar(0.5);
-      var me = new T.Mesh(new T.BoxGeometry(0.55 * k, 0.12 * k, this.seg[i - 1] + 0.55 * k), cm);
+      var me = new T.Mesh(new T.BoxGeometry(0.45 * k, 0.1 * k, this.seg[i - 1] + 0.45 * k), cm);
       me.position.copy(mid); me.lookAt(b); this.group.add(me);
     }
-    this.dotMat = new T.MeshBasicMaterial({ color: color });
+    this.dotMat = B(color);
     this.dots = [];
     var sg = new T.SphereGeometry(1, 12, 8);
     for (i = 0; i < this.n; i++) { var s = new T.Mesh(sg, this.dotMat); s.visible = false; this.group.add(s); this.dots.push(s); }
@@ -1282,7 +1580,7 @@ var Scene3D = (function () {
     this.power = Math.max(0, Math.min(1, frac)); this.dir = dir || 1;
     if (color !== undefined) { this.dotMat.color.setHex(color); this.cableMat.color.setHex(color); }
     this.active = this.power > 0.004 ? Math.max(2, Math.round(this.n * (0.25 + 0.75 * this.power))) : 0;
-    this.cableMat.opacity = this.active ? 0.6 : 0.18;
+    this.cableMat.opacity = this.active ? 0.62 : 0.2;
   };
   Flow.prototype.update = function (dt, camPos) {
     var speed = (16 + 26 * this.power) * this.k / this.len;
@@ -1316,18 +1614,22 @@ var Scene3D = (function () {
     }
   };
 
-  /* ---------- piese ---------- */
+
+  /* ---------- piese: fiecare functie pune un obiect intreg la locul lui ---------- */
   function person(parent, x, y, z) {
-    cyl(parent, 0.17, 0.2, 1.3, SH.person, x, y + 0.65, z, 8);
-    var h = new T.Mesh(new T.SphereGeometry(0.15, 10, 8), SH.skin); h.position.set(x, y + 1.5, z); h.castShadow = true; parent.add(h);
+    box(parent, 0.13, 0.82, 0.15, SH.pants, x - 0.09, y + 0.41, z, false); box(parent, 0.13, 0.82, 0.15, SH.pants, x + 0.09, y + 0.41, z, false);
+    box(parent, 0.4, 0.58, 0.22, SH.person, x, y + 1.11, z);
+    box(parent, 0.1, 0.55, 0.12, SH.person, x - 0.26, y + 1.1, z, false); box(parent, 0.1, 0.55, 0.12, SH.person, x + 0.26, y + 1.1, z, false);
+    sph(parent, 0.115, SH.skin, x, y + 1.55, z, false, 1.1); sph(parent, 0.135, SH.helmet, x, y + 1.63, z, false, 0.6);
   }
   function rackDetail(parent, x, z) {       // un rack desenat in detaliu: usa se deschide, un server iese pe sine
     var g = new T.Group(); g.position.set(x, 0.3, z); parent.add(g);
     [[-0.57, -0.27], [-0.57, 0.27], [0.57, -0.27], [0.57, 0.27]].forEach(function (c) { box(g, 0.06, 2.2, 0.06, SH.rackBody, c[0], 1.1, c[1], false); });
     box(g, 1.2, 0.06, 0.6, SH.rackBody, 0, 2.17, 0); box(g, 1.2, 0.06, 0.6, SH.rackBody, 0, 0.03, 0, false);
     box(g, 1.14, 2.08, 0.02, SH.rackBody, 0, 1.1, -0.29, false); box(g, 0.02, 2.08, 0.56, SH.rackBody, -0.59, 1.1, 0, false);
-    cyl(g, 0.028, 0.028, 2.0, SH.blue, -0.5, 1.1, -0.2, 8).castShadow = false; cyl(g, 0.028, 0.028, 2.0, SH.red, -0.5, 1.1, 0.2, 8).castShadow = false;
-    box(g, 0.05, 1.9, 0.05, SH.copper, -0.5, 1.1, 0, false);
+    cyl(g, 0.028, 0.028, 2.0, SH.blue, -0.5, 1.1, -0.2, 8, null, false); cyl(g, 0.028, 0.028, 2.0, SH.red, -0.5, 1.1, 0.2, 8, null, false);     // colectoarele de lichid
+    box(g, 0.05, 1.9, 0.05, SH.copper, -0.5, 1.1, 0, false);                                                                                   // bara de alimentare
+    box(g, 0.04, 1.9, 0.07, SH.dark, 0.5, 1.1, -0.255, false); for (var q = 0; q < 12; q++) box(g, 0.012, 0.02, 0.02, SH.led, 0.522, 0.35 + q * 0.14, -0.255, false);   // priza verticala
     box(g, 1.0, 0.2, 0.5, SH.silver, 0.02, 0.17, 0, false); box(g, 0.012, 0.03, 0.4, SH.led, 0.53, 0.17, 0, false);
     box(g, 0.8, 0.09, 0.5, SH.rackAlt, 0.12, 2.06, 0, false); box(g, 0.012, 0.04, 0.44, SH.led, 0.525, 2.06, 0, false);
     var out = { g: g, door: null, server: null, cover: null }, m;
@@ -1336,6 +1638,7 @@ var Scene3D = (function () {
       if (i !== 2) {
         box(s, 1.0, 0.36, 0.5, SH.dark, 0, 0.18, 0, false);
         box(s, 0.02, 0.32, 0.48, SH.rackAlt, 0.51, 0.18, 0, false); box(s, 0.012, 0.03, 0.3, SH.led, 0.522, 0.3, 0, false);
+        for (m = 0; m < 6; m++) box(s, 0.014, 0.2, 0.05, SH.dark, 0.522, 0.15, -0.19 + m * 0.076, false);
         continue;
       }
       out.server = s;
@@ -1351,11 +1654,9 @@ var Scene3D = (function () {
         box(s, 0.36, 0.24, 0.014, SH.pcb, 0.27, 0.15, gz, false);
         box(s, 0.16, 0.13, 0.022, SH.copper, 0.27, 0.17, gz + 0.018, false);
       }
-      var t1 = cyl(s, 0.011, 0.011, 0.46, SH.blue, 0.31, 0.295, 0, 6); t1.rotation.x = Math.PI / 2; t1.castShadow = false;
-      var t2 = cyl(s, 0.011, 0.011, 0.46, SH.red, 0.23, 0.295, 0, 6); t2.rotation.x = Math.PI / 2; t2.castShadow = false;
-      var t3 = cyl(s, 0.011, 0.011, 0.75, SH.blue, -0.07, 0.295, -0.22, 6); t3.rotation.z = Math.PI / 2; t3.castShadow = false;
-      var t4 = cyl(s, 0.011, 0.011, 0.67, SH.red, -0.11, 0.295, 0.22, 6); t4.rotation.z = Math.PI / 2; t4.castShadow = false;
-      out.cover = box(s, 1.0, 0.016, 0.5, SH.rackAlt, 0, 0.352, 0, false);
+      cyl(s, 0.011, 0.011, 0.46, SH.blue, 0.31, 0.295, 0, 6, [Math.PI / 2, 0, 0], false); cyl(s, 0.011, 0.011, 0.46, SH.red, 0.23, 0.295, 0, 6, [Math.PI / 2, 0, 0], false);
+      cyl(s, 0.011, 0.011, 0.75, SH.blue, -0.07, 0.295, -0.22, 6, [0, 0, Math.PI / 2], false); cyl(s, 0.011, 0.011, 0.67, SH.red, -0.11, 0.295, 0.22, 6, [0, 0, Math.PI / 2], false);
+      out.cover = mesh(s, new T.BoxGeometry(1.0, 0.016, 0.5), SH.rackAlt, 0, 0.352, 0, false);
     }
     var d = new T.Group(); d.position.set(0.61, 0, -0.3); g.add(d);
     box(d, 0.02, 2.1, 0.6, SH.rackFront, 0, 1.1, 0.3, false);
@@ -1363,109 +1664,284 @@ var Scene3D = (function () {
     return out;
   }
   function transformer(parent, x, z, s) {
-    box(parent, 3 * s, 2.4 * s, 2 * s, SH.trafo, x, 1.2 * s + 0.3, z);
-    box(parent, 2.6 * s, 1.8 * s, 0.5 * s, SH.trafoFin, x, 1.1 * s + 0.3, z + 1.3 * s);
-    box(parent, 2.6 * s, 1.8 * s, 0.5 * s, SH.trafoFin, x, 1.1 * s + 0.3, z - 1.3 * s);
-    for (var i = -1; i <= 1; i++) cyl(parent, 0.1 * s, 0.17 * s, 1.1 * s, SH.ceramic, x + i * 0.8 * s, 2.4 * s + 0.3 + 0.55 * s, z, 8);
-    var c = cyl(parent, 0.35 * s, 0.35 * s, 2.2 * s, SH.trafo, x, 3.1 * s + 0.3, z - 0.55 * s, 10); c.rotation.z = Math.PI / 2;
-  }
-  function genset(parent, x, z, len, s) {     // lungimea pe axa x
-    box(parent, len, 2.9 * s, 2.6 * s, SH.dark, x, 1.45 * s + 0.2, z);
-    box(parent, 0.15, 2.0 * s, 2.0 * s, SH.steel, x - len / 2 - 0.08, 1.4 * s + 0.2, z);
-    cyl(parent, 0.22 * s, 0.22 * s, 1.6 * s, SH.steel, x + len * 0.3, 2.9 * s + 0.8 * s, z, 8);
-    var t = cyl(parent, 0.7 * s, 0.7 * s, len * 0.5, SH.white, x, 0.9 * s, z + 2.4 * s, 10); t.rotation.z = Math.PI / 2;
-  }
-  function cooler(parent, x, z, len) {         // racitor uscat, lungimea pe x
-    box(parent, len, 1.5, 2.3, SH.silver, x, 2.15, z);
-    for (var i = -1; i <= 1; i += 2) for (var j = -1; j <= 1; j += 2) box(parent, 0.14, 1.4, 0.14, SH.steel, x + i * (len / 2 - 0.3), 0.7, z + j * 1.0, false);
-    var nf = Math.max(2, Math.round(len / 2.3));
-    for (var f = 0; f < nf; f++) {
-      var fx = x - len / 2 + (f + 0.5) * len / nf;
-      cyl(parent, 0.95, 0.95, 0.1, SH.dark, fx, 2.95, z, 16).castShadow = false;
-      var g = new T.Group(); g.position.set(fx, 3.03, z); parent.add(g);
-      box(g, 1.7, 0.04, 0.26, SH.silver, 0, 0, 0, false); box(g, 0.26, 0.04, 1.7, SH.silver, 0, 0, 0, false);
-      fans.push(g);
+    var y0 = 0.32, i, sd;
+    box(parent, 3.6 * s, 0.25 * s, 2.6 * s, SH.dark, x, y0 + 0.125 * s, z);                                       // sasiu
+    box(parent, 3 * s, 2.3 * s, 1.9 * s, SH.trafo, x, y0 + 1.4 * s, z);                                           // cuva cu ulei
+    box(parent, 3.2 * s, 0.12 * s, 2.1 * s, SH.trafo, x, y0 + 2.6 * s, z, false);
+    for (sd = -1; sd <= 1; sd += 2) {                                                                              // radiatoare, lamela cu lamela
+      for (i = 0; i < 9; i++) box(parent, 0.07 * s, 1.75 * s, 0.62 * s, SH.trafoFin, x - 1.2 * s + i * 0.3 * s, y0 + 1.35 * s, z + sd * 1.32 * s);
+      cyl(parent, 0.07 * s, 0.07 * s, 2.7 * s, SH.trafo, x, y0 + 2.2 * s, z + sd * 1.3 * s, 8, [0, 0, Math.PI / 2], false);
+      cyl(parent, 0.07 * s, 0.07 * s, 2.7 * s, SH.trafo, x, y0 + 0.55 * s, z + sd * 1.3 * s, 8, [0, 0, Math.PI / 2], false);
     }
-  }
-  function pylon(parent, x, z, h, big) {
-    var g = new T.Group(); g.position.set(x, 0, z); parent.add(g);
-    var a = big ? h * 0.2 : 1.4;
-    if (big) {
-      var body = new T.Mesh(new T.CylinderGeometry(0.5, h * 0.11, h, 4, 5, true), SH.lattice); body.position.y = h / 2; body.rotation.y = Math.PI / 4; g.add(body);
-      box(g, 0.35, 0.35, a * 2, SH.steel, 0, h * 0.8, 0); box(g, 0.3, 0.3, a * 1.2, SH.steel, 0, h * 0.93, 0);
-    } else {
-      cyl(g, 0.16, 0.24, h, SH.trunk, 0, h / 2, 0, 8); box(g, 0.2, 0.2, a * 2, SH.steel, 0, h * 0.92, 0);
+    for (i = -1; i <= 1; i++) {                                                                                    // izolatoare: inalta tensiune (mari) si joasa (mici)
+      cyl(parent, 0.09 * s, 0.17 * s, 1.25 * s, SH.ceramic, x + i * 0.85 * s, y0 + 3.28 * s, z - 0.35 * s, 10);
+      cyl(parent, 0.05 * s, 0.05 * s, 0.22 * s, SH.silver, x + i * 0.85 * s, y0 + 4.0 * s, z - 0.35 * s, 8, null, false);
+      cyl(parent, 0.06 * s, 0.1 * s, 0.5 * s, SH.ceramic, x + i * 0.5 * s, y0 + 2.9 * s, z + 0.55 * s, 8, null, false);
     }
-    var yy = big ? h * 0.8 : h * 0.92;
-    return [new T.Vector3(x, yy, z - a), new T.Vector3(x, yy + (big ? h * 0.13 : 0.25), z), new T.Vector3(x, yy, z + a)];
+    cyl(parent, 0.36 * s, 0.36 * s, 2.3 * s, SH.trafo, x, y0 + 3.5 * s, z + 0.2 * s, 12, [0, 0, Math.PI / 2]);     // conservatorul de ulei
+    box(parent, 0.1 * s, 0.6 * s, 0.1 * s, SH.trafo, x - 0.8 * s, y0 + 2.95 * s, z + 0.2 * s, false); box(parent, 0.1 * s, 0.6 * s, 0.1 * s, SH.trafo, x + 0.8 * s, y0 + 2.95 * s, z + 0.2 * s, false);
+    box(parent, 0.3 * s, 0.9 * s, 0.6 * s, SH.silver, x + 1.65 * s, y0 + 1.3 * s, z, false);                       // dulap de comanda
+    var bw = 4.6 * s, bd = 4.2 * s;                                                                                 // cuva de retentie din beton
+    box(parent, bw, 0.35, 0.18, SH.base, x, 0.45, z - bd / 2, false); box(parent, bw, 0.35, 0.18, SH.base, x, 0.45, z + bd / 2, false);
+    box(parent, 0.18, 0.35, bd, SH.base, x - bw / 2, 0.45, z, false); box(parent, 0.18, 0.35, bd, SH.base, x + bw / 2, 0.45, z, false);
+    ao(parent, 3.4 * s, 3.3 * s, x, 0.34, z, 1.6);
+    return [-1, 0, 1].map(function (k) { return new T.Vector3(x + k * 0.85 * s, y0 + 4.1 * s, z - 0.35 * s); });
+  }
+  function genset(parent, x, z, len, s) {     // grup electrogen in carcasa antifonica, lungimea pe axa x
+    var h = 2.7 * s, w = 2.5 * s, yb = 0.22 + 0.3 * s, top = yb + h, nd = Math.max(2, Math.round(len / 3)), i;
+    box(parent, len + 0.4, 0.3 * s, w + 0.2, SH.dark, x, 0.22 + 0.15 * s, z);                                    // sasiu cu rezervor
+    box(parent, len, h, w, SH.contDark, x, yb + h / 2, z);
+    box(parent, 0.06, h * 0.72, w * 0.8, SH.louver, x - len / 2 - 0.03, yb + h * 0.5, z, false); box(parent, 0.06, h * 0.72, w * 0.8, SH.louver, x + len / 2 + 0.03, yb + h * 0.5, z, false);
+    for (i = 0; i <= nd; i++) for (var sd = -1; sd <= 1; sd += 2) {
+      box(parent, 0.05, h * 0.82, 0.03, SH.dark, x - len / 2 + i * len / nd, yb + h * 0.47, z + sd * (w / 2 + 0.015), false);          // usi de serviciu
+      if (i < nd) box(parent, 0.05, 0.28 * s, 0.05, SH.steel, x - len / 2 + (i + 0.85) * len / nd, yb + h * 0.45, z + sd * (w / 2 + 0.04), false);
+    }
+    cyl(parent, 0.3 * s, 0.3 * s, len * 0.3, SH.silver, x + len * 0.16, top + 0.36 * s, z, 12, [0, 0, Math.PI / 2]);  // toba de esapament
+    cyl(parent, 0.13 * s, 0.13 * s, 1.5 * s, SH.silver, x + len * 0.3, top + 1.1 * s, z, 10);                          // cosul
+    box(parent, len * 0.28, 0.25 * s, w * 0.8, SH.dark, x - len * 0.3, top + 0.125 * s, z, false);                    // radiator pe acoperis
+    disc(parent, w * 0.3, SH.fan, x - len * 0.3, top + 0.26 * s, z);
+    var tz = z + w / 2 + 1.5 * s;                                                                                      // rezervor de motorina
+    cyl(parent, 0.6 * s, 0.6 * s, len * 0.5, SH.white, x, 0.22 + 1.0 * s, tz, 14, [0, 0, Math.PI / 2]);
+    box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x - len * 0.17, 0.22 + 0.25 * s, tz, false); box(parent, 0.2, 0.5 * s, 1.0 * s, SH.steel, x + len * 0.17, 0.22 + 0.25 * s, tz, false);
+    ao(parent, len, w, x, 0.235, z, 1.5);
+    return [x + len * 0.3, top + 2.0 * s, z];
+  }
+  function coolerTpl(len) {                   // racitor uscat: baterie cu lamele, ventilatoare deasupra
+    return tpl(function (g) {
+      var i, j, nf = Math.max(2, Math.round(len / 2.3));
+      for (i = 0; i < 3; i++) for (j = -1; j <= 1; j += 2) box(g, 0.12, 1.2, 0.12, SH.steel, -len / 2 + 0.3 + i * (len - 0.6) / 2, 0.6, j * 1.0, false);
+      box(g, len, 0.12, 2.3, SH.steel, 0, 1.22, 0, false);
+      box(g, len - 0.1, 1.25, 2.2, SH.coil, 0, 1.9, 0);
+      box(g, len, 0.1, 2.3, SH.silver, 0, 2.57, 0, false);
+      box(g, 0.1, 1.3, 2.3, SH.silver, -len / 2, 1.9, 0, false); box(g, 0.1, 1.3, 2.3, SH.silver, len / 2, 1.9, 0, false);
+      for (var f = 0; f < nf; f++) {
+        var fx = -len / 2 + (f + 0.5) * len / nf;
+        cyl(g, 0.98, 0.98, 0.28, SH.silver, fx, 2.76, 0, 20, null, false);
+        disc(g, 0.9, SH.dark, fx, 2.905, 0); disc(g, 0.88, SH.fan, fx, 2.915, 0); disc(g, 0.96, SH.grille, fx, 2.93, 0);
+      }
+      cyl(g, 0.1, 0.1, len, SH.blue, 0, 1.0, 1.25, 8, [0, 0, Math.PI / 2], false); cyl(g, 0.1, 0.1, len, SH.red, 0, 0.75, 1.25, 8, [0, 0, Math.PI / 2], false);
+      ao(g, len, 2.4, 0, 0.02, 0, 1.5);
+    });
+  }
+  function bessTpl() {                        // container de baterii de 20 de picioare
+    return tpl(function (g) {
+      var i;
+      box(g, 6.6, 0.3, 3.0, SH.concrete, 0, 0.15, 0, false);
+      box(g, 6.1, 0.18, 2.46, SH.dark, 0, 0.39, 0, false);
+      box(g, 6.06, 2.6, 2.44, SH.cont, 0, 1.78, 0);
+      box(g, 6.1, 0.34, 2.48, SH.green, 0, 2.86, 0, false);
+      for (i = 0; i < 6; i++) {
+        var dx = -2.5 + i * 1.0;
+        box(g, 0.94, 2.2, 0.04, SH.white, dx, 1.62, 1.235, false);
+        box(g, 0.03, 0.9, 0.03, SH.steel, dx + 0.36, 1.6, 1.27, false);
+        if (i % 2 === 0) box(g, 0.5, 0.3, 0.02, SH.louver, dx, 0.85, 1.262, false);
+      }
+      box(g, 0.24, 0.24, 0.015, SH.hazard, 2.5, 2.3, 1.262, false);
+      for (i = -1; i <= 1; i += 2) { box(g, 0.45, 1.3, 1.5, SH.silver, i * 3.27, 1.5, 0); box(g, 0.02, 1.0, 1.2, SH.louver, i * 3.5, 1.5, 0, false); }
+      for (i = -1; i <= 1; i++) box(g, 1.2, 0.12, 1.0, SH.white, i * 1.9, 3.12, 0, false);
+      ao(g, 6.8, 3.0, 0, 0.02, 0, 1.45);
+    });
+  }
+  function pvTableTpl() {                     // o masa de panouri: 52 de module pe structura metalica, inclinata 25 de grade spre sud
+    var a = 0.436, ca = Math.cos(a), sa = Math.sin(a), yc = 1.9, rot = [a, 0, 0], np = Q.lite ? 4 : 7;
+    return tpl(function (g) {
+      addGeo(g, unit('flat', function () { var gg = new T.PlaneGeometry(1, 1); gg.rotateX(-Math.PI / 2); return gg; }), SH.panel, 0, yc + 0.02 * ca, 0.02 * sa, 30, 1, 4.6, rot, true);                 // fata cu celule
+      addGeo(g, unit('flatDown', function () { var gg = new T.PlaneGeometry(1, 1); gg.rotateX(Math.PI / 2); return gg; }), SH.panelBack, 0, yc - 0.02 * ca, -0.02 * sa, 30, 1, 4.6, rot, true);     // spatele alb
+      [-2.3, 2.3].forEach(function (zl) { box(g, 30, 0.07, 0.05, SH.frame, 0, yc - zl * sa, zl * ca, false, rot); });
+      [-1.25, 1.25].forEach(function (zl) { box(g, 30, 0.1, 0.07, SH.frame, 0, yc - 0.07 * ca - zl * sa, -0.07 * sa + zl * ca, false, rot); });
+      for (var i = 0; i < np; i++) {
+        var px = -13.5 + i * 27 / (np - 1);
+        [-1.25, 1.25].forEach(function (zl) { var top = yc - 0.12 * ca - zl * sa; box(g, 0.1, top, 0.12, SH.steel, px, top / 2, zl * ca, true); });
+        if (!Q.lite) beam(g, SH.steel, px, 0.25, 1.25 * ca, px, yc - 0.12 * ca + 1.25 * sa - 0.25, -1.25 * ca, 0.06, false);
+      }
+    });
+  }
+  function inverterStation(parent, x, z) {    // statie de invertoare cu transformator, pe placa de beton
+    box(parent, 6.8, 0.3, 3.2, SH.concrete, x, 0.15, z, false);
+    box(parent, 5.0, 2.5, 2.4, SH.cont, x - 0.6, 1.55, z);
+    box(parent, 1.6, 1.6, 0.04, SH.louver, x - 1.8, 1.5, z + 1.22, false); box(parent, 0.9, 2.0, 0.04, SH.white, x + 0.4, 1.4, z + 1.22, false); box(parent, 0.03, 0.5, 0.03, SH.steel, x + 0.7, 1.4, z + 1.25, false);
+    box(parent, 1.1, 1.5, 1.4, SH.trafo, x + 2.7, 1.05, z); for (var i = 0; i < 3; i++) cyl(parent, 0.05, 0.08, 0.4, SH.ceramic, x + 2.7, 2.0, z - 0.4 + i * 0.4, 8, null, false);
+    ao(parent, 6.8, 3.2, x, 0.03, z, 1.4);
+  }
+  function towerLattice(parent, x, z, h) {    // stalp metalic cu zabrele, pentru linia de 110 kV
+    var b = h * 0.1, t = h * 0.022 + 0.3, hb = h * 0.78, ns = 5, i, s, c = [[1, 1], [1, -1], [-1, -1], [-1, 1]], th = Math.max(0.14, h * 0.009);
+    for (i = 0; i < 4; i++) {
+      beam(parent, SH.steel, x + c[i][0] * b, 0, z + c[i][1] * b, x + c[i][0] * t, hb, z + c[i][1] * t, th * 1.3);
+      beam(parent, SH.steel, x + c[i][0] * t, hb, z + c[i][1] * t, x + c[i][0] * t * 0.6, h, z + c[i][1] * t * 0.6, th * 1.1);
+    }
+    for (s = 0; s < ns; s++) {
+      var yA = hb * s / ns, yB = hb * (s + 1) / ns, wA = b + (t - b) * s / ns, wB = b + (t - b) * (s + 1) / ns;
+      for (i = 0; i < 4; i++) {
+        var p = c[i], q = c[(i + 1) % 4];
+        beam(parent, SH.steel, x + p[0] * wA, yA, z + p[1] * wA, x + q[0] * wB, yB, z + q[1] * wB, th, false);
+        beam(parent, SH.steel, x + q[0] * wA, yA, z + q[1] * wA, x + p[0] * wB, yB, z + p[1] * wB, th, false);
+        beam(parent, SH.steel, x + p[0] * wB, yB, z + p[1] * wB, x + q[0] * wB, yB, z + q[1] * wB, th, false);
+      }
+    }
+    var a = h * 0.2, y1 = h * 0.8, y2 = h * 0.93, ins = Math.max(1.2, h * 0.05), arms = [[-a, y1], [a * 0.75, y2], [a, y1]];
+    arms.forEach(function (e) {
+      beam(parent, SH.steel, x, e[1] + h * 0.035, z, x, e[1], z + e[0], th); beam(parent, SH.steel, x, e[1] - h * 0.02, z, x, e[1], z + e[0], th, false);
+      cyl(parent, 0.09, 0.09, ins, SH.ceramic, x, e[1] - ins / 2, z + e[0], 8, null, false);
+    });
+    return arms.map(function (e) { return new T.Vector3(x, e[1] - ins, z + e[0]); });
+  }
+  function poleMV(parent, x, z, h) {          // stalp de beton pentru linia de medie tensiune
+    cyl(parent, 0.13, 0.22, h, SH.base, x, h / 2, z, 8);
+    box(parent, 0.12, 0.12, 2.8, SH.steel, x, h * 0.93, z); box(parent, 0.1, 0.5, 0.1, SH.steel, x, h * 0.93 + 0.3, z, false);
+    return [-1.25, 0, 1.25].map(function (dz, i) {
+      var yy = h * 0.93 + (i === 1 ? 0.75 : 0.35);
+      cyl(parent, 0.05, 0.08, 0.5, SH.ceramic, x, yy - 0.2, z + dz, 8, null, false);
+      return new T.Vector3(x, yy + 0.05, z + dz);
+    });
   }
   function wire(parent, a, b, sag) {
     var pts = [];
     for (var i = 0; i <= 12; i++) { var t = i / 12, p = a.clone().lerp(b, t); p.y -= Math.sin(Math.PI * t) * sag; pts.push(p); }
     parent.add(new T.Line(new T.BufferGeometry().setFromPoints(pts), SH.wire));
   }
-  function car(parent, x, z, color) {
-    box(parent, 1.8, 0.7, 4.2, M(color, { roughness: 0.4 }), x, 0.65, z);
-    box(parent, 1.6, 0.6, 2.2, SH.dark, x, 1.25, z - 0.2);
+  function car(parent, x, z, ci) {            // lung pe z
+    var p = SH.carPaint[ci % SH.carPaint.length];
+    box(parent, 1.82, 0.52, 4.3, p, x, 0.74, z); box(parent, 1.7, 0.12, 4.1, SH.dark, x, 0.44, z, false);
+    box(parent, 1.62, 0.5, 2.3, SH.carGlass, x, 1.24, z - 0.15); box(parent, 1.5, 0.06, 1.9, p, x, 1.51, z - 0.15, false);
+    [[-0.86, 1.35], [0.86, 1.35], [-0.86, -1.35], [0.86, -1.35]].forEach(function (w) { cyl(parent, 0.33, 0.33, 0.24, SH.tire, x + w[0], 0.56, z + w[1], 12, [0, 0, Math.PI / 2], false); });
+    box(parent, 1.5, 0.12, 0.04, SH.light, x, 0.82, z + 2.16, false); box(parent, 1.5, 0.1, 0.04, SH.red, x, 0.84, z - 2.16, false);
+    ao(parent, 2.0, 4.5, x, 0.262, z, 1.35);
+  }
+  function truck(parent, x, z) {              // camion cu cutie, cu spatele spre nord
+    box(parent, 2.4, 2.6, 6.2, SH.white, x, 2.25, z - 1.0); box(parent, 2.3, 1.9, 1.9, SH.carPaint[2], x, 1.7, z + 3.2); box(parent, 2.1, 0.8, 0.05, SH.carGlass, x, 2.1, z + 4.16, false);
+    box(parent, 2.2, 0.25, 8.0, SH.dark, x, 0.87, z, false);
+    [[-1.05, 3.1], [1.05, 3.1], [-1.05, -2.4], [1.05, -2.4], [-1.05, -3.4], [1.05, -3.4]].forEach(function (w) { cyl(parent, 0.5, 0.5, 0.3, SH.tire, x + w[0], 0.76, z + w[1], 12, [0, 0, Math.PI / 2], false); });
+    ao(parent, 2.6, 8.4, x, 0.262, z, 1.3);
+  }
+  function treeTpl(kind) {
+    return tpl(function (g) {
+      if (kind === 'poplar') { cyl(g, 0.18, 0.3, 4, SH.trunk, 0, 2, 0, 6); sph(g, 1.45, SH.leaf, 0, 9.4, 0, true, 4.4); sph(g, 1.2, SH.leaf, 0.35, 6.4, 0.2, true, 2.8); sph(g, 1.05, SH.leaf, -0.4, 8.2, -0.3, true, 3.2); sph(g, 0.8, SH.leaf, 0.25, 13.2, 0.3, true, 2.9); }
+      else if (kind === 'conifer') { cyl(g, 0.2, 0.3, 2, SH.trunk, 0, 1, 0, 6); cyl(g, 0.01, 2.4, 4, SH.leaf, 0, 3.6, 0, 8); cyl(g, 0.01, 1.9, 3.4, SH.leaf, 0, 5.6, 0, 8); cyl(g, 0.01, 1.3, 2.8, SH.leaf, 0, 7.4, 0, 8); }
+      else { cyl(g, 0.24, 0.36, 3.4, SH.trunk, 0, 1.7, 0, 6); sph(g, 2.5, SH.leaf, 0, 5.4, 0, true, 0.95); sph(g, 1.9, SH.leaf, 1.5, 4.6, 0.5, true, 0.9); sph(g, 1.8, SH.leaf, -1.3, 4.9, -0.7, true, 0.9); sph(g, 1.6, SH.leaf, 0.2, 6.6, -0.5, true, 0.9); }
+    });
+  }
+  function lampTpl() { return tpl(function (g) { cyl(g, 0.07, 0.11, 7, SH.steel, 0, 3.5, 0, 8); box(g, 0.08, 0.08, 1.3, SH.steel, 0, 7.0, 0.6, false); box(g, 0.34, 0.1, 0.7, SH.lampHead, 0, 6.96, 1.25, false); }); }
+  function fenceRun(parent, posts, x0, z0, x1, z1, hgt) {   // plasa intre doua puncte + stalpii ei
+    var dx = x1 - x0, dz = z1 - z0, len = Math.sqrt(dx * dx + dz * dz), n = Math.max(1, Math.round(len / 3)), ang = Math.atan2(-dz, dx);
+    addGeo(parent, unit('vplane', function () { return new T.PlaneGeometry(1, 1); }), SH.fence, (x0 + x1) / 2, hgt / 2 + 0.05, (z0 + z1) / 2, len, hgt, 1, [0, ang, 0], false);
+    box(parent, len, 0.05, 0.05, SH.steel, (x0 + x1) / 2, hgt + 0.05, (z0 + z1) / 2, false, [0, ang, 0]);
+    for (var i = 0; i <= n; i++) posts.push([x0 + dx * i / n, z0 + dz * i / n, hgt]);
   }
 
-  /* ---------- constructia campusului pentru un scenariu ---------- */
+
+  /* ---------- campusul pentru un scenariu ---------- */
+  function grp(parent) { var g = new T.Group(); parent.add(g); return g; }
+  function vpl(parent, w, h, m, x, y, z, rotY) {       // placa subtire in picioare; fara rotatie priveste spre sud
+    addGeo(parent, unit('vplane', function () { return new T.PlaneGeometry(1, 1); }), m, x, y, z, w, h, 1, rotY ? [0, rotY, 0] : null, false);
+  }
+  function quad(parent, m, x, y, z, w, d, ur, vr, swap) {   // dreptunghi pe sol, cu textura repetata de ur x vr ori
+    var a = batch.acc(parent, m, false), n0 = a.n, hx = w / 2, hz = d / 2;
+    a.pos.push(x - hx, y, z - hz, x + hx, y, z - hz, x + hx, y, z + hz, x - hx, y, z + hz);
+    a.nor.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
+    if (swap) a.uv.push(0, 0, 0, ur, vr, ur, vr, 0); else a.uv.push(0, 0, ur, 0, ur, vr, 0, vr);
+    a.idx.push(n0, n0 + 2, n0 + 1, n0, n0 + 3, n0 + 2); a.n += 4;
+  }
+  function fenceBox(parent, xa, xb, za, zb, hgt) {
+    var posts = [];
+    fenceRun(parent, posts, xa, za, xb, za, hgt); fenceRun(parent, posts, xa, zb, xb, zb, hgt); fenceRun(parent, posts, xa, za, xa, zb, hgt); fenceRun(parent, posts, xb, za, xb, zb, hgt);
+    fencePosts(parent, posts);
+  }
+  function fencePosts(parent, posts) { posts.forEach(function (q) { cyl(parent, 0.04, 0.04, q[2] + 0.12, SH.steel, q[0], (q[2] + 0.12) / 2 + 0.03, q[1], 5, null, false); }); }
+
   function build(p) {
     if (!ok) return null;
     if (root) { scene.remove(root); disposeTree(root); }
     root = new T.Group(); scene.add(root);
-    fans = []; pickObjs = []; flows = {}; clouds = []; puffGen = puffHeat = null;
-    var R = rng(11), i, j;
+    pickObjs = []; tags = []; flows = {}; clouds = []; puffGen = puffHeat = null; batch = new Batch();
+    var R = rng(11), i, j, sd;
+    var mtx = new T.Matrix4(), q0 = new T.Quaternion(), yAx = new T.Vector3(0, 1, 0), qPi = new T.Quaternion().setFromAxisAngle(yAx, Math.PI), one = new T.Vector3(1, 1, 1), pos = new T.Vector3(), qq = new T.Quaternion(), sc = new T.Vector3(), tc = new T.Color();
 
     var area = 120 + 650 * p.it, W = Math.sqrt(area * 1.5), D = area / W, H = p.it >= 3 ? 9 : 7;
     var big = p.it >= 0.8, huge = p.it >= 3;
     var zRoad = D / 2 + 34;
 
     /* --- cladirea --- */
-    var bld = new T.Group(); root.add(bld);
-    var floorM = box(bld, W, 0.3, D, SH.floor, 0, 0.15, 0, false);
-    wallGroup = new T.Group(); bld.add(wallGroup);
-    var wt = 0.4, bldReal = bld; bld = wallGroup;
-    box(bld, W, H, wt, SH.wall, 0, H / 2, -D / 2 + wt / 2); box(bld, W, H, wt, SH.wall, 0, H / 2, D / 2 - wt / 2);
-    box(bld, wt, H, D - 2 * wt, SH.wall, -W / 2 + wt / 2, H / 2, 0); box(bld, wt, H, D - 2 * wt, SH.wall, W / 2 - wt / 2, H / 2, 0);
-    // soclu inchis si dunga galbena sus
-    [[W + 0.1, 0.9, 0.12, 0, 0.45, D / 2 + 0.03], [W + 0.1, 0.9, 0.12, 0, 0.45, -D / 2 - 0.03], [0.12, 0.9, D + 0.1, W / 2 + 0.03, 0.45, 0], [0.12, 0.9, D + 0.1, -W / 2 - 0.03, 0.45, 0]].forEach(function (a) { box(bld, a[0], a[1], a[2], SH.base, a[3], a[4], a[5], false); });
-    [[W + 0.14, 0.45, 0.14, 0, H - 0.5, D / 2 + 0.04], [W + 0.14, 0.45, 0.14, 0, H - 0.5, -D / 2 - 0.04], [0.14, 0.45, D + 0.14, W / 2 + 0.04, H - 0.5, 0], [0.14, 0.45, D + 0.14, -W / 2 - 0.04, H - 0.5, 0]].forEach(function (a) { box(bld, a[0], a[1], a[2], SH.stripe, a[3], a[4], a[5], false); });
-    // intrare si ferestrele birourilor (colt sud-est)
-    var offW = Math.max(5, W * 0.22);
-    box(bld, Math.min(5, offW - 1), 3, 2.2, SH.glass, W / 2 - offW / 2, 1.5, D / 2 + 1.1);
-    box(bld, offW - 1.2, 1.4, 0.1, SH.windowGlow, W / 2 - offW / 2, 4.6, D / 2 + 0.06, false);
-    box(bld, 0.1, 1.4, Math.min(D * 0.5, 9), SH.windowGlow, W / 2 + 0.06, 4.6, D / 2 - Math.min(D * 0.5, 9) / 2 - 1, false);
-    // usa de incarcare pe peretele sudic
-    box(bld, 3.6, 3.6, 0.12, SH.steel, -W / 2 + W * 0.28 + 3, 1.8, D / 2 + 0.06, false);
+    var bld = grp(root), floorG = grp(bld);
+    box(floorG, W, 0.3, D, SH.floor, 0, 0.15, 0, false);
+    ao(floorG, W, D, 0, 0.215, 0, 1.2);
+    wallGroup = grp(bld);
+    var wg = wallGroup, wt = 0.4, offW = Math.max(5, W * 0.22), xE = -W / 2 + W * 0.28, xO = W / 2 - offW, xEnt = W / 2 - offW / 2, xD = xE + 3;
+    box(wg, W, H, wt, SH.wall, 0, H / 2, -D / 2 + wt / 2); box(wg, W, H, wt, SH.wall, 0, H / 2, D / 2 - wt / 2);
+    box(wg, wt, H, D - 2 * wt, SH.wall, -W / 2 + wt / 2, H / 2, 0); box(wg, wt, H, D - 2 * wt, SH.wall, W / 2 - wt / 2, H / 2, 0);
+    // soclu de beton, dunga galbena, cornisa inchisa si colturi
+    [[W + 0.12, D / 2 + 0.03, 0], [W + 0.12, -D / 2 - 0.03, 0], [D + 0.12, W / 2 + 0.03, 1], [D + 0.12, -W / 2 - 0.03, 1]].forEach(function (a) {
+      function strip(h, t, y, m) { if (a[2]) box(wg, t, h, a[0], m, a[1], y, 0, false); else box(wg, a[0], h, t, m, 0, y, a[1], false); }
+      strip(0.9, 0.14, 0.45, SH.base); strip(0.36, 0.1, H - 1.05, SH.stripe); strip(0.3, 0.2, H - 0.15, SH.trim);
+    });
+    [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (c) { box(wg, 0.5, H - 0.3, 0.5, SH.trim, c[0] * (W / 2 - 0.2), (H - 0.3) / 2, c[1] * (D / 2 - 0.2), false); });
+    // stalpii structurii, vizibili pe fatade, si burlane
+    var nBay = Math.max(2, Math.round(W / 6)), ph = H - 2.13, py = 0.9 + ph / 2;
+    for (i = 1; i < nBay; i++) {
+      var bx0 = -W / 2 + i * W / nBay;
+      box(wg, 0.14, ph, 0.07, SH.trim, bx0, py, -D / 2 - 0.03, false);
+      if (bx0 < xO - 0.4 && Math.abs(bx0 - xD) > 2.6) box(wg, 0.14, ph, 0.07, SH.trim, bx0, py, D / 2 + 0.03, false);
+      if (i % 2) cyl(wg, 0.07, 0.07, H - 1.2, SH.silver, bx0 + 0.35, (H - 1.2) / 2 + 0.6, -D / 2 - 0.11, 8, null, false);
+    }
+    var nBayD = Math.max(2, Math.round(D / 6));
+    for (i = 1; i < nBayD; i++) { var bz0 = -D / 2 + i * D / nBayD; box(wg, 0.07, ph, 0.14, SH.trim, -W / 2 - 0.03, py, bz0, false); if (bz0 < D / 2 - Math.min(D * 0.5, 9) - 0.8) box(wg, 0.07, ph, 0.14, SH.trim, W / 2 + 0.03, py, bz0, false); }
+    // birourile: colt vitrat spre sud-est
+    var gh = H - 2.4, gy = 1.05 + gh / 2, gl = Math.min(D * 0.5, 9);
+    box(wg, offW - 1.0, gh, 0.16, SH.glass, xEnt, gy, D / 2 + 0.04, false);
+    box(wg, 0.16, gh, gl, SH.glass, W / 2 + 0.04, gy, D / 2 - gl / 2 - 0.5, false);
+    // intrarea: windfang de sticla, copertina, usi
+    box(wg, 3.2, 2.7, 1.8, SH.glass, xEnt, 1.55, D / 2 + 0.9); box(wg, 3.5, 0.14, 2.1, SH.trim, xEnt, 2.97, D / 2 + 1.0, false);
+    box(wg, 1.8, 2.25, 0.06, SH.trim, xEnt, 1.33, D / 2 + 1.82, false);
+    box(wg, 0.8, 2.05, 0.04, SH.carGlass, xEnt - 0.42, 1.28, D / 2 + 1.85, false); box(wg, 0.8, 2.05, 0.04, SH.carGlass, xEnt + 0.42, 1.28, D / 2 + 1.85, false);
+    box(wg, 5.4, 0.16, 3.6, SH.trim, xEnt, 3.3, D / 2 + 1.9);
+    cyl(wg, 0.07, 0.07, 3.0, SH.steel, xEnt - 2.5, 1.7, D / 2 + 3.5, 8); cyl(wg, 0.07, 0.07, 3.0, SH.steel, xEnt + 2.5, 1.7, D / 2 + 3.5, 8);
+    box(wg, 5.0, 0.04, 0.5, SH.light, xEnt, 3.2, D / 2 + 2.6, false);
+    // firma
+    var sw = Math.max(5, Math.min(9, W * 0.22)), xSign = Math.max(-W / 2 + sw / 2 + 1, xO - sw / 2 - 1.2);
+    box(wg, sw + 0.3, sw / 4 + 0.3, 0.08, SH.trim, xSign, H - 2.25, D / 2 + 0.05, false); vpl(wg, sw, sw / 4, SH.sign, xSign, H - 2.25, D / 2 + 0.1);
+    // usa de incarcare, cu copertina si usa de serviciu
+    box(wg, 3.6, 3.6, 0.1, SH.door, xD, 2.1, D / 2 + 0.04, false);
+    box(wg, 0.2, 3.8, 0.16, SH.trim, xD - 1.9, 2.2, D / 2 + 0.06, false); box(wg, 0.2, 3.8, 0.16, SH.trim, xD + 1.9, 2.2, D / 2 + 0.06, false); box(wg, 4.0, 0.2, 0.16, SH.trim, xD, 4.0, D / 2 + 0.06, false);
+    box(wg, 0.24, 1.0, 0.2, SH.hazard, xD - 1.9, 0.8, D / 2 + 0.08, false); box(wg, 0.24, 1.0, 0.2, SH.hazard, xD + 1.9, 0.8, D / 2 + 0.08, false);
+    box(wg, 4.6, 0.12, 1.6, SH.trim, xD, 4.3, D / 2 + 0.8);
+    if (xD - 3.4 > -W / 2 + 1) { box(wg, 1.0, 2.1, 0.08, SH.white, xD - 3.4, 1.35, D / 2 + 0.04, false); box(wg, 0.5, 0.1, 0.18, SH.light, xD - 3.4, 2.6, D / 2 + 0.1, false); }
+    // aerisirile salii electrice (vest) si ale salii de date (nord), iesiri de urgenta
+    for (i = 0; i < nBayD; i++) box(wg, 0.1, 1.6, Math.min(2.4, D / nBayD - 1), SH.louver, -W / 2 - 0.04, H - 2.7, -D / 2 + (i + 0.5) * D / nBayD, false);
+    for (i = 0; i < nBay; i++) if (i % 2) box(wg, 1.8, 1.2, 0.1, SH.louver, -W / 2 + (i + 0.5) * W / nBay, 2.6, -D / 2 - 0.04, false);
+    box(wg, 1.0, 2.1, 0.08, SH.white, xE - 1.6, 1.35, -D / 2 - 0.04, false); box(wg, 0.5, 0.1, 0.18, SH.light, xE - 1.6, 2.6, -D / 2 - 0.1, false);
 
-    bld = bldReal;
-    // interior: zona electrica (vest), sala de date (mijloc), birouri (est)
-    var partG = new T.Group(), elec = new T.Group(), itg = new T.Group(), itx = new T.Group(); bld.add(partG); bld.add(elec); bld.add(itg); itg.add(itx);
-    var xE = -W / 2 + W * 0.28, xO = W / 2 - offW;
-    box(partG, 0.25, 3.2, D - 1, SH.wallIn, xE, 1.75, 0, false); box(partG, 0.25, 3.2, D - 1, SH.wallIn, xO, 1.75, 0, false);
-    // tablouri si UPS-uri
-    var nUps = Math.min(18, Math.max(3, Math.ceil(p.it * 4)));
-    var perL = Math.max(2, Math.floor((D - 4) / 1.1)), col = 0, cnt = 0;
+    // interior: sala electrica (vest), sala de date (mijloc), birouri (est)
+    var partG = grp(bld), elec = grp(bld), itg = grp(bld), itx = grp(itg);
+    box(partG, 0.25, 3.2, D - 1, SH.wallIn, xE, 1.75, 0); box(partG, 0.25, 3.2, D - 1, SH.wallIn, xO, 1.75, 0);
+    // dulapuri electrice si UPS-uri
+    var nUps = Math.min(18, Math.max(3, Math.ceil(p.it * 4))), perL = Math.max(2, Math.floor((D - 4) / 1.1)), col = 0, cnt = 0, ux, uz;
     while (cnt < nUps * 2) {
       for (i = 0; i < perL && cnt < nUps * 2; i++, cnt++) {
-        var ux = -W / 2 + 1.4 + col * 2.6, uz = -D / 2 + 2.2 + i * 1.1;
+        ux = -W / 2 + 1.4 + col * 2.6; uz = -D / 2 + 2.2 + i * 1.1;
         if (ux > xE - 1) break;
         box(elec, 0.9, 2.0, 0.95, col % 2 ? SH.dark : SH.silver, ux, 1.3, uz);
-        box(elec, 0.05, 0.12, 0.5, SH.upsLed, ux + 0.48, 1.9, uz, false);
+        vpl(elec, 0.93, 1.96, SH.cabF, ux + 0.453, 1.3, uz, Math.PI / 2);
+        box(elec, 0.05, 0.06, 0.5, SH.upsLed, ux + 0.46, 2.24, uz, false);
       }
       col++; if (-W / 2 + 1.4 + col * 2.6 > xE - 1) break;
+    }
+    for (j = 0; j < col; j++) { ux = -W / 2 + 1.4 + j * 2.6; if (ux > xE - 1) break; box(elec, 0.45, 0.07, D - 3.4, SH.steel, ux, 2.7, 0, false); }
+    // tabloul general (pe peretele de sud) si transformatoarele uscate
+    var nSw = Math.max(2, Math.min(9, Math.floor((xE + W / 2 - 2.2) / 0.8)));
+    for (i = 0; i < nSw; i++) { box(elec, 0.78, 2.1, 0.7, SH.silver, -W / 2 + 1.2 + i * 0.8, 1.35, D / 2 - 1.0); vpl(elec, 0.74, 2.04, SH.cabF, -W / 2 + 1.2 + i * 0.8, 1.35, D / 2 - 1.36, Math.PI); }
+    box(elec, nSw * 0.8, 0.07, 0.4, SH.steel, -W / 2 + 0.8 + nSw * 0.4, 2.7, D / 2 - 1.0, false);
+    if (cnt <= perL - 4) for (i = 0; i < (D > 18 ? 2 : 1); i++) {
+      var tzI = D / 2 - 3.6 - i * 3.0;
+      box(elec, 1.5, 0.12, 2.0, SH.dark, xE - 1.5, 0.36, tzI, false); box(elec, 1.3, 1.9, 1.8, SH.trafo, xE - 1.5, 1.37, tzI); box(elec, 0.04, 1.3, 1.4, SH.louver, xE - 2.17, 1.4, tzI, false);
+      for (j = -1; j <= 1; j++) cyl(elec, 0.05, 0.08, 0.3, SH.ceramic, xE - 1.5, 2.45, tzI + j * 0.5, 8, null, false);
     }
     // rackuri: perechi de randuri spate in spate (culoar cald la mijloc)
     var nGpu = Math.ceil(p.it * 1000 / 45), nAll = nGpu + Math.ceil(nGpu * 0.3);
     var hallW = xO - xE - 3, hallD = D - 5, perRowMax = Math.max(2, Math.min(24, Math.floor(hallD / 0.62)));
     var pairs = Math.max(1, Math.ceil(nAll / (2 * perRowMax))); while (pairs * 5.4 > hallW && pairs > 1) pairs--;
     var perRow = Math.ceil(nAll / (pairs * 2));
-    var rackGeo = new T.BoxGeometry(1.2, 2.2, 0.6);
-    var rk = new T.InstancedMesh(rackGeo, [SH.rackFront, SH.rackBody, SH.rackBody, SH.rackBody, SH.rackBody, SH.rackBody], nGpu);
-    var rk2 = new T.InstancedMesh(rackGeo, [SH.rackAlt, SH.rackAlt, SH.rackAlt, SH.rackAlt, SH.rackAlt, SH.rackAlt], Math.max(1, nAll - nGpu));
-    rk.castShadow = rk2.castShadow = true; rk.frustumCulled = rk2.frustumCulled = false;
-    var mtx = new T.Matrix4(), q0 = new T.Quaternion(), qPi = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI), one = new T.Vector3(1, 1, 1);
+    var rackT = tpl(function (g) { box(g, 1.2, 2.2, 0.6, SH.rackBody, 0, 0, 0); vpl(g, 0.58, 2.16, SH.rackFront, 0.603, 0, 0, Math.PI / 2); }),
+      rackT2 = tpl(function (g) { box(g, 1.2, 2.2, 0.6, SH.rackAlt, 0, 0, 0); vpl(g, 0.58, 2.16, SH.rackFront, 0.603, 0, 0, Math.PI / 2); });
+    var rk = inst(itg, rackT, nGpu), rk2 = inst(itg, rackT2, Math.max(1, nAll - nGpu));
     var hallCx = (xE + xO) / 2, n1 = 0, n2 = 0, rowLen = perRow * 0.62, rackPos = [hallCx + (pairs - 1) * 2.7 + 1.2, rowLen / 2 - 0.31];
     for (var pr = 0; pr < pairs; pr++) {
       var px = hallCx + (pr - (pairs - 1) / 2) * 5.4;
@@ -1475,34 +1951,60 @@ var Scene3D = (function () {
           var ix = lastRow ? perRow - 1 - i : i;       // ultimul rand se umple dinspre sud, unde sta rackul desenat in detaliu
           if (lastRow && i === 0) continue;
           if (n1 + n2 >= nAll - 1) break;
-          var rz = -rowLen / 2 + (ix + 0.5) * 0.62;
-          mtx.compose(new T.Vector3(rx, 1.4, rz), side ? q0 : qPi, one);
+          mtx.compose(pos.set(rx, 1.4, -rowLen / 2 + (ix + 0.5) * 0.62), side ? q0 : qPi, one);
           if ((ix === 0 || ix === perRow - 1) && n2 < nAll - nGpu) rk2.setMatrixAt(n2++, mtx); else if (n1 < nGpu - 1) rk.setMatrixAt(n1++, mtx); else rk2.setMatrixAt(n2++, mtx);
         }
       }
-      var hotP = new T.Mesh(new T.PlaneGeometry(1.2, rowLen + 1), SH.hot); hotP.rotation.x = -Math.PI / 2; hotP.position.set(px, 0.33, 0); itx.add(hotP);
-      for (side = -1; side <= 1; side += 2) { var cp = new T.Mesh(new T.PlaneGeometry(1.5, rowLen + 1), SH.cold); cp.rotation.x = -Math.PI / 2; cp.position.set(px + side * 2.55, 0.33, 0); itx.add(cp); }
-      // tevi de racire deasupra randurilor, spre est
-      var pb = cyl(itx, 0.09, 0.09, rowLen + 1.5, SH.blue, px - 0.25, 2.9, 0, 8); pb.rotation.x = Math.PI / 2; pb.castShadow = false;
-      var prd = cyl(itx, 0.09, 0.09, rowLen + 1.5, SH.red, px + 0.25, 2.9, 0, 8); prd.rotation.x = Math.PI / 2; prd.castShadow = false;
-      // unitatea care imparte lichidul de racire (CDU) si jgheaburile de cabluri
-      box(itx, 0.9, 1.9, 1.0, SH.white, px, 1.25, -rowLen / 2 - 1.0); box(itx, 0.92, 0.25, 1.02, SH.blue, px, 1.9, -rowLen / 2 - 1.0, false);
-      box(itx, 0.45, 0.07, rowLen, SH.steel, px - 1.2, 2.62, 0, false); box(itx, 0.45, 0.07, rowLen, SH.steel, px + 1.2, 2.62, 0, false);
+      flat(itx, 1.2, rowLen + 1, SH.hot, px, 0.33, 0);
+      for (sd = -1; sd <= 1; sd += 2) {
+        flat(itx, 1.5, rowLen + 1, SH.cold, px + sd * 2.55, 0.33, 0);
+        box(itx, 1.2, 2.2, 0.05, SH.contain, px, 1.4, sd * (rowLen / 2 + 0.03), false); box(itx, 1.3, 0.08, 0.1, SH.steel, px, 2.54, sd * (rowLen / 2 + 0.03), false);   // usile culoarului cald
+        box(itx, 0.45, 0.07, rowLen, SH.steel, px + sd * 1.2, 2.62, 0, false);                                                                                         // jgheaburi de cabluri
+        box(itx, 0.12, 0.05, rowLen, SH.light, px + sd * 2.55, 3.05, 0, false);                                                                                        // benzi de lumina
+      }
+      box(itx, 1.2, 0.05, rowLen, SH.contain, px, 2.53, 0, false);                                                    // tavanul culoarului cald
+      cyl(itx, 0.09, 0.09, rowLen + 1.5, SH.blue, px - 0.25, 2.9, 0, 8, [Math.PI / 2, 0, 0], false); cyl(itx, 0.09, 0.09, rowLen + 1.5, SH.red, px + 0.25, 2.9, 0, 8, [Math.PI / 2, 0, 0], false);
+      // unitatea care imparte lichidul de racire (CDU)
+      box(itx, 0.9, 1.9, 1.0, SH.white, px, 1.25, -rowLen / 2 - 1.0); box(itx, 0.92, 0.25, 1.02, SH.blue, px, 1.9, -rowLen / 2 - 1.0, false); box(itx, 0.3, 0.2, 0.02, SH.screen, px, 1.5, -rowLen / 2 - 0.49, false);
     }
     rk.count = n1; rk2.count = n2; rk.instanceMatrix.needsUpdate = true; rk2.instanceMatrix.needsUpdate = true;
-    itg.add(rk); itg.add(rk2);
     var rackD = rackDetail(itg, rackPos[0], rackPos[1]);
-    var hz = rowLen / 2 + 1.2, hx0 = hallCx - (pairs - 1) * 2.7 - 0.5, hx1 = W / 2 - 0.3;
-    var h1 = cyl(itx, 0.11, 0.11, hx1 - hx0, SH.blue, (hx0 + hx1) / 2, 2.9, -Math.min(hz + 0.9, D / 2 - 0.8), 8); h1.rotation.z = Math.PI / 2; h1.castShadow = false;
-    var h2 = cyl(itx, 0.11, 0.11, hx1 - hx0, SH.red, (hx0 + hx1) / 2, 2.9, -Math.min(hz + 0.9, D / 2 - 0.8) + 0.35, 8); h2.rotation.z = Math.PI / 2; h2.castShadow = false;
-    // camera de control
-    box(elec, Math.max(2, offW - 3), 0.8, 1, SH.wallIn, xO + offW / 2, 0.7, 0);
-    for (i = -1; i <= 1; i++) box(elec, 0.7, 0.45, 0.05, SH.screen, xO + offW / 2 + i * 0.85, 1.45, -0.2, false);
+    var hz = rowLen / 2 + 1.2, hx0 = hallCx - (pairs - 1) * 2.7 - 0.5, hx1 = W / 2 - 0.3, hzz = -Math.min(hz + 0.9, D / 2 - 0.8);
+    cyl(itx, 0.11, 0.11, hx1 - hx0, SH.blue, (hx0 + hx1) / 2, 2.9, hzz, 8, [0, 0, Math.PI / 2], false); cyl(itx, 0.11, 0.11, hx1 - hx0, SH.red, (hx0 + hx1) / 2, 2.9, hzz + 0.35, 8, [0, 0, Math.PI / 2], false);
+    // butelii de stingere, paleti cu echipamente langa usa de incarcare
+    for (i = 0; i < 4; i++) { cyl(itx, 0.16, 0.16, 1.5, SH.red, xE + 0.6, 1.05, D / 2 - 1.2 - i * 0.45, 10, null, false); cyl(itx, 0.05, 0.05, 0.2, SH.steel, xE + 0.6, 1.9, D / 2 - 1.2 - i * 0.45, 6, null, false); }
+    if (D / 2 - 2.4 > rowLen / 2 + 1.5) {
+      box(itx, 1.2, 0.14, 1.0, SH.wood, xD, 0.37, D / 2 - 2.2, false); box(itx, 1.05, 0.9, 0.9, SH.box, xD, 0.89, D / 2 - 2.2);
+      box(itx, 1.2, 0.14, 1.0, SH.wood, xD + 1.6, 0.37, D / 2 - 2.0, false); box(itx, 0.7, 2.0, 0.85, SH.rackAlt, xD + 1.6, 1.44, D / 2 - 2.0);
+    }
+    // birourile: mese cu ecrane, dulapuri
+    var ocx = xO + offW / 2, dw = Math.max(2, Math.min(4.4, offW - 3)), nDesk = Math.max(1, Math.min(4, Math.floor(D / 9)));
+    for (j = 0; j < nDesk; j++) {
+      var dz0 = (j - (nDesk - 1) / 2) * 6;
+      box(elec, dw, 0.06, 0.9, SH.wood, ocx, 1.05, dz0, false); box(elec, 0.08, 0.74, 0.8, SH.dark, ocx - dw / 2 + 0.1, 0.67, dz0, false); box(elec, 0.08, 0.74, 0.8, SH.dark, ocx + dw / 2 - 0.1, 0.67, dz0, false);
+      for (i = -1; i <= 1; i++) {
+        if (Math.abs(i) * 0.85 + 0.4 > dw / 2) continue;
+        box(elec, 0.7, 0.42, 0.04, SH.dark, ocx + i * 0.85, 1.5, dz0 - 0.22, false); box(elec, 0.64, 0.36, 0.02, SH.screen, ocx + i * 0.85, 1.5, dz0 - 0.195, false); box(elec, 0.06, 0.22, 0.06, SH.dark, ocx + i * 0.85, 1.19, dz0 - 0.24, false);
+      }
+      box(elec, 0.5, 0.1, 0.5, SH.dark, ocx - 0.5, 0.75, dz0 + 0.8, false); box(elec, 0.5, 0.55, 0.08, SH.dark, ocx - 0.5, 1.1, dz0 + 1.05, false); cyl(elec, 0.04, 0.2, 0.42, SH.steel, ocx - 0.5, 0.5, dz0 + 0.8, 6, null, false);
+    }
+    box(elec, 0.5, 1.9, Math.min(3, D * 0.2), SH.white, W / 2 - 0.75, 1.25, -D / 4);
 
-    // acoperis (se ridica)
-    roofGroup = new T.Group(); bld.add(roofGroup);
-    box(roofGroup, W + 0.6, 0.5, D + 0.6, SH.roof, 0, H + 0.25, 0);
-    for (i = 0; i < Math.max(2, Math.round(W / 9)); i++) box(roofGroup, 1.6, 0.9, 1.6, SH.roof, -W / 2 + 4 + i * 8, H + 0.95, -D / 4);
+    // acoperisul (se ridica): membrana, atic, aparate
+    roofGroup = grp(bld);
+    box(roofGroup, W + 0.3, 0.3, D + 0.3, SH.roof, 0, H + 0.15, 0);
+    for (sd = -1; sd <= 1; sd += 2) {
+      box(roofGroup, W + 0.5, 0.7, 0.25, SH.roofUnit, 0, H + 0.35, sd * (D / 2 + 0.12)); box(roofGroup, W + 0.56, 0.08, 0.33, SH.roofTrim, 0, H + 0.74, sd * (D / 2 + 0.12), false);
+      box(roofGroup, 0.25, 0.7, D + 0.5, SH.roofUnit, sd * (W / 2 + 0.12), H + 0.35, 0); box(roofGroup, 0.33, 0.08, D + 0.56, SH.roofTrim, sd * (W / 2 + 0.12), H + 0.74, 0, false);
+    }
+    var nU = Math.max(2, Math.round(W / 9));
+    for (i = 0; i < nU; i++) {
+      var rxU = -W / 2 + (i + 0.5) * W / nU, rzU = -D / 4;
+      box(roofGroup, 2.6, 0.15, 2.0, SH.roofTrim, rxU, H + 0.38, rzU, false); box(roofGroup, 2.4, 1.3, 1.8, SH.roofUnit, rxU, H + 1.1, rzU);
+      box(roofGroup, 1.7, 0.8, 0.04, SH.roofTrim, rxU, H + 1.1, rzU + 0.91, false); cyl(roofGroup, 0.6, 0.6, 0.14, SH.roofTrim, rxU, H + 1.8, rzU, 16, null, false);
+    }
+    for (i = 0; i <= nU; i++) { var vx = -W / 2 + (i + 0.5) * W / (nU + 1); box(roofGroup, 1.3, 0.28, 1.3, SH.roofTrim, vx, H + 0.44, D / 4, false); box(roofGroup, 1.1, 0.1, 1.1, SH.roofUnit, vx, H + 0.62, D / 4, false); }
+    box(roofGroup, W * 0.8, 0.12, 0.4, SH.roofTrim, 0, H + 0.4, 0.6, false);
     roofK = roofOpen ? 1 : 0;
     tag(bld, 'building');
 
@@ -1515,87 +2017,85 @@ var Scene3D = (function () {
     var nB = p.bess > 0 ? Math.max(1, Math.ceil(p.bess / 2.5)) : 0, perRowB = Math.max(2, Math.floor((W * 0.75 + 10) / 8)), rowsB = Math.ceil(nB / perRowB);
     var zB0 = -D / 2 - 11, zPV0 = zB0 - Math.max(1, rowsB) * 6 - 12;
     var platX0 = xSub - subW / 2 - 6, platX1 = W / 2 + 4 + coolW + 8, platZ0 = zPV0 + 5, platZ1 = D / 2 + 24;
-    var plat = box(root, platX1 - platX0, 0.2, platZ1 - platZ0, SH.concrete, (platX0 + platX1) / 2, 0.1, (platZ0 + platZ1) / 2, false);
+    var pw = platX1 - platX0, pd = platZ1 - platZ0, platG = grp(root); platG.position.set((platX0 + platX1) / 2, 0, (platZ0 + platZ1) / 2);
+    box(platG, pw, 0.2, pd, SH.concrete, 0, 0.1, 0, false);
+    box(platG, pw + 0.3, 0.3, 0.3, SH.base, 0, 0.15, -pd / 2, false); box(platG, 0.3, 0.3, pd, SH.base, -pw / 2, 0.15, 0, false); box(platG, 0.3, 0.3, pd, SH.base, pw / 2, 0.15, 0, false);
 
     // racire (est)
-    var cool = new T.Group(), coolO = []; root.add(cool);
+    var cool = grp(root), coolO = [], coolI = inst(cool, coolerTpl(coolLen), nCool);
     for (i = 0; i < nCool; i++) {
-      var cc = Math.floor(i / perCol), cr = i % perCol, rowsHere = Math.min(perCol, nCool - cc * perCol);
-      cooler(cool, coolX0 + cc * (coolLen + 2), (cr - (rowsHere - 1) / 2) * 4, coolLen);
-      coolO.push([coolX0 + cc * (coolLen + 2), 3.4, (cr - (rowsHere - 1) / 2) * 4]);
+      var cc = Math.floor(i / perCol), cr = i % perCol, rowsHere = Math.min(perCol, nCool - cc * perCol), ccx = coolX0 + cc * (coolLen + 2), ccz = (cr - (rowsHere - 1) / 2) * 4;
+      mtx.compose(pos.set(ccx, 0.2, ccz), q0, one); coolI.setMatrixAt(i, mtx); coolO.push([ccx, 3.6, ccz]);
     }
     var pz = Math.min(D / 2 - 1.2, ((Math.min(perCol, nCool) - 1) / 2) * 4 + 2.2);
-    var cpb = cyl(cool, 0.22, 0.22, coolW + 3, SH.blue, W / 2 + (coolW + 3) / 2, 0.9, pz, 8); cpb.rotation.z = Math.PI / 2;
-    var cpr = cyl(cool, 0.22, 0.22, coolW + 3, SH.red, W / 2 + (coolW + 3) / 2, 0.9, pz + 0.6, 8); cpr.rotation.z = Math.PI / 2;
+    cyl(cool, 0.22, 0.22, coolW + 3, SH.blue, W / 2 + (coolW + 3) / 2, 0.9, pz, 10, [0, 0, Math.PI / 2]); cyl(cool, 0.22, 0.22, coolW + 3, SH.red, W / 2 + (coolW + 3) / 2, 0.9, pz + 0.6, 10, [0, 0, Math.PI / 2]);
+    for (i = 0; i < Math.round((coolW + 3) / 4); i++) box(cool, 0.12, 0.6, 1.2, SH.steel, W / 2 + 1 + i * 4, 0.5, pz + 0.3, false);
+    cyl(cool, 0.8, 0.8, 2.6, SH.silver, W / 2 + 1.7, 1.5, -pz, 16); sph(cool, 0.8, SH.silver, W / 2 + 1.7, 2.8, -pz, false, 0.45);      // vas tampon
+    box(cool, 2.2, 0.16, 1.2, SH.dark, W / 2 + 1.9, 0.28, -pz + 2.2, false); cyl(cool, 0.3, 0.3, 1.0, SH.blue, W / 2 + 1.6, 0.72, -pz + 2.2, 12, [0, 0, Math.PI / 2], false); cyl(cool, 0.24, 0.24, 0.7, SH.steel, W / 2 + 2.5, 0.72, -pz + 2.2, 12, [0, 0, Math.PI / 2], false);   // pompe
     tag(cool, 'cool');
 
     // generatoare (vest)
-    var gen = new T.Group(); root.add(gen);
-    var zGen0 = -D / 2 + 3;
-    var genO = [];
-    for (i = 0; i < nGen; i++) { genset(gen, xGen, zGen0 + i * (genS * 5.6 + 1.2), genLen, genS); genO.push([xGen + genLen * 0.3, 4.6 * genS, zGen0 + i * (genS * 5.6 + 1.2)]); }
+    var gen = grp(root), zGen0 = -D / 2 + 3, genO = [], gStep = genS * 5.6 + 1.2;
+    for (i = 0; i < nGen; i++) genO.push(genset(gen, xGen, zGen0 + i * gStep, genLen, genS));
     tag(gen, 'gen');
 
     // statie electrica si linia din retea
-    var sub = new T.Group(); root.add(sub);
+    var sub = grp(root);
     box(sub, subW, 0.12, subD, SH.gravel, xSub, 0.26, zSub, false);
-    transformer(sub, xSub + (big ? subW * 0.2 : 0), zSub - (big ? subD * 0.18 : 0), subS);
-    if (big) transformer(sub, xSub + subW * 0.2, zSub + subD * 0.24, subS);
-    box(sub, 3 * subS, 2.6, 2.4 * subS, SH.white, xSub - subW * 0.22, 1.5, zSub + subD * 0.2);
-    var pylH = huge ? 30 : big ? 16 : 10, gx = xSub - subW / 2 + 1.2, gantH = big ? 8 * Math.sqrt(subS) : 0;
-    var prev = null, at;
+    var tr1 = transformer(sub, xSub + (big ? subW * 0.2 : 0), zSub - (big ? subD * 0.18 : 0), subS), tr2 = null;
+    if (big) { tr2 = transformer(sub, xSub + subW * 0.2, zSub + subD * 0.24, subS); box(sub, 4.8 * subS, 3.4 * subS, 0.3, SH.concrete, xSub + subW * 0.2, 0.3 + 1.7 * subS, zSub + subD * 0.03); }     // zid antifoc intre transformatoare
+    var cbx = xSub - subW * 0.22, cbz = zSub + subD * 0.2, cbw = 3 * subS, cbd = 2.4 * subS;                 // cladirea de comanda
+    box(sub, cbw, 2.6, cbd, SH.paint, cbx, 1.6, cbz); box(sub, cbw + 0.3, 0.15, cbd + 0.3, SH.trim, cbx, 2.97, cbz);
+    box(sub, 0.9, 2.0, 0.06, SH.contDark, cbx - cbw * 0.2, 1.3, cbz + cbd / 2 + 0.02, false); box(sub, 0.8, 0.5, 0.06, SH.louver, cbx + cbw * 0.22, 2.2, cbz + cbd / 2 + 0.02, false);
+    var pylH = huge ? 30 : big ? 12 : 10, gx = xSub - subW / 2 + 1.2, gantH = big ? 8 * Math.sqrt(subS) : 0, prev, at;
     if (big) {
-      cyl(sub, 0.2, 0.25, gantH, SH.steel, gx, gantH / 2, zSub - subD * 0.35, 8); cyl(sub, 0.2, 0.25, gantH, SH.steel, gx, gantH / 2, zSub + subD * 0.35, 8);
-      box(sub, 0.3, 0.3, subD * 0.75, SH.steel, gx, gantH, zSub);
-      prev = [new T.Vector3(gx, gantH, zSub - subD * 0.25), new T.Vector3(gx, gantH, zSub), new T.Vector3(gx, gantH, zSub + subD * 0.25)];
+      for (sd = -1; sd <= 1; sd += 2) {
+        var gz = zSub + sd * subD * 0.35;
+        beam(sub, SH.steel, gx - 0.9, 0.3, gz, gx, gantH, gz, 0.2); beam(sub, SH.steel, gx + 0.9, 0.3, gz, gx, gantH, gz, 0.2); box(sub, 1.0, 0.12, 0.12, SH.steel, gx, gantH * 0.5, gz, false);
+      }
+      box(sub, 0.35, 0.35, subD * 0.75, SH.steel, gx, gantH, zSub);
+      prev = [-1, 0, 1].map(function (q) { var zz = zSub + q * subD * 0.25; cyl(sub, 0.09, 0.09, 1.0, SH.ceramic, gx, gantH - 0.68, zz, 8, null, false); return new T.Vector3(gx, gantH - 1.2, zz); });
+      [tr1, tr2].forEach(function (tr) { for (var q = 0; q < 3; q++) wire(sub, prev[q], tr[q], 0.5); });
     } else {
-      prev = pylon(sub, gx, zSub, 9, false);
+      prev = poleMV(sub, gx, zSub, 9);
+      for (j = 0; j < 3; j++) wire(sub, prev[j], tr1[j], 0.4);
     }
-    var span = huge ? 150 : big ? 90 : 55, lineG = new T.Group(); root.add(lineG);
+    var subF = grp(sub); subF.position.y = 0.2; fenceBox(subF, xSub - subW / 2, xSub + subW / 2, zSub - subD / 2, zSub + subD / 2, 2.2);
+    var span = huge ? 150 : big ? 70 : 55, lineG = grp(root);
     for (i = 1; i <= 5; i++) {
-      var pyG = new T.Group(); lineG.add(pyG);
-      at = pylon(pyG, gx - i * span + (i === 1 ? span * 0.45 : 0), zSub, pylH, big);
+      var pyG = grp(lineG), tx0 = gx - i * span + (i === 1 ? span * 0.45 : 0);
+      at = huge ? towerLattice(pyG, tx0, zSub, pylH) : poleMV(pyG, tx0, zSub, pylH);
       for (j = 0; j < 3; j++) wire(pyG, prev[j], at[j], span * 0.035);
       prev = at;
     }
     tag(sub, 'sub');
 
     // baterii (nord, intre cladire si panouri)
-    var bess = new T.Group(); root.add(bess);
-    var xB0 = -W / 2 - 3;
-    for (i = 0; i < nB; i++) {
-      var bx = xB0 + (i % perRowB) * 8 + 3.05, bz = zB0 - Math.floor(i / perRowB) * 6;
-      var bc = new T.Group(); bess.add(bc);
-      box(bc, 6.1, 2.9, 2.44, SH.white, bx, 1.65, bz);
-      box(bc, 6.14, 0.5, 2.48, SH.green, bx, 2.5, bz, false);
-      box(bc, 0.9, 1.6, 0.08, SH.steel, bx - 1.8, 1.2, bz + 1.25, false); box(bc, 0.9, 1.6, 0.08, SH.steel, bx + 1.8, 1.2, bz + 1.25, false);
+    var bess = grp(root), xB0 = -W / 2 - 3, bessI = null;
+    if (nB) {
+      bessI = inst(bess, bessTpl(), nB);
+      for (i = 0; i < nB; i++) { mtx.compose(pos.set(xB0 + (i % perRowB) * 8 + 3.05, 0.2, zB0 - Math.floor(i / perRowB) * 6), q0, one); bessI.setMatrixAt(i, mtx); }
+      box(bess, 3.0, 0.14, 2.6, SH.concrete, xB0 - 2.6, 0.27, zB0, false); box(bess, 2.4, 2.3, 2.0, SH.cont, xB0 - 2.6, 1.5, zB0);        // statia de conversie
+      box(bess, 0.05, 1.4, 1.4, SH.louver, xB0 - 3.83, 1.6, zB0, false); box(bess, 1.0, 1.9, 0.05, SH.white, xB0 - 2.6, 1.4, zB0 + 1.02, false);
+      tag(bess, 'bess');
     }
-    if (nB) { box(bess, 2.4, 2.4, 2.2, SH.silver, xB0 - 2.5, 1.4, zB0); tag(bess, 'bess'); }
     var bN = Math.min(nB, perRowB), xBc = xB0 + bN * 4, zBc = zB0 - (Math.max(1, rowsB) - 1) * 3;
 
     /* --- parcul fotovoltaic --- */
     var nT = Math.ceil(p.pv * 1000 / 30), pitch = 9.2, colW = 32;
     var nc = Math.max(1, Math.round(Math.sqrt(nT * 0.42))), nr = Math.max(1, Math.ceil(nT / nc));
     function colX(c) { return c * colW + Math.floor(c / 4) * 6; }
-    var fieldW = nT ? colX(nc - 1) + 30 : 0, fieldD = nT ? nr * pitch : 0;
+    var fieldW = nT ? colX(nc - 1) + 30 : 0, fieldD = nT ? nr * pitch : 0, tables = null, inv = null, pvG = grp(root);
     if (nT > 0) {
-      var tg = new T.BoxGeometry(30, 0.14, 4.6);
-      var tables = new T.InstancedMesh(tg, [SH.frame, SH.frame, SH.panel, SH.panelBack, SH.frame, SH.frame], nT);
-      var legs = new T.InstancedMesh(new T.BoxGeometry(0.2, 1.8, 0.2), SH.steel, nT * 4);
-      var qt = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), 0.436), k4 = 0;
-      for (i = 0; i < nT; i++) {
-        var c = i % nc, r = Math.floor(i / nc);
-        var tx = colX(c) + 15 - fieldW / 2, tz = zPV0 - r * pitch - 2.3;
-        mtx.compose(new T.Vector3(tx, 1.85, tz), qt, one); tables.setMatrixAt(i, mtx);
-        for (j = 0; j < 4; j++) { mtx.compose(new T.Vector3(tx - 11.25 + j * 7.5, 0.9, tz), q0, one); legs.setMatrixAt(k4++, mtx); }
-      }
-      tables.castShadow = tables.receiveShadow = true; legs.castShadow = true;
-      tables.frustumCulled = legs.frustumCulled = false;
-      tables.userData.pick = 'pv'; pickObjs.push(tables);
-      root.add(tables); root.add(legs);
-      var nInv = Math.max(1, Math.round(p.pv / 2.5)), inv = new T.Group(); root.add(inv);
-      for (i = 0; i < nInv; i++) box(inv, 5, 2.6, 2.4, SH.white, -fieldW / 2 + (i + 0.5) * fieldW / nInv, 1.4, zPV0 + 4.5);
+      tables = inst(root, pvTableTpl(), nT);
+      for (i = 0; i < nT; i++) { mtx.compose(pos.set(colX(i % nc) + 15 - fieldW / 2, 0, zPV0 - Math.floor(i / nc) * pitch - 2.3), q0, one); tables.setMatrixAt(i, mtx); }
+      var nInv = Math.max(1, Math.round(p.pv / 2.5)); inv = grp(root);
+      for (i = 0; i < nInv; i++) inverterStation(inv, -fieldW / 2 + (i + 0.5) * fieldW / nInv, zPV0 + 4.5);
       tag(inv, 'pv');
+      // drumuri de intretinere din pietris si fasii batatorite intre randuri
+      for (i = 4; i < nc; i += 4) flat(pvG, 4, fieldD + 4, SH.gravel, colX(i) - 4 - fieldW / 2, 0.075, zPV0 - fieldD / 2);
+      flat(pvG, fieldW + 10, 3.5, SH.gravel, 0, 0.07, zPV0 - fieldD - 3.2); flat(pvG, 3.5, fieldD + 8, SH.gravel, -fieldW / 2 - 4, 0.07, zPV0 - fieldD / 2); flat(pvG, 3.5, fieldD + 8, SH.gravel, fieldW / 2 + 4, 0.07, zPV0 - fieldD / 2);
+      for (i = 0; i < nr; i++) flat(pvG, fieldW, 1.6, SH.soil, 0, 0.065, zPV0 - i * pitch - 6.9);
     }
     var zPVmid = zPV0 - fieldD / 2, zPVend = zPV0 - fieldD;
 
@@ -1603,64 +2103,93 @@ var Scene3D = (function () {
     var x0 = Math.min(-fieldW / 2, platX0) - 10, x1 = Math.max(fieldW / 2, platX1) + 10, z0 = zPVend - 10, z1 = platZ1 + 2;
     var cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, spanX = x1 - x0, spanZ = z1 - z0, RR = Math.sqrt(spanX * spanX + spanZ * spanZ) / 2;
     var k = Math.max(0.7, Math.min(3.2, RR / 110));
-    var fenceG = new T.Group(); root.add(fenceG);
-    box(fenceG, spanX, 2, 0.15 * k, SH.fence, cx, 1, z0, false); box(fenceG, spanX, 2, 0.15 * k, SH.fence, cx, 1, z1, false);
-    box(fenceG, 0.15 * k, 2, spanZ, SH.fence, x0, 1, cz, false); box(fenceG, 0.15 * k, 2, spanZ, SH.fence, x1, 1, cz, false);
+    var xGate = xEnt + 9, fenceG = grp(root), fposts = [], fh = 2.4;
+    fenceRun(fenceG, fposts, x0, z0, x1, z0, fh); fenceRun(fenceG, fposts, x0, z0, x0, z1, fh); fenceRun(fenceG, fposts, x1, z0, x1, z1, fh);
+    fenceRun(fenceG, fposts, x0, z1, xGate - 4.5, z1, fh); fenceRun(fenceG, fposts, xGate + 4.5, z1, x1, z1, fh);
+    fencePosts(fenceG, Q.lite ? fposts.filter(function (q, n) { return n % 2 === 0; }) : fposts);
+    box(fenceG, 0.3, 2.8, 0.3, SH.dark, xGate - 4.5, 1.4, z1); box(fenceG, 0.3, 2.8, 0.3, SH.dark, xGate + 4.5, 1.4, z1);
+    fenceRun(fenceG, [], xGate - 13, z1 - 0.4, xGate - 4.3, z1 - 0.4, 2.2); box(fenceG, 8.7, 0.12, 0.08, SH.dark, xGate - 8.65, 0.25, z1 - 0.4, false);     // poarta culisanta, deschisa
+    box(fenceG, 0.1, 2.2, 0.1, SH.dark, xGate - 13, 1.15, z1 - 0.4, false); box(fenceG, 0.1, 2.2, 0.1, SH.dark, xGate - 4.3, 1.15, z1 - 0.4, false);
 
-    var gr = new T.Mesh(new T.CircleGeometry(RR * 16, 48), SH.ground); gr.rotation.x = -Math.PI / 2; gr.position.set(cx, -0.05, cz); gr.receiveShadow = true; root.add(gr);
-    // parcele agricole in jur
-    var cell = Math.max(spanX, spanZ) * 0.62;
+    var gr = new T.Mesh(new T.CircleGeometry(RR * 16, 64), SH.ground); gr.rotation.x = -Math.PI / 2; gr.position.set(cx, -0.05, cz); gr.receiveShadow = true; root.add(gr);
+    TEX.grass.repeat.set(RR * 32 / 34, RR * 32 / 34);
+    // pete mari, mai inchise si mai uscate, ca iarba si culturile sa nu arate uniform
+    for (i = 0; i < 120; i++) {
+      var pa = R() * 6.28, prd = RR * (i < 40 ? R() * 1.2 : 0.4 + R() * 4.2), psz = (i < 40 ? 14 + R() * 40 : 40 + R() * 110) * k;
+      quad(root, R() > 0.45 ? SH.patchA : SH.patchB, cx + Math.cos(pa) * prd, 0.03 + i * 0.0004, cz + Math.sin(pa) * prd, psz, psz * (0.5 + R() * 0.8), 1, 1, false);
+    }
+    // parcele agricole in jur: fasii lungi, cum sunt in Dolj
+    var cell = Math.max(spanX, spanZ) * 0.62, gap = 4 * k;
     for (i = -7; i <= 7; i++) for (j = -7; j <= 7; j++) {
       var fx0 = cx + i * cell, fz0 = cz + j * cell;
       if (fx0 + cell / 2 > x0 - 6 && fx0 - cell / 2 < x1 + 6 && fz0 + cell / 2 > z0 - 6 && fz0 - cell / 2 < z1 + 20) continue;
-      var fw = cell - 5 * k, fd = cell - 5 * k, pg = new T.PlaneGeometry(fw, fd), uv = pg.attributes.uv, rot = R() > 0.5, rep = fw / (7 * k);
-      for (var u = 0; u < uv.count; u++) { if (rot) uv.setXY(u, uv.getY(u) * rep, uv.getX(u) * rep); else uv.setXY(u, uv.getX(u) * rep, uv.getY(u) * rep); }
-      var pm = new T.Mesh(pg, SH.crops[Math.floor(R() * SH.crops.length)]); pm.rotation.x = -Math.PI / 2; pm.position.set(fx0, 0.02, fz0); pm.receiveShadow = true; root.add(pm);
+      var ns = 1 + Math.floor(R() * 3.4), alongX = R() > 0.5, full = cell - gap, part = full / ns;
+      for (var s = 0; s < ns; s++) {
+        var off = -full / 2 + (s + 0.5) * part, fw = alongX ? full : part - gap * 0.35, fd = alongX ? part - gap * 0.35 : full, rep = 26 * k;
+        quad(root, SH.crops[Math.floor(R() * SH.crops.length)], fx0 + (alongX ? 0 : off), 0.02, fz0 + (alongX ? off : 0), fw, fd, alongX ? fw / rep : fd / rep, alongX ? fd / rep : fw / rep, !alongX);
+      }
     }
     // drum national la sud + acces
-    box(root, RR * 30, 0.12, 8, SH.asphalt, cx, 0.1, zRoad, false);
-    var dash = new T.InstancedMesh(new T.BoxGeometry(3, 0.02, 0.22), SH.white, 160); dash.frustumCulled = false;
-    for (i = 0; i < 160; i++) { mtx.compose(new T.Vector3(cx + (i - 80) * 9 * k, 0.18, zRoad), q0, new T.Vector3(k, 1, k)); dash.setMatrixAt(i, mtx); }
-    root.add(dash);
-    var xGate = W / 2 - offW / 2 + 9;
-    var siteG = new T.Group(), carsG = new T.Group(), peopleG = new T.Group(); root.add(siteG); root.add(carsG); root.add(peopleG);
-    box(siteG, 7, 0.12, zRoad - platZ1 + 6, SH.asphalt, xGate, 0.12, (zRoad + platZ1) / 2 - 1, false);
-    box(siteG, 3, 2.6, 3, SH.white, xGate + 6, 1.5, platZ1 - 3); box(siteG, 3.4, 0.2, 3.4, SH.base, xGate + 6, 2.9, platZ1 - 3);
-    var carCols = [0xc9463d, 0xf2f2f2, 0x2f5fa8, 0x3a3f44, 0xd8d2c4];
-    for (i = 0; i < Math.min(5, Math.max(2, Math.round(W / 8))); i++) car(carsG, W / 2 - offW / 2 - 6 - i * 2.9, D / 2 + 9, carCols[i % 5]);
+    quad(root, SH.road, cx, 0.13, zRoad, RR * 30, 10, RR * 30 / 12, 1, false);
+    var siteG = grp(root), carsG = grp(root), peopleG = grp(root);
+    var zA = platZ1 - 4, zB = zRoad - 4.2;
+    box(siteG, 7, 0.22, zB - zA, SH.asphalt, xGate, 0.11, (zA + zB) / 2, false);
+    flat(siteG, 0.14, zB - zA - 1, SH.paint, xGate - 3.2, 0.226, (zA + zB) / 2); flat(siteG, 0.14, zB - zA - 1, SH.paint, xGate + 3.2, 0.226, (zA + zB) / 2); flat(siteG, 3.0, 0.4, SH.paint, xGate + 1.6, 0.226, zB - 1.2);
+    // cabina de paza si bariera
+    box(siteG, 3, 2.5, 3, SH.paint, xGate + 6, 1.45, platZ1 - 3); box(siteG, 3.6, 0.16, 3.6, SH.trim, xGate + 6, 2.78, platZ1 - 3); box(siteG, 3.04, 0.9, 3.04, SH.carGlass, xGate + 6, 1.75, platZ1 - 3, false);
+    box(siteG, 0.3, 1.1, 0.3, SH.white, xGate + 3.9, 0.75, platZ1 + 0.8); box(siteG, 6.6, 0.1, 0.1, SH.red, xGate + 0.6, 1.2, platZ1 + 0.8, false);
+    for (i = 0; i < 3; i++) box(siteG, 0.7, 0.11, 0.11, SH.white, xGate + 2.4 - i * 2, 1.2, platZ1 + 0.8, false);
+    // curtea: banda de circulatie, parcare, rampa de incarcare
+    var xF = xO - 4, nCar = Math.min(5, Math.max(2, Math.round(W / 8))), nBay2 = nCar + 2, xP1 = xF - 1.6, xP0 = xP1 - nBay2 * 2.9, zP = D / 2 + 17.5, xR = -W / 2 - 4 - genLen - 6, zN = -D / 2 - 5.4, xL0 = xR - 2.75, xL1 = xGate + 3.5;
+    box(siteG, xL1 - xL0, 0.03, 6, SH.asphalt, (xL0 + xL1) / 2, 0.215, D / 2 + 11.6, false);
+    box(siteG, 5.5, 0.03, D / 2 + 8.6 - (zN - 2.75), SH.asphalt, xR, 0.215, (D / 2 + 8.6 + zN - 2.75) / 2, false);                       // drumul din vest, intre generatoare si statie
+    box(siteG, W / 2 + 2 - (xR + 2.75), 0.03, 5.5, SH.asphalt, (W / 2 + 2 + xR + 2.75) / 2, 0.215, zN, false);                           // drumul din nord, spre baterii
+    box(siteG, xP1 - xP0, 0.03, 5.8, SH.asphalt, (xP0 + xP1) / 2, 0.215, zP, false);
+    for (i = 0; i <= nBay2; i++) flat(siteG, 0.12, 5.2, SH.paint, xP1 - i * 2.9, 0.236, zP);
+    box(siteG, 7, 0.03, 8.2, SH.asphalt, xD, 0.215, D / 2 + 4.5, false);
+    flat(siteG, 0.2, 7.6, SH.stripe, xD - 2.6, 0.236, D / 2 + 4.5); flat(siteG, 0.2, 7.6, SH.stripe, xD + 2.6, 0.236, D / 2 + 4.5);
+    box(siteG, 0.2, 0.9, 0.2, SH.stripe, xD - 2.6, 0.65, D / 2 + 0.9); box(siteG, 0.2, 0.9, 0.2, SH.stripe, xD + 2.6, 0.65, D / 2 + 0.9);
+    box(siteG, 4.2, 0.02, 3.6, SH.concrete, xEnt, 0.215, D / 2 + 2.4, false);
+    for (i = 0; i < nCar; i++) car(carsG, xP1 - 1.45 - (i + (i > 1 ? 1 : 0)) * 2.9, zP, i);
+    if (xD + 1.5 < xP0 - 0.6 || D / 2 + 11.8 < zP - 3.2) truck(carsG, xD, D / 2 + 7.4);
     // oameni, ca sa se vada scara
-    person(peopleG, rackPos[0] + 1.45, 0.3, rackPos[1] - 1.9); person(peopleG, xGate + 3.6, 0.2, platZ1 - 3.4); person(peopleG, W / 2 - offW / 2 + 3.4, 0.2, D / 2 + 3.2);
+    person(peopleG, rackPos[0] + 1.45, 0.3, rackPos[1] - 1.9); person(peopleG, xGate + 3.9, 0.2, platZ1 - 3.6); person(peopleG, xEnt + 0.9, 0.22, D / 2 + 4.6); person(peopleG, xD + 2.2, 0.22, D / 2 + 2.6);
     // stalpi de iluminat pe marginea platformei: noaptea lumineaza
-    var lampG = new T.Group(); root.add(lampG);
-    var lp = [], nl = Math.max(3, Math.round((platX1 - platX0) / 26));
+    var lampG = grp(root), lp = [], nl = Math.max(3, Math.round((platX1 - platX0) / 26));
     for (i = 0; i <= nl; i++) { var lx = platX0 + 3 + i * (platX1 - platX0 - 6) / nl; lp.push([lx, platZ1 - 2.5]); lp.push([lx, platZ0 + 2.5]); }
-    var poles = new T.InstancedMesh(new T.CylinderGeometry(0.09, 0.12, 7, 6), SH.steel, lp.length), heads = new T.InstancedMesh(new T.BoxGeometry(1.1, 0.14, 0.4), SH.lampHead, lp.length), glows = new T.InstancedMesh(new T.PlaneGeometry(24, 24), SH.glow, lp.length);
-    var qFlat = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), -Math.PI / 2);
+    var lampI = inst(lampG, lampTpl(), lp.length), glows = new T.InstancedMesh(new T.PlaneGeometry(26, 26), SH.glow, lp.length), qFlat = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), -Math.PI / 2);
     for (i = 0; i < lp.length; i++) {
-      mtx.compose(new T.Vector3(lp[i][0], 3.7, lp[i][1]), q0, one); poles.setMatrixAt(i, mtx);
-      mtx.compose(new T.Vector3(lp[i][0], 7.2, lp[i][1] + (i % 2 ? 0.4 : -0.4)), q0, one); heads.setMatrixAt(i, mtx);
-      mtx.compose(new T.Vector3(lp[i][0], 0.27 + (i % 7) * 0.004, lp[i][1] + (i % 2 ? 2 : -2)), qFlat, one); glows.setMatrixAt(i, mtx);
+      mtx.compose(pos.set(lp[i][0], 0.2, lp[i][1]), i % 2 ? q0 : qPi, one); lampI.setMatrixAt(i, mtx);
+      mtx.compose(pos.set(lp[i][0], 0.27 + (i % 7) * 0.004, lp[i][1] + (i % 2 ? 2.2 : -2.2)), qFlat, one); glows.setMatrixAt(i, mtx);
     }
-    poles.frustumCulled = heads.frustumCulled = glows.frustumCulled = false; poles.castShadow = true; glows.renderOrder = 2;
-    lampG.add(poles); lampG.add(heads); lampG.add(glows);
-    // copaci de-a lungul drumului
-    var nTree = 46, cone = new T.InstancedMesh(new T.ConeGeometry(2.6, 7, 7), SH.tree, nTree), ball = new T.InstancedMesh(new T.IcosahedronGeometry(3, 0), SH.tree2, nTree), trunk = new T.InstancedMesh(new T.CylinderGeometry(0.3, 0.4, 3, 6), SH.trunk, nTree * 2);
-    cone.frustumCulled = ball.frustumCulled = trunk.frustumCulled = false; cone.castShadow = ball.castShadow = true;
-    var sc = new T.Vector3(), tk = 0;
+    glows.frustumCulled = false; glows.renderOrder = 2; lampG.add(glows);
+    // copaci: plopi de-a lungul drumului, palcuri prin camp, cativa langa curte
+    var trees = [[], [], []];
+    function addTree(kind, x, z, s) { if (x > x0 - 4 && x < x1 + 4 && z > z0 - 4 && z < z1 + 3) return; trees[kind].push([x, z, s, R() * 6.28, R()]); }
+    var nTree = 46;
     for (i = 0; i < nTree; i++) {
-      var txx = cx + (i - nTree / 2) * 13 * k + (R() - 0.5) * 6, s = (0.8 + R() * 0.5) * Math.sqrt(k);
-      if (Math.abs(txx - xGate) < 8) txx += 16;
-      sc.set(s, s, s);
-      mtx.compose(new T.Vector3(txx, 3 * s + 3.4 * s, zRoad + 9), q0, sc); cone.setMatrixAt(i, mtx);
-      mtx.compose(new T.Vector3(txx, 1.5 * s, zRoad + 9), q0, sc); trunk.setMatrixAt(tk++, mtx);
-      var bxx = txx + 6.5 * k;
-      mtx.compose(new T.Vector3(bxx, 5 * s, zRoad - 8.5), q0, sc); ball.setMatrixAt(i, mtx);
-      mtx.compose(new T.Vector3(bxx, 1.5 * s, zRoad - 8.5), q0, sc); trunk.setMatrixAt(tk++, mtx);
+      var txx = cx + (i - nTree / 2) * 13 * k + (R() - 0.5) * 6, ts = (0.8 + R() * 0.5) * Math.sqrt(k);
+      if (Math.abs(txx - xGate) < 9) txx += 18;
+      addTree(0, txx, zRoad + 9, ts); addTree(1, txx + 6.5 * k, zRoad - 8.5, ts);
     }
-    root.add(cone); root.add(ball); root.add(trunk);
-    // nori nevazuti care lasa umbre miscatoare in zilele cu nori
-    var cloudG = new T.Group(), cgeo = new T.PlaneGeometry(2, 2); root.add(cloudG); cgeo.rotateX(-Math.PI / 2);
-    for (i = 0; i < 7; i++) {      // umbre moi de nori: pete intunecate care plutesc deasupra campusului
+    for (i = 0; i < 26; i++) {
+      var ang = R() * 6.28, rad = RR * (1.25 + R() * 3.2), gxx = cx + Math.cos(ang) * rad, gzz = cz + Math.sin(ang) * rad, nn = 2 + Math.floor(R() * 5), kind = R() > 0.75 ? 2 : 1;
+      if (Math.abs(gzz - zRoad) < 14) continue;
+      for (j = 0; j < nn; j++) addTree(kind, gxx + (R() - 0.5) * 22 * k, gzz + (R() - 0.5) * 22 * k, (0.8 + R() * 0.6) * Math.sqrt(k));
+    }
+    for (i = 0; i < 5; i++) addTree(2, x1 + 7 + (R() - 0.5) * 3, z1 - 6 - i * 7, 0.8 + R() * 0.3);
+    ['poplar', 'broad', 'conifer'].forEach(function (name, kd) {
+      var list = trees[kd]; if (!list.length) return;
+      var im = inst(root, treeTpl(name), list.length);
+      list.forEach(function (t, n) {
+        qq.setFromAxisAngle(yAx, t[3]); mtx.compose(pos.set(t[0], 0, t[1]), qq, sc.set(t[2], t[2] * (0.9 + t[4] * 0.25), t[2])); im.setMatrixAt(n, mtx);
+        im.setColorAt(n, tc.setHSL(0.24 + t[4] * 0.07 - (kd === 2 ? 0.02 : 0), 0.42 + t[4] * 0.14, (kd === 2 ? 0.2 : kd === 0 ? 0.3 : 0.27) + t[4] * 0.08));
+      });
+      im.instanceColor.needsUpdate = true;
+    });
+    // umbre moi de nori: pete intunecate care plutesc deasupra campusului
+    var cloudG = grp(root), cgeo = new T.PlaneGeometry(2, 2); cgeo.rotateX(-Math.PI / 2);
+    for (i = 0; i < 7; i++) {
       var cm = new T.Group(), cr2 = RR * (0.2 + R() * 0.2), c1 = new T.Mesh(cgeo, SH.cloud), c2 = new T.Mesh(cgeo, SH.cloud);
       c1.scale.set(cr2, 1, cr2 * (0.55 + R() * 0.3)); c2.scale.set(cr2 * 0.7, 1, cr2 * 0.5); c2.position.set(cr2 * (0.3 + R() * 0.4), 0.05, cr2 * (R() - 0.5) * 0.6);
       c1.renderOrder = c2.renderOrder = 3; cm.add(c1); cm.add(c2);
@@ -1672,22 +2201,20 @@ var Scene3D = (function () {
     if (nT) zone(root, 'pv', -fieldW / 2 - 2, fieldW / 2 + 2, zPVend - 2, zPV0 + 6.5, 3.2);
     if (nB) zone(root, 'bess', xB0 - 5, xB0 + bN * 8 + 1, zB0 - (Math.max(1, rowsB) - 1) * 6 - 2.5, zB0 + 2.5, 3.4);
     zone(root, 'cool', W / 2 + 1.5, W / 2 + 4 + coolW, -Math.min(perCol, nCool) * 2 - 1, Math.min(D / 2, Math.min(perCol, nCool) * 2 + 3.5), 3.4);
-    zone(root, 'gen', xGen - genLen / 2 - 1, -W / 2 - 1, zGen0 - 2.5, zGen0 + (nGen - 1) * (genS * 5.6 + 1.2) + 4.5, 3.6);
+    zone(root, 'gen', xGen - genLen / 2 - 1, -W / 2 - 1, zGen0 - 2.5, zGen0 + (nGen - 1) * gStep + 4.5, 3.6);
     zone(root, 'sub', xSub - subW / 2, xSub + subW / 2, zSub - subD / 2, zSub + subD / 2, 4 * subS + 2);
-    zone(root, 'fiber', W / 2 - offW - 7, W / 2 - offW + 2, D / 2 + 0.6, zRoad - 4.5, 0.8);
-    zone(root, 'fiber', x0 - 30, x1 + 30, zRoad - 10.5, zRoad - 4.5, 0.8);
+    zone(root, 'fiber', xF - 3, xF + 6, D / 2 + 0.6, zRoad - 4.5, 0.8);
+    zone(root, 'fiber', x0 - 30, x1 + 30, zRoad - 10.5, zRoad - 5.2, 0.8);
 
     /* --- fluxuri --- */
-    var fg = new T.Group(); root.add(fg);
-    var xPvIn = W / 2 - 3;
+    var fg = grp(root), xPvIn = W / 2 - 3;
     if (nT) flows.pv = new Flow(fg, [[0, zPVmid], [0, zPV0 + 8], [xPvIn, zPV0 + 8], [xPvIn, -D / 2]], COL.sun, k, 14);
     if (nB) flows.bess = new Flow(fg, [[xBc, zB0 + 1.4], [xBc, -D / 2]], COL.batt, k, 6);
     flows.grid = new Flow(fg, [[xSub - subW / 2 - 30 * k, zSub + subD / 2 + 2], [xSub, zSub + subD / 2 + 2], [xSub + subW / 2 + 3, zSub + subD / 2 + 2], [xSub + subW / 2 + 3, D / 2 - 2.5], [-W / 2, D / 2 - 2.5]], COL.grid, k, 12);
-    var xF = W / 2 - offW - 4;
-    flows.fiberA = new Flow(fg, [[xF, D / 2], [xF, zRoad - 6], [x0 - 60 * k, zRoad - 6]], COL.fiber, k * 0.7, 8);
+    flows.fiberA = new Flow(fg, [[xF, D / 2], [xF, zRoad - 6.2], [x0 - 60 * k, zRoad - 6.2]], COL.fiber, k * 0.7, 8);
     flows.fiberB = new Flow(fg, [[xF + 3, D / 2], [xF + 3, zRoad - 9], [x1 + 60 * k, zRoad - 9]], COL.fiber, k * 0.7, 8);
     flows.fiberA.set(0.5, 1); flows.fiberB.set(0.5, -1);
-    var zGm = zGen0 + (nGen - 1) * (genS * 5.6 + 1.2) / 2;
+    var zGm = zGen0 + (nGen - 1) * gStep / 2;
     flows.gen = new Flow(fg, [[xGen, zGm], [-W / 2, zGm]], COL.gen, k, 6);
     puffGen = new Puffs(root, genO, SH.smoke, 0.8 * genS, 9, 4); puffGen.on = outage === 2 ? 1 : 0;
     puffHeat = new Puffs(root, coolO, SH.heat, 1.5, 11, 3); puffHeat.on = thermal ? 1 : 0;
@@ -1696,7 +2223,7 @@ var Scene3D = (function () {
       W: W, D: D, H: H, k: k, R: RR, cx: cx, cz: cz, spanX: spanX, spanZ: spanZ,
       anchors: {
         building: [0, H + 3, 0], pv: nT ? [0, 7 * k, zPVmid] : null, bess: nB ? [xBc, 6, zBc] : null,
-        sub: [xSub, 4 * subS + 5, zSub], gen: [xGen, 6, zGen0 + (nGen - 1) * (genS * 5.6 + 1.2) / 2],
+        sub: [xSub, 4 * subS + 5, zSub], gen: [xGen, 6, zGm],
         cool: [coolX0 + (coolCols - 1) * (coolLen + 2) / 2, 6, 0], fiber: [xF + 1.5, 2.5, zRoad - 7],
         f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [xBc, 1.3 * k, (zB0 + 1.4 - D / 2) / 2] : null,
         f_grid: [xSub + subW / 2 + 3, 1.3 * k, (zSub + subD / 2 + 2 + D / 2 - 2.5) / 2], f_gen: [(xGen - W / 2) / 2, 1.3 * k, zGm],
@@ -1705,6 +2232,7 @@ var Scene3D = (function () {
       },
       views: {
         overview: { t: [cx, 0, cz + spanZ * 0.02], dist: fit(RR * 0.86), az: 0.62, pol: 1.0 },
+        hero: { t: [cx, 0, cz - spanZ * 0.06], dist: fit(RR * 0.74), az: 0.5, pol: 1.3 },          // privire joasa, cu orizont si cer, pentru primul capitol
         building: { t: [0, 2, 0], dist: fit(Math.max(W, D) * 0.95), az: 0.55, pol: 1.0 },
         inside: { t: [(xE + xO) / 2 - W * 0.08, 1, 0], dist: fit(Math.max(W * 0.46, D * 0.6)), az: 0.5, pol: 0.66 },
         power: { t: [(xSub + -W / 2) / 2, 2, D / 4], dist: fit(Math.max(-xSub - W / 2 + subW, D) * 0.85), az: -0.75, pol: 1.02 },
@@ -1719,15 +2247,17 @@ var Scene3D = (function () {
       land: { w: spanX, d: spanZ }
     };
     camera.near = 0.6 * k; camera.far = RR * 40; camera.updateProjectionMatrix();
-    scene.fog.near = RR * 5; scene.fog.far = RR * 17;
-    var sc2 = sunLight.shadow.camera; sc2.left = -RR * 1.1; sc2.right = RR * 1.1; sc2.top = RR * 1.1; sc2.bottom = -RR * 1.1; sc2.near = RR * 0.5; sc2.far = RR * 6; sc2.updateProjectionMatrix();
-    sunLight.shadow.normalBias = 0.25 * k; sunLight.target.position.set(cx, 0, cz); sunLight.target.updateMatrixWorld();
-    parts = { plat: plat, fenceG: fenceG, siteG: siteG, carsG: carsG, peopleG: peopleG, lampG: lampG, sub: sub, lineG: lineG, floorM: floorM, wallGroup: wallGroup, partG: partG, elec: elec, itg: itg, itx: itx,
-      cool: cool, gen: gen, rk: rk, rk2: rk2, n1: n1, n2: n2, rack: rackD, tables: nT ? tables : null, legs: nT ? legs : null, inv: nT ? inv : null, nT: nT, bess: bess, fg: fg, cloudG: cloudG, shell: 1 };
+    scene.fog.near = RR * 3.5; scene.fog.far = RR * 15;
+    if (sky) sky.scale.setScalar(RR * 20);
+    parts = { plat: platG, fenceG: fenceG, siteG: siteG, carsG: carsG, peopleG: peopleG, lampG: lampG, sub: sub, lineG: lineG, floorM: floorG, wallGroup: wallGroup, partG: partG, elec: elec, itg: itg, itx: itx,
+      cool: cool, gen: gen, rk: rk, rk2: rk2, n1: n1, n2: n2, rack: rackD, tables: tables, inv: inv, pvG: pvG, nT: nT, bess: bess, bessI: bessI, nB: nB, fg: fg, cloudG: cloudG, shell: 1 };
+    batch.flush(); applyTags();
+    shF.x = 1e9;
     applyBuild();
     applySun();
     return L;
   }
+
 
   /* ---------- constructia pe etape: 0 platforma, 1 racord, 2 cladire, 3 instalatii, 4 calculatoare, 5 panouri, 6 baterii, 7 pornire ---------- */
   function applyBuild() {
@@ -1739,16 +2269,16 @@ var Scene3D = (function () {
     f = b[2]; p.floorM.visible = f > 0.01; p.wallGroup.visible = f > 0.04; p.shell = Math.min(1, f / 0.85);
     f = b[3]; [p.cool, p.gen, p.elec, p.partG, p.lampG].forEach(function (g) { g.visible = f > 0.01; g.scale.y = Math.max(0.02, f); });
     f = b[4]; p.itg.visible = f > 0.01; p.rk.count = Math.round(p.n1 * f); p.rk2.count = Math.round(p.n2 * f); p.itx.visible = f > 0.5; p.rack.g.visible = f > 0.9;
-    f = b[5]; if (p.tables) { p.tables.count = Math.round(p.nT * f); p.legs.count = p.tables.count * 4; p.inv.visible = f > 0.2; }
-    f = b[6]; n = p.bess.children.length; for (i = 0; i < n; i++) p.bess.children[i].visible = f > 0.01 && i < Math.ceil(f * n);
+    f = b[5]; if (p.tables) { p.tables.count = Math.round(p.nT * f); p.inv.visible = f > 0.2; p.pvG.visible = f > 0.05; }
+    f = b[6]; p.bess.visible = f > 0.01; if (p.bessI) p.bessI.count = Math.ceil(f * p.nB);
     f = b[7]; p.fg.visible = f > 0.5; p.carsG.visible = f > 0.5; p.peopleG.visible = f > 0.5;
+    shadowDirty = true;
   }
-  function disp2(hex) { return new T.Color(hex).convertSRGBToLinear().getHex(); }
   function setThermal(on) {
     thermal = !!on; if (!ok) return;
-    THERM.forEach(function (e) { e.m.color.setHex(thermal ? e.hot : e.base); });
-    SH.rackFront.emissive.setHex(thermal ? 0xffa030 : 0xffffff); SH.rackFront.emissiveIntensity = thermal ? 0.9 : 1.1;
-    SH.hot.opacity = thermal ? 0.62 : 0.28; SH.cold.opacity = thermal ? 0.5 : 0.22;
+    THERM.forEach(function (e) { e.m.color.setHex(thermal ? e.hot : e.base); if (e.map) e.m.map = thermal ? TEX.white : e.map; });
+    SH.rackFront.emissive.setHex(thermal ? 0xffa030 : 0xffffff); SH.rackFront.emissiveIntensity = thermal ? 0.8 : 1.6; SH.cabF.emissiveIntensity = thermal ? 0 : 1;
+    SH.hot.opacity = thermal ? 0.5 : 0.16; SH.cold.opacity = thermal ? 0.42 : 0.12; SH.ao.opacity = thermal ? 0 : 0.5; SH.patchA.opacity = thermal ? 0 : 0.4; SH.patchB.opacity = thermal ? 0 : 0.4;
     if (puffHeat) puffHeat.on = thermal ? 1 : 0;
     applySun();
   }
@@ -1758,50 +2288,118 @@ var Scene3D = (function () {
     return r / Math.sin(vf / 2) / Math.max(0.55, Math.min(1, a)) * 0.82;
   }
 
+  /* ---------- cerul: gradient, soare, nori, stele, totul calculat pe placa video ---------- */
+  var SKY_V = 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  function makeSky() {
+    var mat = new T.ShaderMaterial({
+      side: T.BackSide, depthWrite: false, depthTest: false, fog: false, toneMapped: false,
+      uniforms: { uSun: { value: new T.Vector3(0, 1, 0) }, uTop: { value: new T.Color() }, uHor: { value: new T.Color() }, uSunCol: { value: new T.Color() }, uCloudCol: { value: new T.Color() }, uCloudSh: { value: new T.Color() },
+        uCloud: { value: 0.2 }, uTime: { value: 0 }, uNight: { value: 0 }, uSunVis: { value: 1 } },
+      vertexShader: SKY_V,
+      fragmentShader: [
+        'uniform vec3 uSun; uniform vec3 uTop; uniform vec3 uHor; uniform vec3 uSunCol; uniform vec3 uCloudCol; uniform vec3 uCloudSh;',
+        'uniform float uCloud; uniform float uTime; uniform float uNight; uniform float uSunVis; varying vec3 vDir;',
+        'float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+        'float noise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+        '  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }',
+        'float fbm(vec2 p) { float a = 0.5; float s = 0.0; for (int i = 0; i < 5; i++) { s += a * noise(p); p = p * 2.03 + vec2(17.0, 9.0); a *= 0.5; } return s; }',
+        'void main() {',
+        '  vec3 d = normalize(vDir); float h = clamp(d.y, 0.0, 1.0);',
+        '  vec3 col = mix(uHor, uTop, pow(h, 0.42));',
+        '  float sd = max(dot(d, uSun), 0.0);',
+        '  col += uSunCol * (pow(sd, 6.0) * 0.12 + pow(sd, 48.0) * 0.25) * uSunVis * (1.0 - 0.6 * uCloud);',
+        '  float cl = 0.0;',
+        '  if (d.y > 0.0) {',
+        '    vec2 uv = d.xz / (d.y + 0.1) * 0.9 + vec2(uTime * 0.012, uTime * 0.004);',
+        '    float n = fbm(uv); float th = mix(0.72, 0.22, uCloud);',
+        '    cl = smoothstep(th, th + 0.26, n) * smoothstep(0.0, 0.1, d.y);',
+        '    float lit = clamp(0.55 + 0.9 * (n - th) + 0.35 * pow(sd, 3.0), 0.0, 1.0);',
+        '    col = mix(col, mix(uCloudCol, uCloudSh, clamp(lit * (0.35 + 0.65 * uCloud), 0.0, 1.0) * 0.8), cl * (0.82 + 0.18 * uCloud));',
+        '    float st = step(0.9965, hash(floor(d.xz / (d.y + 0.25) * 150.0))) * uNight * smoothstep(0.04, 0.3, d.y) * (1.0 - cl);',
+        '    col += vec3(st) * 0.8;',
+        '  }',
+        '  col += uSunCol * smoothstep(0.99955, 0.99985, sd) * 4.0 * uSunVis * (1.0 - cl) * step(0.0, d.y);',
+        '  gl_FragColor = vec4(col, 1.0);',
+        '  #include <encodings_fragment>',
+        '}'].join('\n')
+    });
+    sky = new T.Mesh(new T.SphereGeometry(1, 40, 20), mat); sky.renderOrder = -100; sky.frustumCulled = false; sky.matrixAutoUpdate = true; scene.add(sky);
+  }
+  function makeEnv() {      // cerul pe care il oglindesc sticla, panourile si tabla
+    try {
+      var pm = new T.PMREMGenerator(renderer), es = new T.Scene();
+      var m = new T.ShaderMaterial({ side: T.BackSide, depthWrite: false, depthTest: false, vertexShader: SKY_V,
+        fragmentShader: 'varying vec3 vDir; void main() { vec3 d = normalize(vDir); float h = d.y; vec3 sk = mix(vec3(0.95, 0.98, 1.02), vec3(0.3, 0.5, 0.92), pow(clamp(h, 0.0, 1.0), 0.5)); vec3 gd = mix(vec3(0.5, 0.48, 0.4), vec3(0.2, 0.21, 0.15), clamp(-h * 2.5, 0.0, 1.0)); gl_FragColor = vec4(h > 0.0 ? sk : gd, 1.0); }' });
+      es.add(new T.Mesh(new T.SphereGeometry(40, 32, 16), m));
+      scene.environment = pm.fromScene(es, 0.02).texture; pm.dispose();
+    } catch (e) { scene.environment = null; }
+  }
+
   /* ---------- soare, cer, noapte ---------- */
-  var sunState = { el: 1.0, az: 0, wx: 0 };
-  var cTop = null, cBot = null, cTmp = null;
+  var sunState = { el: 1.0, az: 0, wx: 0 }, sunDir = null, cA = null, cB = null, cTmp = null;
+  var EXPO = 1.0, SUN_I = 1.65, HEMI_D = 0.36, HEMI_N = 0.09, ENV_I = 0.3;
+  function srgbOf(c, hex) { return c.setHex(hex).convertLinearToSRGB(); }
   function applySun() {
     if (!ok || !L) return;
-    var s = sunState, sinEl = Math.sin(s.el), day = Math.max(0, Math.min(1, (sinEl + 0.06) / 0.3));
+    var s = sunState, sinEl = Math.sin(s.el), day = Math.max(0, Math.min(1, (sinEl + 0.08) / 0.24));
     day = day * day * (3 - 2 * day);
-    var direct = [1, 0.62, 0.22][s.wx], amb = [1, 1.05, 0.95][s.wx];
-    var el = Math.max(s.el, 0.05), dx = -Math.sin(s.az) * Math.cos(el), dz = Math.cos(s.az) * Math.cos(el), dy = Math.sin(el);
-    sunLight.position.set(L.cx + dx * L.R * 3, dy * L.R * 3, L.cz + dz * L.R * 3);
-    sunLight.intensity = 1.05 * day * direct * Math.min(1, 0.4 + sinEl * 1.5);
-    sunLight.castShadow = sinEl > 0.02;
-    var warm = Math.max(0, Math.min(1, sinEl / 0.45));
-    sunLight.color.setRGB(1, 0.72 + 0.26 * warm, 0.5 + 0.44 * warm);
-    hemi.intensity = 0.26 + 0.36 * day * amb;
-    moonLight.intensity = 0.3 * (1 - day);
-    nightK = 1 - day;
-    SH.glass.emissiveIntensity = 0.9 * nightK; SH.windowGlow.emissiveIntensity = 1.3 * nightK;
-    SH.lampHead.color.setHex(0x8a8f8c).lerp(cTmp.setHex(0xfff0c0), nightK); SH.glow.opacity = 0.6 * nightK;
-    if (parts) parts.cloudG.visible = s.wx === 1 && day > 0.3 && !thermal; SH.cloud.opacity = 0.3 * day;
-    hemi.color.setHex(thermal ? 0xffffff : 0xdfeeff); hemi.groundColor.setHex(thermal ? 0xd0d0ea : 0x8a8f6a);
-    if (thermal) {      // imagine "termica": lumina plata, cer inchis
-      sunLight.intensity = 0.2; sunLight.color.setRGB(1, 1, 1); hemi.intensity = 0.92; moonLight.intensity = 0;
-      SH.glass.emissiveIntensity = 0; SH.windowGlow.emissiveIntensity = 0; SH.glow.opacity = 0;
-      host.style.background = 'linear-gradient(#070920 0%, #121640 62%)'; scene.fog.color.setHex(disp2(0x121640));
-      return;
+    var direct = [1, 0.8, 0.1][s.wx], amb = [1, 1.15, 1.75][s.wx];
+    var el = Math.max(s.el, 0.07);
+    sunDir.set(-Math.sin(s.az) * Math.cos(el), Math.sin(el), Math.cos(s.az) * Math.cos(el));
+    var warm = Math.max(0, Math.min(1, sinEl / 0.5)), u = sky.material.uniforms;
+    nightK = 1 - day; shF.x = 1e9; shadowDirty = true;
+    u.uSun.value.copy(sunDir); if (s.el < 0.07) u.uSun.value.set(-Math.sin(s.az) * Math.cos(s.el), sinEl, Math.cos(s.az) * Math.cos(s.el));
+    SH.lampHead.color.setHex(0x8a8f8c).lerp(cTmp.setHex(0xfff0c0), nightK); SH.glow.opacity = 0.5 * nightK;
+    if (parts) parts.cloudG.visible = s.wx === 1 && day > 0.3 && !thermal; SH.cloud.opacity = 0.26 * day;
+    var envK;
+    if (thermal) {      // imagine "termica": lumina plata, cer inchis, fara umbre tari
+      sunLight.intensity = 0.45; sunLight.color.setRGB(1, 1, 1); hemi.intensity = 1.45; hemi.color.setHex(0xffffff); hemi.groundColor.setHex(0xc8c8e6); moonLight.intensity = 0; envK = 0;
+      SH.glass.emissiveIntensity = 0; SH.glow.opacity = 0;
+      u.uTop.value.setHex(0x05071c); u.uHor.value.setHex(0x161a48); u.uSunVis.value = 0; u.uCloud.value = 0; u.uNight.value = 0; u.uSunCol.value.setRGB(0, 0, 0);
+      scene.fog.color.copy(srgbOf(cTmp, 0x161a48));
+    } else {
+      sunLight.color.setRGB(1, 0.56 + 0.41 * warm, 0.28 + 0.64 * warm);
+      sunLight.intensity = SUN_I * day * direct * Math.min(1, 0.55 + sinEl * 1.3);
+      hemi.color.setHex(0x16233f).lerp(cTmp.setHex([0xbfd6f2, 0xd0dae6, 0xc6ccd2][s.wx]), day); hemi.groundColor.setHex(0x0c0f14).lerp(cTmp.setHex(0x8f8a6c), day);
+      hemi.intensity = HEMI_N + HEMI_D * day * amb;
+      moonLight.intensity = 0.2 * nightK;
+      envK = (0.05 + 0.95 * day) * [1, 0.9, 0.75][s.wx] * ENV_I;
+      SH.glass.emissiveIntensity = 1.5 * nightK;
+      // culorile cerului: zi dupa vreme, amurg portocaliu la orizont, noapte albastru inchis
+      cA.setHex(0x050914).lerp(cTmp.setHex([0x2e73c9, 0x5b8cc0, 0x8b97a1][s.wx]), day);
+      cB.setHex(0x101a30).lerp(cTmp.setHex([0xbdd8ee, 0xc8d6e0, 0xb7bdc2][s.wx]), day);
+      var dusk = Math.max(0, 1 - Math.abs(sinEl - 0.05) / 0.22) * (s.wx === 2 ? 0.15 : 0.7);
+      cB.lerp(cTmp.setHex(0xf0a56a), dusk); cA.lerp(cTmp.setHex(0x6a6fa8), dusk * 0.35);
+      u.uTop.value.copy(cA); u.uHor.value.copy(cB);
+      u.uSunCol.value.setRGB(1, 0.75 + 0.22 * warm, 0.5 + 0.42 * warm); u.uSunVis.value = [1, 0.75, 0][s.wx] * (sinEl > -0.03 ? 1 : 0);
+      u.uCloud.value = [0.2, 0.52, 1][s.wx]; u.uNight.value = nightK * (s.wx === 2 ? 0 : 1);
+      u.uCloudCol.value.setHex(0x1a2236).lerp(cTmp.setHex([0xffffff, 0xf6f6f4, 0xc9cdd0][s.wx]), day).lerp(cTmp.setHex(0xffc38f), dusk * 0.6);
+      u.uCloudSh.value.setHex(0x0c111e).lerp(cTmp.setHex([0xaab6c6, 0x97a1ad, 0x8b9299][s.wx]), day);
+      cTmp.copy(cB).convertLinearToSRGB(); scene.fog.color.copy(cTmp);     // ceata se amesteca dupa ce culorile au fost pregatite pentru ecran
     }
-    // cerul: un gradient CSS in spatele canvasului transparent
-    var topD = [[0x4f9fe6, 0x8cb2d2, 0x97a4ae][s.wx]], botD = [[0xd4e9f7, 0xe0e9ef, 0xd3d8db][s.wx]];
-    cTop.setHex(0x091220).lerp(cTmp.setHex(topD[0]), day);
-    cBot.setHex(0x1a2944).lerp(cTmp.setHex(botD[0]), day);
-    var dusk = Math.max(0, 1 - Math.abs(sinEl - 0.06) / 0.2) * (s.wx === 2 ? 0.2 : 0.75);
-    cBot.lerp(cTmp.setHex(0xf2a86b), dusk);
-    host.style.background = 'linear-gradient(' + '#' + cTop.getHexString() + ' 0%, #' + cBot.getHexString() + ' 62%)';
-    scene.fog.color.copy(cBot);
+    for (var i = 0; i < MATS.length; i++) MATS[i].envMapIntensity = MATS[i].userData.env * envK;
   }
   function setSun(el, az, wx) { sunState.el = el; sunState.az = az; sunState.wx = wx; applySun(); }
+
+  /* ---------- umbre: harta de umbre urmareste zona la care te uiti, ca sa fie clare si de aproape ---------- */
+  function focusShadow() {
+    if (!L || Q.noShadow) return;
+    var ext = Math.max(26, Math.min(L.R * 1.15, cam.dist * 0.95)), fx = cam.tx, fz = cam.tz;
+    if (Math.abs(fx - shF.x) < shF.ext * 0.07 && Math.abs(fz - shF.z) < shF.ext * 0.07 && Math.abs(ext - shF.ext) < shF.ext * 0.1) return;
+    shF.x = fx; shF.z = fz; shF.ext = ext;
+    var c = sunLight.shadow.camera, far = L.R * 3;
+    c.left = -ext; c.right = ext; c.top = ext; c.bottom = -ext; c.near = Math.max(1, far - ext * 2.6 - 90); c.far = far + ext * 2.6 + 90; c.updateProjectionMatrix();
+    sunLight.target.position.set(fx, 0, fz); sunLight.position.set(fx + sunDir.x * far, sunDir.y * far, fz + sunDir.z * far); sunLight.target.updateMatrixWorld();
+    sunLight.shadow.normalBias = Math.max(0.03, ext * 2 / Q.shadow * 1.1); sunLight.shadow.bias = -0.0002;
+    shadowDirty = true;
+  }
 
   /* ---------- camera ---------- */
   function placeCamera() {
     var sp = Math.sin(cam.pol), cp = Math.cos(cam.pol);
     camera.position.set(cam.tx + cam.dist * sp * Math.sin(cam.az), cam.ty + cam.dist * cp, cam.tz + cam.dist * sp * Math.cos(cam.az));
     camera.lookAt(cam.tx, cam.ty, cam.tz);
-    if (L) { var nr = Math.max(0.1, Math.min(0.6 * L.k, cam.dist * 0.03)); if (Math.abs(nr - camera.near) > camera.near * 0.15) { camera.near = nr; camera.updateProjectionMatrix(); } }
+    if (L) { var nr = Math.max(0.1, cam.dist * 0.02); if (Math.abs(nr - camera.near) > camera.near * 0.15) { camera.near = nr; camera.updateProjectionMatrix(); } }
   }
   function go(name, instant) {
     if (!ok || !L) return;
@@ -1877,7 +2475,7 @@ var Scene3D = (function () {
   }
   function shown(o) { while (o) { if (!o.visible) return false; o = o.parent; } return true; }
   function hover(e) {
-    var now = performance.now(); if (now - hoverT < 60) return; hoverT = now;
+    var now = performance.now(); if (now - hoverT < 70) return; hoverT = now;
     var id = pickAt(e.clientX, e.clientY);
     canvas.style.cursor = id ? 'pointer' : 'grab';
     if (handlers.hover) handlers.hover(id, e.clientX, e.clientY);
@@ -1928,19 +2526,49 @@ var Scene3D = (function () {
     }
   }
 
+  /* ---------- calitatea se regleaza singura: daca aparatul nu tine 27 de cadre pe secunda, coboram o treapta ---------- */
+  var QSTEPS = [[2, 1], [1.5, 1], [1.25, 0.5], [1, 0.5], [0.8, 0]], gov = { t: 0, n: 0, wait: 3 }, inView = true;
+  function pickQuality() {
+    var touch = (navigator.maxTouchPoints || 0) > 0, small = Math.min(window.screen.width || 9999, window.screen.height || 9999);
+    Q.lite = (touch && small < 820) || Math.min(window.innerWidth, window.innerHeight) < 480;
+    Q.shadow0 = Q.lite ? 1024 : 2048; Q.shadow = Q.shadow0;
+    Q.fixed = /q=max/.test(String(window.location.hash));
+    if (/q=low/.test(String(window.location.hash))) Q.step = 4;
+  }
+  function applyQuality() {
+    var st = QSTEPS[Q.step], dpr = window.devicePixelRatio || 1, sh = Math.round(Q.shadow0 * st[1]);
+    Q.pr = Q.step === 4 ? Math.min(dpr, 1) * 0.85 : Math.min(dpr, st[0]);
+    if (sh !== Q.shadow || (sh === 0) !== Q.noShadow) {
+      Q.noShadow = sh === 0; sunLight.castShadow = !Q.noShadow;
+      if (sh) { Q.shadow = sh; sunLight.shadow.mapSize.set(sh, sh); if (sunLight.shadow.map) { sunLight.shadow.map.dispose(); sunLight.shadow.map = null; } }
+      shF.x = 1e9; shadowDirty = true;
+    }
+    resize();
+  }
+  function govern(dt) {
+    if (Q.fixed || dt > 0.4) return;
+    if (gov.wait > 0) { gov.wait -= dt; gov.t = 0; gov.n = 0; return; }
+    gov.t += dt; gov.n++;
+    if (gov.t < 1.5) return;
+    var fps = gov.n / gov.t; gov.t = 0; gov.n = 0;
+    if (fps < 27 && Q.step < QSTEPS.length - 1) { Q.step++; applyQuality(); gov.wait = 1.2; }
+  }
+
   /* ---------- bucla ---------- */
   function frame(t) {
     if (!running) return;
     requestAnimationFrame(frame);
-    var dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t;
+    var real = (t - lastT) / 1000 || 0.016, dt = Math.min(0.05, real); lastT = t;
+    if (!inView) return;                       // macheta nu se vede (ai derulat mai jos): nu consumam bateria
+    govern(real);
     stepCamera(dt);
     for (var id in flows) flows[id].update(dt, camera.position);
     var i;
-    if (!reduced && outage !== 1) for (i = 0; i < fans.length; i++) fans[i].rotation.y += dt * 7;
+    if (!reduced && outage !== 1) TEX.fan.rotation += dt * 7;
     if (puffGen) puffGen.update(dt); if (puffHeat) puffHeat.update(dt);
     if (!reduced && parts && parts.cloudG.visible) for (i = 0; i < clouds.length; i++) { var cl = clouds[i]; cl.position.x += cl.userData.v * dt; if (cl.position.x > L.cx + L.R * 1.7) cl.position.x = L.cx - L.R * 1.7; }
     var rt = rackOpen ? 1 : 0;
-    if (Math.abs(rackK - rt) > 0.001) rackK += (rt - rackK) * (reduced ? 1 : Math.min(1, dt * 2.6)); else rackK = rt;
+    if (Math.abs(rackK - rt) > 0.001) { rackK += (rt - rackK) * (reduced ? 1 : Math.min(1, dt * 2.6)); shadowDirty = true; } else rackK = rt;
     if (parts) {
       var e = rackK * rackK * (3 - 2 * rackK), rd = parts.rack, e2 = Math.max(0, (e - 0.25) / 0.75), e3 = Math.max(0, (e - 0.7) / 0.3);
       rd.door.rotation.y = e * 1.95; rd.server.position.x = 0.02 + 0.92 * e2; rd.cover.position.set(-0.55 * e3, 0.352 + 0.42 * e3, 0);
@@ -1948,12 +2576,16 @@ var Scene3D = (function () {
     }
     if (roofGroup) {
       var target = roofOpen ? 1 : 0;
-      if (Math.abs(roofK - target) > 0.001) roofK += (target - roofK) * (reduced ? 1 : Math.min(1, dt * 4)); else roofK = target;
-      roofGroup.position.y = roofK * (L.H * 1.2 + 3); SH.roof.opacity = 1 - roofK; roofGroup.visible = roofK < 0.97 && buildK[2] >= 0.92;
+      if (Math.abs(roofK - target) > 0.001) { roofK += (target - roofK) * (reduced ? 1 : Math.min(1, dt * 4)); shadowDirty = true; } else roofK = target;
+      var op = 1 - roofK; for (i = 0; i < ROOFM.length; i++) ROOFM[i].opacity = op;
+      roofGroup.position.y = roofK * (L.H * 1.2 + 3); roofGroup.visible = roofK < 0.97 && buildK[2] >= 0.92;
       if (wallGroup) wallGroup.scale.y = Math.max(0.02, (1 - 0.6 * roofK - 0.25 * rackK) * (parts ? parts.shell : 1));
       var shade = roofK < 0.04;
-      if (roofGroup.userData.shade !== shade) { roofGroup.userData.shade = shade; roofGroup.traverse(function (o) { if (o.isMesh) o.castShadow = shade; }); }
+      if (roofGroup.userData.shade !== shade) { roofGroup.userData.shade = shade; roofGroup.traverse(function (o) { if (o.isMesh) o.castShadow = shade; }); shadowDirty = true; }
     }
+    if (sky) { sky.position.copy(camera.position); if (!reduced) sky.material.uniforms.uTime.value += dt; }
+    focusShadow();
+    if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; }
     renderer.render(scene, camera);
     stepLabels();
     if (handlers.north) handlers.north(cam.az);
@@ -1961,30 +2593,35 @@ var Scene3D = (function () {
   function resize() {
     if (!ok) return;
     var w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, w < 700 ? 1.6 : 2));
-    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Q.pr); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
   }
 
   function init(opts) {
     host = opts.host; canvas = opts.canvas; labelHost = opts.labels;
     handlers.pick = opts.onPick; handlers.hover = opts.onHover; handlers.north = opts.onNorth; handlers.touched = opts.onTouched;
     if (!T) return false;
+    pickQuality();
     try {
-      renderer = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      renderer = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
     } catch (e) { return false; }
-    renderer.outputEncoding = T.sRGBEncoding; renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
-    renderer.setClearColor(0x000000, 0);
+    renderer.outputEncoding = T.sRGBEncoding; renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = EXPO;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
+    renderer.setClearColor(0xbdd8ee, 1);
+    _m4 = new T.Matrix4(); _n3 = new T.Matrix3(); _v = new T.Vector3(); _q = new T.Quaternion(); _e = new T.Euler(); _s = new T.Vector3(); _a = new T.Vector3(); _b = new T.Vector3(); _up = new T.Vector3(0, 1, 0);
     scene = new T.Scene(); scene.fog = new T.Fog(0xd4e9f7, 500, 3000);
     camera = new T.PerspectiveCamera(38, 1.5, 1, 9000);
-    hemi = new T.HemisphereLight(0xdfeeff, 0x8a8f6a, 0.9); scene.add(hemi);
-    sunLight = new T.DirectionalLight(0xffffff, 1.8); sunLight.castShadow = true; var lite = Math.min(window.innerWidth, window.innerHeight) < 700; sunLight.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); sunLight.shadow.bias = -0.0004;
+    hemi = new T.HemisphereLight(0xbfd6f2, 0x8f8a6c, 0.7); scene.add(hemi);
+    sunLight = new T.DirectionalLight(0xffffff, 3); sunLight.castShadow = true; sunLight.shadow.mapSize.set(Q.shadow, Q.shadow); sunLight.shadow.bias = -0.0002;
     scene.add(sunLight); scene.add(sunLight.target);
-    moonLight = new T.DirectionalLight(0x8fa8d8, 0); moonLight.position.set(-300, 500, 400); scene.add(moonLight);
-    ray = new T.Raycaster(); v2 = new T.Vector2(); pv3 = new T.Vector3(); cTop = new T.Color(); cBot = new T.Color(); cTmp = new T.Color();
-    initShared(); ok = true;
-    resize(); bindControls();
+    moonLight = new T.DirectionalLight(0x9db4e6, 0); moonLight.position.set(-300, 500, 400); scene.add(moonLight);
+    ray = new T.Raycaster(); v2 = new T.Vector2(); pv3 = new T.Vector3(); cA = new T.Color(); cB = new T.Color(); cTmp = new T.Color(); sunDir = new T.Vector3(0, 1, 0);
+    initShared(); makeSky(); makeEnv(); ok = true;
+    applyQuality(); bindControls();
     if (window.ResizeObserver) new ResizeObserver(resize).observe(host); else window.addEventListener('resize', resize);
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && !running) { running = true; lastT = performance.now(); requestAnimationFrame(frame); } else if (document.hidden) running = false; });
+    if (window.IntersectionObserver) new IntersectionObserver(function (es) { inView = es[es.length - 1].isIntersecting; if (inView) gov.wait = Math.max(gov.wait, 0.8); }).observe(host);
+    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); running = false; });
+    canvas.addEventListener('webglcontextrestored', function () { shadowDirty = true; if (!running) { running = true; lastT = performance.now(); requestAnimationFrame(frame); } });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && !running) { running = true; lastT = performance.now(); gov.wait = 1.5; requestAnimationFrame(frame); } else if (document.hidden) running = false; });
     requestAnimationFrame(frame);
     return true;
   }
@@ -2001,6 +2638,8 @@ var Scene3D = (function () {
     flow: function (id) { return flows[id] || null; },
     layout: function () { return L; },
     isReady: function () { return ok; }, _pick: function (x, y) { return pickAt(x, y); },
+    _info: function () { return ok ? { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, tex: renderer.info.memory.textures, progs: renderer.info.programs.length, q: { lite: Q.lite, step: Q.step, pr: Q.pr, shadow: Q.shadow, noShadow: Q.noShadow } } : null; },
+    _cam: cam,
     COL: COL
   };
 })();
@@ -2576,7 +3215,7 @@ var Scene3D = (function () {
     if (!instant) toView(true);      // pe telefon macheta sta in capul paginii: la capitol nou ne intoarcem la ea
     var view = chapters[i].getAttribute('data-view'), roof = view === 'inside';
     roofUi(roof);
-    if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview'); }
+    if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview' || view === 'hero'); }
     [].forEach.call(document.querySelectorAll('.lbl'), function (l) { l.classList.toggle('hot', PICK_CH[l.dataset.id] === i); });
   }
 

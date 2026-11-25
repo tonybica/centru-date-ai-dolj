@@ -13,7 +13,7 @@ const path = require('path');
   const errs = [];
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ': ' + m.text()); });
   page.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
-  await page.goto('file://' + path.join(__dirname, file));
+  await page.goto('file://' + path.join(__dirname, '..', file) + (process.env.QAUTO ? '' : '#q=max'));
   await page.waitForTimeout(1800);
   for (const s of steps) {
     const [name, ...acts] = s.split(':');
@@ -28,7 +28,7 @@ const path = require('path');
       else if (a.startsWith('range=')) { const [id, v] = a.slice(6).split('@'); await page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }, [id, v]); }
     }
     await page.waitForTimeout(2200);
-    await page.screenshot({ path: path.join(__dirname, 'shots', name + '.png') });
+    await page.screenshot({ path: path.join(__dirname, '..', 'shots', name + '.png') });
   }
   const info = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, hasGL: !document.querySelector('.nogl'), overflowX: document.documentElement.scrollWidth - window.innerWidth,
     wide: [...document.querySelectorAll('.chapter:not([hidden]) *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1).slice(0, 6).map(e => e.tagName + '.' + e.className) }));

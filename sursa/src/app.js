@@ -569,7 +569,7 @@
     if (!instant) toView(true);      // pe telefon macheta sta in capul paginii: la capitol nou ne intoarcem la ea
     var view = chapters[i].getAttribute('data-view'), roof = view === 'inside';
     roofUi(roof);
-    if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview'); }
+    if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview' || view === 'hero'); }
     [].forEach.call(document.querySelectorAll('.lbl'), function (l) { l.classList.toggle('hot', PICK_CH[l.dataset.id] === i); });
   }
 
