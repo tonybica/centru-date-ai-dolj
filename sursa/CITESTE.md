@@ -3,7 +3,7 @@
 Site-ul este un singur fișier HTML, făcut din piesele de mai jos. Tot proiectul este lucrat cu Claude Code, iar `CLAUDE.md` îi spune ce trebuie să știe ca să continue de aici.
 
 - `src/model.js`: presupunerile și calculele (consum, soare, baterii, bani, planul pe 10 ani, fonduri europene). Aici se schimbă cifrele.
-- `src/scene/`: macheta 3D (three.js r149), în patru bucăți lipite la construire: materiale și texturi, obiecte, campusul, apoi cerul, lumina și camera. Cuprinde rackul deschis, pana de curent, vederea de căldură și construcția pe etape.
+- `src/scene/`: macheta 3D (three.js r149), împărțită pe zone și lipită la construire în ordinea numelui: materiale și texturi (`10`), fluxuri (`15`), piese pe zone (`2x-p-*`), campusul pe zone (`30`–`39`), apoi cerul, lumina și camera (`40`). Regulile sunt în `CLAUDE.md`. Cuprinde rackul deschis, pana de curent, vederea de căldură și construcția pe etape.
 - `src/app.js`: capitolele, graficele și legătura dintre cifre și machetă.
 - `src/body.html`, `src/style.css`: textele și aspectul, inclusiv așezarea pentru telefon.
 - `src/fonts.css`: fonturile Barlow puse în fișier, ca site-ul să arate la fel și fără internet. Se refac cu `node fonts.js`.

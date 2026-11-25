@@ -63,7 +63,7 @@
         box(itx, 0.24, 0.2, 0.3, SH.dark, rx + sg * 0.4, 2.8, zCt - 0.385, false);
         // unitatea care imparte lichidul de racire (CDU), la capatul de nord al randului
         var zc = -rowLen / 2 - 0.47, cf = rx + sg * 0.6;
-        box(itx, 1.2, 2.2, 0.8, SH.white, rx, 1.4, zc); box(itx, 1.21, 0.18, 0.81, SH.blue, rx, 2.2, zc, false);
+        box(itx, 1.2, 2.2, 0.8, SH.white, rx, 1.4, zc); box(itx, 1.24, 0.16, 0.84, SH.blue, rx, 2.16, zc, false);
         box(itx, 0.02, 0.2, 0.3, SH.screen, cf + sg * 0.012, 1.7, zc, false); box(itx, 0.02, 1.2, 0.03, SH.dark, cf + sg * 0.012, 1.0, zc + 0.3, false);
         box(itx, 0.02, 0.5, 0.6, SH.dark, cf + sg * 0.012, 0.7, zc - 0.02, false);
         // circuitul rackurilor: din CDU urca doua tevi si merg de-a lungul randului, pe grinzi

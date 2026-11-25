@@ -35,9 +35,10 @@
         <div class="north" title="Nord"><svg id="north" width="30" height="30" viewBox="-15 -15 30 30" aria-label="Săgeata arată nordul"><path d="M0-12L5 6 0 3-5 6z" fill="var(--ink)"/><text x="0" y="13" text-anchor="middle" font-size="7" font-weight="700" fill="var(--muted)" font-family="Arial, sans-serif">N</text></svg></div>
         <div class="hint" id="hint">Trage ca să rotești · rotița apropie · apasă pe un obiect</div>
       </div>
-      <div class="dock">
+      <div class="dock" id="dock">
         <div class="dock-row">
           <button type="button" class="btn" id="play" aria-pressed="false">▶ Rulează 24 de ore</button>
+          <button type="button" class="btn" id="speed" aria-label="Schimbă viteza simulării">Viteză: normală</button>
           <div class="time">
             <output id="clock" for="hour">13:00</output>
             <input type="range" id="hour" min="0" max="23.75" step="0.25" value="13" aria-label="Ora din zi">
@@ -52,8 +53,9 @@
         <div class="dock-row chips" aria-live="off">
           <span class="chip"><i class="sw load"></i>Consum <b id="f-load"></b></span>
           <span class="chip"><i class="sw sun"></i>Panouri <b id="f-pv"></b></span>
-          <span class="chip"><i class="sw batt"></i>Baterii <b id="f-batt"></b></span>
-          <span class="chip"><i class="sw grid"></i>Rețea <b id="f-grid"></b></span>
+          <span class="chip wide"><i class="sw batt"></i>Baterii <b id="f-batt"></b></span>
+          <span class="chip"><i class="sw grid"></i><span id="l-grid">Luăm din rețea</span> <b id="f-grid"></b></span>
+          <span class="chip" id="chip-temp" hidden>Afară <b id="f-temp"></b></span>
           <span class="chip" id="chip-gen" hidden><i class="sw gen"></i>Generatoare <b id="f-gen"></b></span>
         </div>
       </div>
@@ -67,10 +69,11 @@
           <p class="eyebrow"></p>
           <h2>O fabrică de calcul, alimentată în parte de soare</h2>
           <p>Un centru de date AI este o clădire plină de calculatoare foarte puternice. Firmele care fac inteligență artificială au nevoie de ele, dar rareori le cumpără. Le închiriază, cu ora sau pe contract.</p>
-          <p>Noi am deține clădirea, curentul și răcirea, iar într-una din variante și calculatoarele. Clienții plătesc pentru puterea de calcul pe care o folosesc.</p>
+          <p>Noi am deține clădirea, instalațiile de curent și de răcire și calculatoarele. Clienții plătesc pentru puterea de calcul pe care o folosesc.</p>
+          <p class="fine">Trei unități apar peste tot. <b>kW</b> (kilowatt) măsoară puterea, adică cât curent se trage într-o clipă: un fier de călcat trage cam 2 kW. <b>MW</b> (megawatt) înseamnă 1.000 kW. <b>MWh</b> (megawatt-oră) măsoară energia: 1 MW tras timp de o oră.</p>
           <p>Cea mai mare cheltuială lunară este curentul. De aceea lângă clădire stau un parc fotovoltaic și baterii. Soarele din Dolj acoperă o parte din consum, iar restul vine din rețea.</p>
           <dl class="stats">
-            <div class="stat"><dt>Puterea calculatoarelor</dt><dd><span data-v="it"></span><small><span data-v="gpus"></span> GPU-uri</small></dd></div>
+            <div class="stat"><dt>Puterea calculatoarelor</dt><dd><span data-v="it"></span><small><span data-v="gpus"></span> plăci grafice (GPU)</small></dd></div>
             <div class="stat"><dt>Investiție</dt><dd><span data-v="capexTotal"></span><small>din care <span data-v="capexGpu"></span> calculatoarele</small></dd></div>
             <div class="stat"><dt>Teren</dt><dd><span data-v="landHa"></span> ha<small>din care <span data-v="pvHa"></span> ha panouri</small></dd></div>
             <div class="stat"><dt>Curent din soare și baterii</dt><dd><span data-v="coverage"></span><small>restul din rețea</small></dd></div>
@@ -86,7 +89,7 @@
           <p>Piesa de bază este placa grafică, pe scurt <b>GPU</b>. Un GPU face un număr uriaș de calcule în același timp, exact ce cere inteligența artificială.</p>
           <ul>
             <li><b>Serverul</b> este un calculator cu 8 GPU-uri. Consumă cam 14 kW, cât cinci cuptoare electrice pornite deodată, și costă câteva sute de mii de euro.</li>
-            <li><b>Rackul</b> este dulapul metalic în care stau 3–4 servere, unul peste altul.</li>
+            <li><b>Rackul</b> este dulapul metalic în care stau 3 servere, unul peste altul.</li>
             <li><b>Sala de date</b> este camera cu rânduri de rackuri, cabluri și țevi de răcire. Culoarul roșu din machetă este cel cald, pe unde iese căldura.</li>
           </ul>
           <div class="act">
@@ -119,12 +122,19 @@
           <p>Siguranța are trei trepte: baterii mici numite <b>UPS</b>, care preiau sarcina într-o clipă, <b>generatoare diesel</b>, care pornesc în mai puțin de un minut, și, unde se poate, <b>două linii din rețea</b> pe trasee diferite.</p>
           <div class="act">
             <button type="button" class="btn big" id="b-outage" aria-pressed="false">Simulează o pană de curent</button>
+            <div class="tl" id="out-bar" role="group" aria-label="Pașii penei de curent"></div>
+            <p class="outnow" id="out-now" aria-live="polite"></p>
             <ol class="steps" id="outage-steps">
-              <li data-s="1"><b>Secunda 0.</b> Rețeaua cade. Punctele albastre de pe cablu se opresc.</li>
-              <li data-s="2"><b>Aceeași clipă.</b> UPS-urile din clădire țin calculatoarele pornite. Luminițele lor devin portocalii.</li>
-              <li data-s="3"><b>După 30–60 de secunde.</b> Generatoarele au pornit și duc tot consumul. Se vede fumul și curentul portocaliu.</li>
-              <li data-s="4"><b>Când revine rețeaua.</b> Centrul trece înapoi pe rețea, iar generatoarele se opresc. Clienții nu au simțit nimic.</li>
+              <li data-s="1"><b>Secunda 0.</b> Rețeaua cade.</li>
+              <li data-s="2"><b>Aceeași clipă.</b> UPS-urile din clădire țin calculatoarele pornite.</li>
+              <li data-s="3"><b>Secunda 15.</b> Generatoarele diesel pornesc.</li>
+              <li data-s="4"><b>Secunda 45.</b> Generatoarele duc tot consumul.</li>
+              <li data-s="5"><b>Când revine rețeaua.</b> Centrul trece înapoi pe rețea, iar generatoarele se opresc.</li>
             </ol>
+            <div class="stepnav">
+              <button type="button" class="btn" id="out-prev">◀ Pasul dinainte</button>
+              <button type="button" class="btn" id="out-next">Primul pas ▶</button>
+            </div>
           </div>
           <p>Panourile obișnuite se opresc singure când cade rețeaua, din motive de siguranță. Bateriile mari din curte pot ajuta la o pană doar dacă invertorul lor este făcut să lucreze și fără rețea. Este o opțiune care se cere din proiectare.</p>
           <p class="note">Avizul de racordare (ATR), de la Distribuție Oltenia sau Transelectrica, este de obicei pasul cel mai lung din tot proiectul și poate dura peste un an. De aceea terenul se alege după rețea.</p>
@@ -139,7 +149,7 @@
             <div class="heatbar" aria-hidden="true"><span>rece</span><i></i><span>fierbinte</span></div>
             <p class="fine">Macheta se colorează ca într-o cameră termică. Rackurile sunt cele mai fierbinți. Țevile albastre duc lichid la aproximativ 30 °C, cele roșii îl aduc înapoi la peste 40 °C, iar răcitoarele de afară aruncă toată căldura în aer.</p>
           </div>
-          <p>Eficiența se măsoară cu un număr numit <b>PUE</b>. Am presupus PUE 1,25. Asta înseamnă că la fiecare 1 kW pentru calculatoare se mai consumă 0,25 kW pentru răcire și pierderi.</p>
+          <p>Eficiența se măsoară cu un număr numit <b>PUE</b>. Am presupus PUE 1,25. Asta înseamnă că la fiecare 1 kW pentru calculatoare se mai consumă 0,25 kW pentru răcire și pierderi. <span data-v="pueRange"></span></p>
           <p>În Dolj verile trec de 38 °C, așa că răcirea se dimensionează pentru cele mai calde zile. Circuitul este închis și consumă foarte puțină apă.</p>
           <dl class="stats">
             <div class="stat"><dt>Căldură de scos afară</dt><dd data-v="heat"></dd></div>
@@ -152,7 +162,7 @@
           <p class="eyebrow"></p>
           <h2>Parcul fotovoltaic</h2>
           <p>În zona Craiovei, 1 kW de panouri produce cam 1.350 kWh pe an, printre cele mai bune valori din țară. 1 MW de panouri ocupă aproximativ 1,2 hectare.</p>
-          <p>Centrul consumă la fel zi și noapte, iar soarele produce doar ziua, mai ales vara. Dacă punem multe panouri, la prânz avem surplus, iar noaptea luăm tot din rețea.</p>
+          <p>Centrul consumă aproape la fel zi și noapte, iar soarele produce doar ziua, mai ales vara. Dacă punem multe panouri, la prânz avem surplus, iar noaptea luăm tot din rețea.</p>
           <div class="ctrl">
             <label for="s-pv">Puterea panourilor</label><output id="o-pv" for="s-pv"></output>
             <input type="range" id="s-pv" min="0" max="8" step="0.25" value="4">
@@ -185,7 +195,12 @@
               <span><i class="sw line"></i>Cât produc panourile</span>
             </div>
             <div id="c-day"></div>
-            <p class="fine">Luna și vremea se schimbă din bara de sub machetă. Mută ora și urmărește punctele care curg pe cabluri. Cifrele de lângă cabluri arată puterea din acel moment.</p>
+            <p class="daynow" id="day-now" aria-live="off"></p>
+            <div class="playrow">
+              <button type="button" class="btn" id="play2" aria-pressed="false">▶ Rulează 24 de ore</button>
+              <span class="fine" id="play-left"></span>
+            </div>
+            <p class="fine">Linia neagră cu ceas arată ora aleasă. Apasă pe o oră din grafic sau pornește ziua întreagă: poți pune pauză oricând, iar viteza, luna și vremea se schimbă din bara de sub machetă. Punctele care curg pe cabluri și cifrele de lângă ele arată puterea din acel moment.</p>
           </div>
           <p>Pe tot anul: <b data-v="directShare"></b> direct din panouri, <b data-v="battShare"></b> din baterii, <b data-v="gridShare"></b> din rețea.</p>
           <div class="chart">
@@ -299,7 +314,7 @@
           <div class="tblwrap"><table class="sens" id="t-sens"></table></div>
           <p class="fine">Apasă pe o căsuță ca să folosești acele valori în tot planul. Căsuța încadrată este varianta de acum.</p>
           <p class="note" data-v="tenNote"></p>
-          <p class="fine">Presupuneri pentru acest capitol: anul 1 la jumătate din clienții țintă, anul 2 la 80%. Chiria unui GPU scade cu 8% pe an pe măsură ce îmbătrânește. În anul 6 se cumpără GPU-uri noi, la 80% din prețul primelor, cu același credit. Creditul obișnuit se plătește în 7 ani. Fără impozit pe profit și fără inflație.</p>
+          <p class="fine">Presupuneri pentru acest capitol: anul 1 la jumătate din clienții țintă, anul 2 la 80%. Chiria unui GPU scade cu 8% pe an pe măsură ce îmbătrânește. În anul 6 se cumpără GPU-uri noi, la 80% din prețul primelor, cu un credit care se plătește în 5 ani. Creditul de la început se plătește în 7 ani. Fără impozit pe profit și fără inflație.</p>
         </article>
 
         <article class="chapter" data-title="Fonduri europene" data-view="overview" hidden>

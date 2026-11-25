@@ -141,6 +141,21 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .sw.sun { background: var(--sun); } .sw.batt { background: var(--batt); } .sw.grid { background: var(--grid); } .sw.load { background: var(--ink); } .sw.fiber { background: var(--fiber); }
 .sw.gen { background: var(--gen); }
 .sw.line { height: 3px; width: 14px; border-radius: 2px; background: var(--ink); }
+.chip b { white-space: nowrap; } .chip[hidden] { display: none; }
+/* ---- simularea: cursorul din grafic, citirile de sub el, pana de curent pe pasi ---- */
+.chart svg text.cur { fill: var(--surface); font-weight: 600; }
+.daynow { margin: 0; font-size: 13.5px; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
+.playrow { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.playrow .btn { box-shadow: none; }
+.tl { display: flex; gap: 4px; }
+.tl button { flex: 1 1 0; min-width: 0; border: 0; background: transparent; padding: 4px 0 2px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; align-items: stretch; font: 600 11.5px var(--font-display); color: var(--muted); text-align: left; }
+.tl button i { display: block; height: 8px; border-radius: 4px; background: var(--line); }
+.tl button.done i { background: var(--ink); } .tl button.done { color: var(--ink); }
+.tl button.on i { background: var(--gen); } .tl button.on { color: var(--ink); }
+.tl button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outnow { margin: 0; font-size: 13.5px; }
+.steps { margin: 0; padding-left: 22px; } .steps li span { display: none; } .steps li.on span { display: inline; }
+.stepnav { display: flex; gap: 8px; flex-wrap: wrap; } .stepnav .btn { box-shadow: none; flex: 1 1 130px; } .stepnav .btn:disabled { opacity: .45; cursor: default; }
 
 /* ---- povestea ---- */
 .story { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
@@ -275,6 +290,10 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
   .view { position: relative; flex: none; height: 42vh; min-height: 240px; max-height: 380px; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
   .dock { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; gap: 6px; }
   .dock .chips { display: none; }
+  .dock.live .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 6px; }
+  .dock.live .chip { font-size: 12px; padding: 3px 8px; border-radius: 8px; min-width: 0; flex-wrap: wrap; gap: 2px 5px; }
+  .dock.live .chip.wide { grid-column: 1 / -1; }
+  .dock.live .chip[hidden] { display: none; }
   .dock .btn { padding: 5px 10px; }
   .time { flex-basis: 150px; }
   .story { margin-top: 10px; overflow: visible; }
@@ -297,6 +316,17 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
   table.sens td button { font-size: 11.5px; padding: 7px 0; }
   .pick > span { display: none; }
   #t-ten { font-size: 12px; } #t-ten th, #t-ten td { padding: 6px 2px; } #t-ten thead th { font-size: 11.5px; }
+}
+@media (pointer: coarse) {
+  /* tinte de apasat de 44 px pe ecrane cu degetul: in text crestem butonul; in bara de sub macheta si pe macheta ramane mic la vedere si marim doar zona care prinde degetul */
+  .seg button, .toc button, .pager .go, .btn.big, .playrow .btn, .stepnav .btn, .cases button, .cmp th button, table.sens td button { min-height: 44px; }
+  .dock .btn, .dock select, .hud .btn, .dock .seg button { min-height: 36px; position: relative; }
+  .zoom .btn.sq { width: 38px; height: 38px; position: relative; }
+  .dock .btn::after, .hud .btn::after, .dock .seg button::after { content: ''; position: absolute; inset: -4px 0; }
+  .zoom .btn.sq::after { content: ''; position: absolute; inset: -3px; }
+  input[type="range"] { height: 44px; } .dock input[type="range"] { height: 36px; }
+  .tl button { min-height: 44px; justify-content: center; }
+  details summary { padding: 12px 0; }
 }
 @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
 @media (max-width: 900px) and (max-height: 520px) { .view { height: 78vh; max-height: none; } .pager { position: static; } }
@@ -340,9 +370,10 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
         <div class="north" title="Nord"><svg id="north" width="30" height="30" viewBox="-15 -15 30 30" aria-label="Săgeata arată nordul"><path d="M0-12L5 6 0 3-5 6z" fill="var(--ink)"/><text x="0" y="13" text-anchor="middle" font-size="7" font-weight="700" fill="var(--muted)" font-family="Arial, sans-serif">N</text></svg></div>
         <div class="hint" id="hint">Trage ca să rotești · rotița apropie · apasă pe un obiect</div>
       </div>
-      <div class="dock">
+      <div class="dock" id="dock">
         <div class="dock-row">
           <button type="button" class="btn" id="play" aria-pressed="false">▶ Rulează 24 de ore</button>
+          <button type="button" class="btn" id="speed" aria-label="Schimbă viteza simulării">Viteză: normală</button>
           <div class="time">
             <output id="clock" for="hour">13:00</output>
             <input type="range" id="hour" min="0" max="23.75" step="0.25" value="13" aria-label="Ora din zi">
@@ -357,8 +388,9 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
         <div class="dock-row chips" aria-live="off">
           <span class="chip"><i class="sw load"></i>Consum <b id="f-load"></b></span>
           <span class="chip"><i class="sw sun"></i>Panouri <b id="f-pv"></b></span>
-          <span class="chip"><i class="sw batt"></i>Baterii <b id="f-batt"></b></span>
-          <span class="chip"><i class="sw grid"></i>Rețea <b id="f-grid"></b></span>
+          <span class="chip wide"><i class="sw batt"></i>Baterii <b id="f-batt"></b></span>
+          <span class="chip"><i class="sw grid"></i><span id="l-grid">Luăm din rețea</span> <b id="f-grid"></b></span>
+          <span class="chip" id="chip-temp" hidden>Afară <b id="f-temp"></b></span>
           <span class="chip" id="chip-gen" hidden><i class="sw gen"></i>Generatoare <b id="f-gen"></b></span>
         </div>
       </div>
@@ -372,10 +404,11 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <p class="eyebrow"></p>
           <h2>O fabrică de calcul, alimentată în parte de soare</h2>
           <p>Un centru de date AI este o clădire plină de calculatoare foarte puternice. Firmele care fac inteligență artificială au nevoie de ele, dar rareori le cumpără. Le închiriază, cu ora sau pe contract.</p>
-          <p>Noi am deține clădirea, curentul și răcirea, iar într-una din variante și calculatoarele. Clienții plătesc pentru puterea de calcul pe care o folosesc.</p>
+          <p>Noi am deține clădirea, instalațiile de curent și de răcire și calculatoarele. Clienții plătesc pentru puterea de calcul pe care o folosesc.</p>
+          <p class="fine">Trei unități apar peste tot. <b>kW</b> (kilowatt) măsoară puterea, adică cât curent se trage într-o clipă: un fier de călcat trage cam 2 kW. <b>MW</b> (megawatt) înseamnă 1.000 kW. <b>MWh</b> (megawatt-oră) măsoară energia: 1 MW tras timp de o oră.</p>
           <p>Cea mai mare cheltuială lunară este curentul. De aceea lângă clădire stau un parc fotovoltaic și baterii. Soarele din Dolj acoperă o parte din consum, iar restul vine din rețea.</p>
           <dl class="stats">
-            <div class="stat"><dt>Puterea calculatoarelor</dt><dd><span data-v="it"></span><small><span data-v="gpus"></span> GPU-uri</small></dd></div>
+            <div class="stat"><dt>Puterea calculatoarelor</dt><dd><span data-v="it"></span><small><span data-v="gpus"></span> plăci grafice (GPU)</small></dd></div>
             <div class="stat"><dt>Investiție</dt><dd><span data-v="capexTotal"></span><small>din care <span data-v="capexGpu"></span> calculatoarele</small></dd></div>
             <div class="stat"><dt>Teren</dt><dd><span data-v="landHa"></span> ha<small>din care <span data-v="pvHa"></span> ha panouri</small></dd></div>
             <div class="stat"><dt>Curent din soare și baterii</dt><dd><span data-v="coverage"></span><small>restul din rețea</small></dd></div>
@@ -391,7 +424,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <p>Piesa de bază este placa grafică, pe scurt <b>GPU</b>. Un GPU face un număr uriaș de calcule în același timp, exact ce cere inteligența artificială.</p>
           <ul>
             <li><b>Serverul</b> este un calculator cu 8 GPU-uri. Consumă cam 14 kW, cât cinci cuptoare electrice pornite deodată, și costă câteva sute de mii de euro.</li>
-            <li><b>Rackul</b> este dulapul metalic în care stau 3–4 servere, unul peste altul.</li>
+            <li><b>Rackul</b> este dulapul metalic în care stau 3 servere, unul peste altul.</li>
             <li><b>Sala de date</b> este camera cu rânduri de rackuri, cabluri și țevi de răcire. Culoarul roșu din machetă este cel cald, pe unde iese căldura.</li>
           </ul>
           <div class="act">
@@ -424,12 +457,19 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <p>Siguranța are trei trepte: baterii mici numite <b>UPS</b>, care preiau sarcina într-o clipă, <b>generatoare diesel</b>, care pornesc în mai puțin de un minut, și, unde se poate, <b>două linii din rețea</b> pe trasee diferite.</p>
           <div class="act">
             <button type="button" class="btn big" id="b-outage" aria-pressed="false">Simulează o pană de curent</button>
+            <div class="tl" id="out-bar" role="group" aria-label="Pașii penei de curent"></div>
+            <p class="outnow" id="out-now" aria-live="polite"></p>
             <ol class="steps" id="outage-steps">
-              <li data-s="1"><b>Secunda 0.</b> Rețeaua cade. Punctele albastre de pe cablu se opresc.</li>
-              <li data-s="2"><b>Aceeași clipă.</b> UPS-urile din clădire țin calculatoarele pornite. Luminițele lor devin portocalii.</li>
-              <li data-s="3"><b>După 30–60 de secunde.</b> Generatoarele au pornit și duc tot consumul. Se vede fumul și curentul portocaliu.</li>
-              <li data-s="4"><b>Când revine rețeaua.</b> Centrul trece înapoi pe rețea, iar generatoarele se opresc. Clienții nu au simțit nimic.</li>
+              <li data-s="1"><b>Secunda 0.</b> Rețeaua cade.</li>
+              <li data-s="2"><b>Aceeași clipă.</b> UPS-urile din clădire țin calculatoarele pornite.</li>
+              <li data-s="3"><b>Secunda 15.</b> Generatoarele diesel pornesc.</li>
+              <li data-s="4"><b>Secunda 45.</b> Generatoarele duc tot consumul.</li>
+              <li data-s="5"><b>Când revine rețeaua.</b> Centrul trece înapoi pe rețea, iar generatoarele se opresc.</li>
             </ol>
+            <div class="stepnav">
+              <button type="button" class="btn" id="out-prev">◀ Pasul dinainte</button>
+              <button type="button" class="btn" id="out-next">Primul pas ▶</button>
+            </div>
           </div>
           <p>Panourile obișnuite se opresc singure când cade rețeaua, din motive de siguranță. Bateriile mari din curte pot ajuta la o pană doar dacă invertorul lor este făcut să lucreze și fără rețea. Este o opțiune care se cere din proiectare.</p>
           <p class="note">Avizul de racordare (ATR), de la Distribuție Oltenia sau Transelectrica, este de obicei pasul cel mai lung din tot proiectul și poate dura peste un an. De aceea terenul se alege după rețea.</p>
@@ -444,7 +484,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
             <div class="heatbar" aria-hidden="true"><span>rece</span><i></i><span>fierbinte</span></div>
             <p class="fine">Macheta se colorează ca într-o cameră termică. Rackurile sunt cele mai fierbinți. Țevile albastre duc lichid la aproximativ 30 °C, cele roșii îl aduc înapoi la peste 40 °C, iar răcitoarele de afară aruncă toată căldura în aer.</p>
           </div>
-          <p>Eficiența se măsoară cu un număr numit <b>PUE</b>. Am presupus PUE 1,25. Asta înseamnă că la fiecare 1 kW pentru calculatoare se mai consumă 0,25 kW pentru răcire și pierderi.</p>
+          <p>Eficiența se măsoară cu un număr numit <b>PUE</b>. Am presupus PUE 1,25. Asta înseamnă că la fiecare 1 kW pentru calculatoare se mai consumă 0,25 kW pentru răcire și pierderi. <span data-v="pueRange"></span></p>
           <p>În Dolj verile trec de 38 °C, așa că răcirea se dimensionează pentru cele mai calde zile. Circuitul este închis și consumă foarte puțină apă.</p>
           <dl class="stats">
             <div class="stat"><dt>Căldură de scos afară</dt><dd data-v="heat"></dd></div>
@@ -457,7 +497,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <p class="eyebrow"></p>
           <h2>Parcul fotovoltaic</h2>
           <p>În zona Craiovei, 1 kW de panouri produce cam 1.350 kWh pe an, printre cele mai bune valori din țară. 1 MW de panouri ocupă aproximativ 1,2 hectare.</p>
-          <p>Centrul consumă la fel zi și noapte, iar soarele produce doar ziua, mai ales vara. Dacă punem multe panouri, la prânz avem surplus, iar noaptea luăm tot din rețea.</p>
+          <p>Centrul consumă aproape la fel zi și noapte, iar soarele produce doar ziua, mai ales vara. Dacă punem multe panouri, la prânz avem surplus, iar noaptea luăm tot din rețea.</p>
           <div class="ctrl">
             <label for="s-pv">Puterea panourilor</label><output id="o-pv" for="s-pv"></output>
             <input type="range" id="s-pv" min="0" max="8" step="0.25" value="4">
@@ -490,7 +530,12 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
               <span><i class="sw line"></i>Cât produc panourile</span>
             </div>
             <div id="c-day"></div>
-            <p class="fine">Luna și vremea se schimbă din bara de sub machetă. Mută ora și urmărește punctele care curg pe cabluri. Cifrele de lângă cabluri arată puterea din acel moment.</p>
+            <p class="daynow" id="day-now" aria-live="off"></p>
+            <div class="playrow">
+              <button type="button" class="btn" id="play2" aria-pressed="false">▶ Rulează 24 de ore</button>
+              <span class="fine" id="play-left"></span>
+            </div>
+            <p class="fine">Linia neagră cu ceas arată ora aleasă. Apasă pe o oră din grafic sau pornește ziua întreagă: poți pune pauză oricând, iar viteza, luna și vremea se schimbă din bara de sub machetă. Punctele care curg pe cabluri și cifrele de lângă ele arată puterea din acel moment.</p>
           </div>
           <p>Pe tot anul: <b data-v="directShare"></b> direct din panouri, <b data-v="battShare"></b> din baterii, <b data-v="gridShare"></b> din rețea.</p>
           <div class="chart">
@@ -604,7 +649,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
           <div class="tblwrap"><table class="sens" id="t-sens"></table></div>
           <p class="fine">Apasă pe o căsuță ca să folosești acele valori în tot planul. Căsuța încadrată este varianta de acum.</p>
           <p class="note" data-v="tenNote"></p>
-          <p class="fine">Presupuneri pentru acest capitol: anul 1 la jumătate din clienții țintă, anul 2 la 80%. Chiria unui GPU scade cu 8% pe an pe măsură ce îmbătrânește. În anul 6 se cumpără GPU-uri noi, la 80% din prețul primelor, cu același credit. Creditul obișnuit se plătește în 7 ani. Fără impozit pe profit și fără inflație.</p>
+          <p class="fine">Presupuneri pentru acest capitol: anul 1 la jumătate din clienții țintă, anul 2 la 80%. Chiria unui GPU scade cu 8% pe an pe măsură ce îmbătrânește. În anul 6 se cumpără GPU-uri noi, la 80% din prețul primelor, cu un credit care se plătește în 5 ani. Creditul de la început se plătește în 7 ani. Fără impozit pe profit și fără inflație.</p>
         </article>
 
         <article class="chapter" data-title="Fonduri europene" data-view="overview" hidden>
@@ -1712,15 +1757,16 @@ var Scene3D = (function () {
     box(g, 0.8, 0.09, 0.5, SH.rackAlt, 0.12, 2.06, 0, false); box(g, 0.012, 0.04, 0.44, SH.led, 0.525, 2.06, 0, false);
     var out = { g: g, door: null, server: null, cover: null }, m;
     for (var i = 0; i < 4; i++) {
-      var s = new T.Group(); s.position.set(0.02, 0.32 + i * 0.42, 0); g.add(s);
-      if (i !== 2) {
-        box(s, 1.0, 0.36, 0.5, SH.dark, 0, 0.18, 0, false);
-        box(s, 0.02, 0.32, 0.48, SH.rackAlt, 0.51, 0.18, 0, false); box(s, 0.012, 0.03, 0.3, SH.led, 0.522, 0.3, 0, false);
-        for (m = 0; m < 6; m++) box(s, 0.014, 0.2, 0.05, SH.dark, 0.522, 0.15, -0.19 + m * 0.076, false);
-        box(s, 0.03, 0.05, 0.02, SH.silver, 0.53, 0.18, -0.235, false); box(s, 0.03, 0.05, 0.02, SH.silver, 0.53, 0.18, 0.235, false);            // manere
-        box(s, 0.06, 0.03, 0.03, SH.blue, -0.52, 0.26, -0.2, false); box(s, 0.06, 0.03, 0.03, SH.red, -0.52, 0.26, 0.2, false);                  // cuplele de lichid din spate
+      if (i !== 2) {       // serverele care nu se misca se lipesc de rack, ca sa nu coste desene in plus
+        var sy = 0.32 + i * 0.42;
+        box(g, 1.0, 0.36, 0.5, SH.dark, 0.02, sy + 0.18, 0, false);
+        box(g, 0.02, 0.32, 0.48, SH.rackAlt, 0.53, sy + 0.18, 0, false); box(g, 0.012, 0.03, 0.3, SH.led, 0.542, sy + 0.3, 0, false);
+        for (m = 0; m < 6; m++) box(g, 0.014, 0.2, 0.05, SH.dark, 0.542, sy + 0.15, -0.19 + m * 0.076, false);
+        box(g, 0.03, 0.05, 0.02, SH.silver, 0.55, sy + 0.18, -0.235, false); box(g, 0.03, 0.05, 0.02, SH.silver, 0.55, sy + 0.18, 0.235, false);          // manere
+        box(g, 0.06, 0.03, 0.03, SH.blue, -0.5, sy + 0.26, -0.2, false); box(g, 0.06, 0.03, 0.03, SH.red, -0.5, sy + 0.26, 0.2, false);                // cuplele de lichid din spate
         continue;
       }
+      var s = new T.Group(); s.position.set(0.02, 0.32 + i * 0.42, 0); g.add(s);
       out.server = s;
       box(s, 1.0, 0.02, 0.5, SH.steel, 0, 0.01, 0, false);
       box(s, 1.0, 0.34, 0.012, SH.rackAlt, 0, 0.18, -0.244, false); box(s, 1.0, 0.34, 0.012, SH.rackAlt, 0, 0.18, 0.244, false);
@@ -2056,7 +2102,7 @@ var Scene3D = (function () {
       }
       for (f = 0; f < nf; f++) for (j = -1; j <= 1; j += 2) {
         var fx = xw + (f + 0.5) * len / nf, fz = j * 0.58;
-        cyl(g, 0.48, 0.52, 0.22, SH.silver, fx, 2.35, fz, 14, null, F);                                 // duza ventilatorului
+        cyl(g, 0.48, 0.52, 0.22, SH.silver, fx, 2.35, fz, Q.lite ? 10 : 14, null, F);                                 // duza ventilatorului
         if (!Q.lite) disc(g, 0.455, SH.dark, fx, 2.4, fz);
         disc(g, 0.45, SH.fan, fx, 2.44, fz); disc(g, 0.48, SH.grille, fx, 2.47, fz);
         if (!Q.lite) cyl(g, 0.09, 0.11, 0.09, SH.dark, fx, 2.49, fz, 8, null, F);                        // motorul
@@ -2064,8 +2110,8 @@ var Scene3D = (function () {
       // colectoarele bateriei si cele doua racorduri: sus intra apa calda (rosu), jos iese apa racita (albastru)
       var yr = 1.95, yb = 1.38, zr = 0.45, zb = -0.45, xr = xw - 0.75, xb = xw - 1.35, rb = 0.065;
       cyl(g, 0.055, 0.055, 0.95, SH.red, xw - 0.055, 1.63, zr, 8, null, F); cyl(g, 0.055, 0.055, 0.95, SH.blue, xw - 0.055, 1.63, zb, 8, null, F);
-      rcSeg(g, SH.red, rb, xw - 0.05, yr, zr, xr, yr, zr, 8, F); sph(g, rb * 1.15, SH.red, xr, yr, zr, F, 1, 1); rcSeg(g, SH.red, rb, xr, yr, zr, xr, hl, zr, 8, F);
-      rcSeg(g, SH.blue, rb, xw - 0.05, yb, zb, xb, yb, zb, 8, F); sph(g, rb * 1.15, SH.blue, xb, yb, zb, F, 1, 1); rcSeg(g, SH.blue, rb, xb, yb, zb, xb, hl, zb, 8, F);
+      rcSeg(g, SH.red, rb, xw - 0.05, yr, zr, xr, yr, zr, 8, F); sph(g, rb * 1.15, SH.red, xr, yr, zr, F, 1, Q.lite ? 0 : 1); rcSeg(g, SH.red, rb, xr, yr, zr, xr, hl, zr, 8, F);
+      rcSeg(g, SH.blue, rb, xw - 0.05, yb, zb, xb, yb, zb, 8, F); sph(g, rb * 1.15, SH.blue, xb, yb, zb, F, 1, Q.lite ? 0 : 1); rcSeg(g, SH.blue, rb, xb, yb, zb, xb, hl, zb, 8, F);
       rcFlange(g, rb, xw - 0.2, yr, zr, RCX, F); rcFlange(g, rb, xw - 0.2, yb, zb, RCX, F);              // flansele racordurilor
       rcValve(g, rb, xw - 0.47, yr, zr, RCX, F); rcValve(g, rb, xw - 0.47, yb, zb, RCX, F);              // robinet pe fiecare ramura
       cyl(g, rb + 0.03, rb + 0.03, 0.05, SH.steel, xr, hl + rH + 0.02, zr, 10, null, F); cyl(g, rb + 0.03, rb + 0.03, 0.05, SH.steel, xb, hl + rH + 0.02, zb, 10, null, F);   // gulerul de pe colector
@@ -2615,7 +2661,7 @@ var Scene3D = (function () {
         box(itx, 0.24, 0.2, 0.3, SH.dark, rx + sg * 0.4, 2.8, zCt - 0.385, false);
         // unitatea care imparte lichidul de racire (CDU), la capatul de nord al randului
         var zc = -rowLen / 2 - 0.47, cf = rx + sg * 0.6;
-        box(itx, 1.2, 2.2, 0.8, SH.white, rx, 1.4, zc); box(itx, 1.21, 0.18, 0.81, SH.blue, rx, 2.2, zc, false);
+        box(itx, 1.2, 2.2, 0.8, SH.white, rx, 1.4, zc); box(itx, 1.24, 0.16, 0.84, SH.blue, rx, 2.16, zc, false);
         box(itx, 0.02, 0.2, 0.3, SH.screen, cf + sg * 0.012, 1.7, zc, false); box(itx, 0.02, 1.2, 0.03, SH.dark, cf + sg * 0.012, 1.0, zc + 0.3, false);
         box(itx, 0.02, 0.5, 0.6, SH.dark, cf + sg * 0.012, 0.7, zc - 0.02, false);
         // circuitul rackurilor: din CDU urca doua tevi si merg de-a lungul randului, pe grinzi
@@ -3048,7 +3094,7 @@ var Scene3D = (function () {
     tag(sub, 'sub');
 
     // baterii (nord, intre cladire si panouri)
-    var bess = grp(root), xB0 = -W / 2 - 3, bessI = null;
+    var bess = grp(root), xB0 = -W / 2 - 4.4, bessI = null;      // mutat spre vest, ca santul de cabluri al panourilor (x = -W/2 + 3) sa treaca pe langa containere
     if (nB) {
       bessI = inst(bess, bessTpl(), nB);
       for (i = 0; i < nB; i++) { mtx.compose(pos.set(xB0 + (i % perRowB) * 8 + 3.05, 0.2, zB0 - Math.floor(i / perRowB) * 6), q0, one); bessI.setMatrixAt(i, mtx); }
@@ -3448,9 +3494,9 @@ var Scene3D = (function () {
     zone(root, 'fiber', x0 - 30, x1 + 30, zRoad - 10.5, zRoad - 5.2, 0.8);
 
     /* --- fluxuri --- */
-    var fg = grp(root), xPvIn = W / 2 - 3;
+    var fg = grp(root), xPvIn = -W / 2 + 3;      // panourile si bateriile intra in sala electrica prin peretele de nord, la dulapul de cabluri
     if (nT) flows.pv = new Flow(fg, [[0, zPVmid], [0, zPV0 + 8], [xPvIn, zPV0 + 8], [xPvIn, -D / 2]], COL.sun, k, 14);
-    if (nB) flows.bess = new Flow(fg, [[xBc, zB0 + 1.4], [xBc, -D / 2]], COL.batt, k, 6);
+    if (nB) flows.bess = new Flow(fg, [[xBc, zB0 + 1.4], [xBc, -D / 2 - 2.2], [xPvIn - 0.8, -D / 2 - 2.2], [xPvIn - 0.8, -D / 2]], COL.batt, k, 6);
     flows.grid = new Flow(fg, [[xSub - subW / 2 - 30 * k, zSub + subD / 2 + 2], [xSub, zSub + subD / 2 + 2], [xSub + subW / 2 + 3, zSub + subD / 2 + 2], [xSub + subW / 2 + 3, D / 2 - 2.5], [-W / 2, D / 2 - 2.5]], COL.grid, k, 12);
     flows.fiberA = new Flow(fg, [[xF, D / 2], [xF, zRoad - 6.2], [x0 - 60 * k, zRoad - 6.2]], COL.fiber, k * 0.7, 8);
     flows.fiberB = new Flow(fg, [[xF + 3, D / 2], [xF + 3, zRoad - 9], [x1 + 60 * k, zRoad - 9]], COL.fiber, k * 0.7, 8);
@@ -3467,7 +3513,7 @@ var Scene3D = (function () {
         building: [0, H + 3, 0], pv: nT ? [0, 7 * k, zPVmid] : null, bess: nB ? [xBc, 6, zBc] : null,
         sub: [xSub, 4 * subS + 5, zSub], gen: [xGen, 6, zGm],
         cool: [coolX0 + (coolCols - 1) * (coolLen + 2) / 2, 6, 0], fiber: [xF + 1.5, 2.5, zRoad - 7],
-        f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [xBc, 1.3 * k, (zB0 + 1.4 - D / 2) / 2] : null,
+        f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [xBc, 1.3 * k, (zB0 + 1.4 - D / 2 - 2.2) / 2] : null,
         f_grid: [xSub + subW / 2 + 3, 1.3 * k, (zSub + subD / 2 + 2 + D / 2 - 2.5) / 2], f_gen: [-W / 2 - 1.6, 1.3 * k, (zGen0 + zGm) / 2],
         r_gpu: [rackPos[0] + 1.21, 1.95, rackPos[1] - 0.1], r_cool: [rackPos[0] - 0.5, 2.42, rackPos[1] + 0.2], r_net: [rackPos[0] + 0.35, 2.5, rackPos[1]],
         r_srv: [rackPos[0] + 0.62, 0.95, rackPos[1] + 0.25], r_pow: [rackPos[0] + 0.55, 0.47, rackPos[1] + 0.28]
@@ -3483,7 +3529,7 @@ var Scene3D = (function () {
         bess: { t: [xBc, 1, zB0 - 3], dist: fit(Math.max(bN * 8, 26) * 0.9), az: 2.55, pol: 1.0 },
         fiber: { t: [xF, 0, D / 2 + 16], dist: fit(Math.max(W * 0.7, 44)), az: 0.2, pol: 0.95 },
         top: { t: [cx, 0, cz], dist: fit(RR * 0.9), az: 0, pol: 0.06 },
-        rack: { t: [rackPos[0] + 0.7, 1.4, rackPos[1] - 0.1], dist: fit(1.55), az: 1.02, pol: 0.98 },
+        rack: { t: [rackPos[0] + 0.7, 1.3, rackPos[1] - 0.1], dist: fit(1.55), az: 1.02, pol: 1.3 },
         thermal: { t: [W / 4 + coolW / 4, 1, 0], dist: fit(Math.max(W + coolW + 10, D) * 0.62), az: 0.5, pol: 0.72 }
       },
       land: { w: spanX, d: spanZ }
@@ -3911,7 +3957,7 @@ var Scene3D = (function () {
   var M = Model, A = M.A, FU = M.FUNDS;
   function $(id) { return document.getElementById(id); }
   var st = { scen: 'mediu', it: 1, pv: 4, bess: 4, hour: 13, month: 6, wx: 1, ch: 0, playing: false, fund: 'fptj', outage: 0, rack: false, thermal: false, buildM: null, building: false };
-  var cache = { key: '', days: {} };
+  var cache = { key: '', days: {}, fines: {} };
   var chapters = [].slice.call(document.querySelectorAll('.chapter'));
   var has3d = false;
   function chIndex(title) { for (var i = 0; i < chapters.length; i++) if (chapters[i].getAttribute('data-title') === title) return i; return 0; }
@@ -3953,13 +3999,17 @@ var Scene3D = (function () {
   function calc() {
     var key = [st.it, st.pv, st.bess].join('|');
     if (cache.key !== key) {
-      cache.key = key; cache.days = {};
+      cache.key = key; cache.days = {}; cache.fines = {};
       cache.year = M.simulateYear(st.it, st.pv, st.bess, A);
       cache.ph = M.physical(st.it, st.pv, st.bess, A);
     }
     var dk = st.month + '|' + st.wx;
     if (!cache.days[dk]) cache.days[dk] = M.simulateDay(st.month, st.wx, st.it, st.pv, st.bess, A);
     cache.day = cache.days[dk];
+    // pas de un sfert de ora pentru citiri line, daca modelul il are; altfel raman cele 24 de randuri
+    cache.fine = null;
+    if (M.simulateDayFine) { try { cache.fine = cache.fines[dk] || (cache.fines[dk] = M.simulateDayFine(st.month, st.wx, st.it, st.pv, st.bess, A, 4)); } catch (e) { cache.fine = null; } }
+    var mx = 0; cache.day.forEach(function (r) { mx = Math.max(mx, r.pv, r.load); }); cache.dayRef = mx;
     cache.fin = M.finance(st.it, st.pv, st.bess, A, SELL, cache.year);
     cache.ten = tenOf(st.it, st.pv, st.bess, cache.year, st.fund);
     cache.ten0 = st.fund === 'none' ? cache.ten : tenOf(st.it, st.pv, st.bess, cache.year, 'none');
@@ -3989,7 +4039,9 @@ var Scene3D = (function () {
     var ph = cache.ph, y = cache.year, f = cache.fin, v = {};
     v.it = mw(st.it); v.gpus = num(ph.gpus); v.servers = num(ph.servers); v.racks = num(ph.racks);
     v.buildingM2 = num(Math.round(ph.buildingM2 / 10) * 10); v.scenName = M.SCEN[st.scen].name;
-    v.loadAvg = mw(ph.loadAvg); v.annualMWh = num(Math.round(ph.annualMWh / 100) * 100); v.households = num(Math.round(ph.households / 100) * 100);
+    function rnd(x) { var q = x < 5000 ? 10 : 100; return Math.round(x / q) * q; }
+    v.loadAvg = mw(ph.loadAvg); v.annualMWh = num(rnd(ph.annualMWh)); v.households = num(rnd(ph.households));
+    v.pueRange = ph.pueMin && ph.pueMax ? 'Este o medie pe an: de la ' + trim(num(ph.pueMin, 2)) + ' în nopțile reci până la ' + trim(num(ph.pueMax, 2)) + ' în după-amiezile de vară, când răcirea muncește cel mai mult.' : 'Este o medie pe an: noaptea și iarna răcirea consumă mai puțin, vara la prânz mai mult.';
     v.gridNote = GRID_NOTE[st.scen]; v.heat = mw(st.it); v.overhead = mw(st.it * (A.pue - 1));
     v.landHa = trim(num(ph.landHa, 1)); v.pvHa = trim(num(ph.landPvHa, 1));
     v.coverage = pct(y.coverage); v.wasteShare = pct(y.wasteShare); v.pvGen = num(Math.round(y.pv / 10) * 10);
@@ -4001,8 +4053,8 @@ var Scene3D = (function () {
     v.calTotal = CAL_TOTAL[st.scen]; v.prudentLine = prudentLine();
     if (f.ebitda <= 0) v.paybackLine = 'La aceste cifre, veniturile nu acoperă nici cheltuielile de funcționare.';
     else if (f.profit <= 0) v.paybackLine = 'La aceste cifre, banii rămași nu acoperă uzura echipamentelor. Proiectul ar pierde aproximativ <b>' + mil(-f.profit) + ' pe an</b>.';
-    else v.paybackLine = 'La aceste cifre proiectul rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit și fonduri.';
-    if (st.pv > 0) v.solarLine = 'Panourile și bateriile reduc costul curentului cu aproximativ <b>' + mil(f.solarSaving) + ' pe an</b>. Fără ele, curentul ar costa ' + mil(f.energyNoSolar) + ' pe an. Investiția în ele (' + mil(f.capex.pv + f.capex.bess) + ') se plătește singură în circa ' + years(f.solarPayback) + '.';
+    else v.paybackLine = 'La aceste cifre, un an obișnuit rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. ' + (cache.ten.breakeven ? 'Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit și fonduri.' : '<b>Asta nu înseamnă că banii se întorc.</b> Cu clienți care vin treptat, rate la credit și GPU-uri noi în anul 6, capitolul „Zece ani” arată că la aceste prețuri banii nu se întorc în 10 ani.');
+    if (st.pv > 0) v.solarLine = 'Panourile și bateriile aduc aproximativ <b>' + mil(f.solarSaving) + ' pe an</b>: curent pe care nu îl mai cumpărăm și surplus vândut, minus întreținerea lor. Fără ele, curentul ar costa ' + mil(f.energyNoSolar) + ' pe an. Investiția în ele (' + mil(f.capex.pv + f.capex.bess) + ') se plătește singură în circa ' + years(f.solarPayback) + '.';
     else v.solarLine = 'Fără panouri, tot curentul vine din rețea și costă aproximativ <b>' + mil(f.energyNoSolar) + ' pe an</b>.';
     // cat costa o unitate vanduta
     var u = cache.unit, left = u.price - u.total;
@@ -4067,8 +4119,8 @@ var Scene3D = (function () {
     var W = 420, H = 222, ml = 34, mr = 6, mt = 26, mb = 22, pw = W - ml - mr, ph = H - mt - mb, base = mt + ph;
     var maxv = 0; day.forEach(function (r) { maxv = Math.max(maxv, r.pv, r.load); });
     var u = maxv < 1 ? 1000 : 1, un = maxv < 1 ? 'kW' : 'MW', step = niceStep(maxv * u * 1.08), top = Math.ceil(maxv * u * 1.08 / step) * step, sc = ph / top;
-    var slot = pw / 24, bw = Math.min(24, slot - 4), cur = Math.floor(st.hour) % 24, s = '';
-    s += '<rect x="' + (ml + cur * slot).toFixed(1) + '" y="' + mt + '" width="' + slot.toFixed(1) + '" height="' + ph + '" fill="var(--surface-2)"/>';
+    var slot = pw / 24, bw = Math.min(24, slot - 4), s = '';
+    dayGeo = { ml: ml, slot: slot, mt: mt, base: base, k: sc * u, W: W, mr: mr };
     for (var t = 0; t <= top + 1e-9; t += step) {
       var gy = base - t * sc;
       s += '<line class="gridl" x1="' + ml + '" x2="' + (W - mr) + '" y1="' + gy.toFixed(1) + '" y2="' + gy.toFixed(1) + '"/><text x="' + (ml - 6) + '" y="' + (gy + 3.5).toFixed(1) + '" text-anchor="end">' + trim(num(t, step < 1 ? 1 : 0)) + '</text>';
@@ -4083,12 +4135,27 @@ var Scene3D = (function () {
     });
     s += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--surface)" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
     s += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
-    if (peak.v > day[0].load * 1.12) s += '<circle cx="' + peak.x.toFixed(1) + '" cy="' + peak.y.toFixed(1) + '" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/><text class="val" x="' + peak.x.toFixed(1) + '" y="' + (peak.y - 9).toFixed(1) + '" text-anchor="middle">' + mw(peak.v) + '</text>';
+    var lmin = Infinity, lmax = 0; day.forEach(function (r) { lmin = Math.min(lmin, r.load); lmax = Math.max(lmax, r.load); });
+    if (peak.v > lmax * 1.12) s += '<circle cx="' + peak.x.toFixed(1) + '" cy="' + peak.y.toFixed(1) + '" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/><text class="val" x="' + peak.x.toFixed(1) + '" y="' + (peak.y - 9).toFixed(1) + '" text-anchor="middle">' + mw(peak.v) + '</text>';
     if (day[0].pv < 0.001 && day[1].pv < 0.001) s += '<text x="' + (ml + 3) + '" y="' + (base - day[0].load * u * sc - 6).toFixed(1) + '">Consum: ' + mw(day[0].load) + '</text>';
     [0, 6, 12, 18, 24].forEach(function (h) { s += '<text x="' + (ml + h * slot).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + (h < 10 ? '0' : '') + h + ':00</text>'; });
     for (var h2 = 0; h2 < 24; h2++) s += '<rect class="hit" data-h="' + h2 + '" x="' + (ml + h2 * slot).toFixed(1) + '" y="' + mt + '" width="' + slot.toFixed(1) + '" height="' + ph + '" fill="transparent" style="cursor:pointer"/>';
-    var desc = 'Grafic pe ore: consumul este constant, ' + mw(day[0].load) + '. Panourile ating ' + mw(peak.v) + ' la prânz.';
+    // cursorul orei: o linie, un punct pe curba panourilor si ceasul deasupra; se muta fara sa redesenam graficul
+    s += '<g id="day-cur" pointer-events="none"><line x1="0" x2="0" y1="' + (mt - 6) + '" y2="' + base + '" stroke="var(--ink)" stroke-width="1.5"/>' +
+      '<circle id="day-dot" cx="0" cy="' + base + '" r="4.5" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/>' +
+      '<g id="day-tag"><rect x="-19" y="' + (mt - 23) + '" width="38" height="16" rx="8" fill="var(--ink)"/><text id="day-clk" class="cur" x="0" y="' + (mt - 11.5) + '" text-anchor="middle">00:00</text></g></g>';
+    var desc = 'Grafic pe ore: consumul ' + (lmax - lmin < 0.02 * lmax ? 'este aproape constant, ' + mw(lmax) : 'merge de la ' + mw(lmin) + ' noaptea la ' + mw(lmax) + ' în orele calde') + '. Panourile ating ' + mw(peak.v) + ' la prânz.';
     host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + desc + '">' + s + '</svg>';
+    moveCursor();
+  }
+  var dayGeo = null;
+  function moveCursor() {
+    var g = $('day-cur'); if (!g || !dayGeo) return;
+    var x = dayGeo.ml + (st.hour % 24) * dayGeo.slot, r = rowAt(st.hour);
+    g.setAttribute('transform', 'translate(' + x.toFixed(1) + ',0)');
+    $('day-dot').setAttribute('cy', (dayGeo.base - (r.pv || 0) * dayGeo.k).toFixed(1));
+    $('day-tag').setAttribute('transform', 'translate(' + (Math.max(dayGeo.ml + 19, Math.min(dayGeo.W - dayGeo.mr - 19, x)) - x).toFixed(1) + ',0)');
+    $('day-clk').textContent = clock(st.hour);
   }
   function dayTip(h) {
     var r = cache.day[h], rows = '';
@@ -4275,7 +4342,7 @@ var Scene3D = (function () {
     h += cmpRow(cols, 'din care calculatoarele', function (c) { return mil(c.cl.capex.gpu); });
     h += cmpRow(cols, 'venituri pe an', function (c) { return mil(c.cl.rev.total); });
     h += cmpRow(cols, 'profit pe an', function (c) { return sg(c.cl.profit); });
-    h += cmpRow(cols, 'grant posibil', function (c) { return mil(c.tc.grant); });
+    h += cmpRow(cols, 'grant, ' + fn, function (c) { return c.tc.grant > 0.0005 ? mil(c.tc.grant) : 'nimic'; });
     h += cmpRow(cols, 'bani proprii, ' + fn, function (c) { return mil(c.tc.equity); });
     h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.tc); });
     $('t-cmp').innerHTML = h + '</tbody>';
@@ -4374,34 +4441,63 @@ var Scene3D = (function () {
   }
   function clock(h) { var hh = Math.floor(h), mm = Math.round((h - hh) * 60); if (mm === 60) { hh++; mm = 0; } return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm; }
   function lab(id, on, text) { Scene3D.setLabelOn(id, on); if (on) Scene3D.setLabelText(id, text); }
+  // randul de calcul pentru o ora cu zecimale (pas de un sfert de ora daca modelul il da)
+  function rowAt(h) {
+    var d = cache.fine; h = ((h % 24) + 24) % 24;
+    if (d && d.length >= 24) return d[Math.min(d.length - 1, Math.floor(h * d.length / 24))];
+    return cache.day[Math.floor(h) % 24];
+  }
+  function simNow() {       // starea din clipa aleasa, in cuvinte simple; aceleasi texte in bara, sub grafic si in macheta
+    var r = rowAt(st.hour), so = st.outage, out = so === 1 || so === 2, eps = 0.0005;
+    var ch = r.charge || 0, dis = r.discharge || 0, gr = r.grid || 0, ex = r.exp || 0, soc = Math.max(0, Math.min(1, r.soc || 0));
+    var night = M.sunPos(st.month, st.hour).el <= 0;
+    var o = { r: r, out: out, ch: ch, dis: dis, gr: gr, ex: ex, soc: soc, eps: eps };
+    o.load = mw(r.load);
+    o.pv = st.pv === 0 ? 'fără panouri' : out ? 'oprite' : r.pv > eps ? 'produc ' + mw(r.pv) : night ? 'noapte, nu produc' : 'nu produc';
+    o.batt = st.bess === 0 ? 'fără baterii' : pct(soc) + ' pline, ' + (out ? 'așteaptă' : ch > eps ? 'se încarcă cu ' + mw(ch) : dis > eps ? 'dau ' + mw(dis) : 'așteaptă');
+    o.gridLbl = out ? 'Rețea' : ex > eps ? 'Dăm în rețea' : 'Luăm din rețea';
+    o.grid = out ? 'pană de curent' : ex > eps ? mw(ex) : gr > eps ? mw(gr) : 'nimic';
+    o.temp = typeof r.temp === 'number' && isFinite(r.temp) ? num(r.temp, 0) + ' °C' : '';
+    return o;
+  }
   function tick() {     // tot ce depinde de ora
-    var r = cache.day[Math.floor(st.hour) % 24], out = st.outage;
+    var o = simNow(), r = o.r, so = st.outage, out = o.out, eps = o.eps;
     $('clock').textContent = clock(st.hour);
-    $('f-load').textContent = mw(r.load);
-    $('f-pv').textContent = st.pv === 0 ? 'fără' : out ? 'oprite' : r.pv > 0.0005 ? mw(r.pv) : 'nu produc';
-    $('f-batt').textContent = st.bess === 0 ? 'fără' : out ? 'așteaptă' : r.charge > 0.0005 ? 'se încarcă, ' + mw(r.charge) : r.discharge > 0.0005 ? 'dau ' + mw(r.discharge) : r.soc > 0.9 ? 'pline' : r.soc < 0.08 ? 'goale' : 'așteaptă';
-    $('f-grid').textContent = out ? 'pană de curent' : r.exp > 0.0005 ? 'primește ' + mw(r.exp) : r.grid > 0.0005 ? 'dă ' + mw(r.grid) : 'nimic';
-    $('chip-gen').hidden = !out; $('f-gen').textContent = out === 2 ? mw(r.load) : 'pornesc';
+    $('f-load').textContent = o.load; $('f-pv').textContent = o.pv; $('f-batt').textContent = o.batt;
+    $('l-grid').textContent = o.gridLbl; $('f-grid').textContent = o.grid;
+    $('chip-temp').hidden = !o.temp; $('f-temp').textContent = o.temp;
+    $('chip-gen').hidden = !so; $('f-gen').textContent = so === 2 ? 'dau ' + mw(r.load) : so === 3 ? 'se răcesc' : outStep >= 3 ? 'pornesc' : 'gata de pornire';
+    var dn = $('day-now');
+    if (dn) dn.innerHTML = '<b>Ora ' + clock(st.hour) + '.</b> Consum: ' + o.load + '. Panourile: ' + o.pv + '. Bateriile: ' + o.batt + '. ' + (out ? 'Rețea: pană de curent.' : o.gridLbl + ': ' + o.grid + '.') + (o.temp ? ' Afară: ' + o.temp + '.' : '');
+    moveCursor();
     if (!has3d) return;
     var s = M.sunPos(st.month, st.hour); Scene3D.setSun(s.el, s.az, st.wx);
     var ref = Math.max(cache.ph.loadAvg * 1.5, 1e-6), f;
-    if ((f = Scene3D.flow('pv'))) f.set(out ? 0 : r.pv / Math.max(st.pv * 0.8, ref), 1);
-    if ((f = Scene3D.flow('bess'))) { if (out) f.set(0, 1); else if (r.charge > 0.0005) f.set(r.charge / ref, -1); else f.set(r.discharge / ref, 1); }
-    if ((f = Scene3D.flow('grid'))) { if (out) f.set(0, 1, Scene3D.COL.grid); else if (r.exp > 0.0005) f.set(r.exp / (ref * 1.6), -1, Scene3D.COL.sun); else f.set(r.grid / ref, 1, Scene3D.COL.grid); }
-    if ((f = Scene3D.flow('gen'))) f.set(out === 2 ? 0.85 : 0, 1);
-    lab('f_pv', !out && r.pv > 0.0005, mw(r.pv));
-    lab('f_bess', !out && (r.charge > 0.0005 || r.discharge > 0.0005), r.charge > 0.0005 ? 'încarcă ' + mw(r.charge) : 'dă ' + mw(r.discharge));
-    lab('f_grid', out > 0 || r.grid > 0.0005 || r.exp > 0.0005, out ? 'pană' : r.exp > 0.0005 ? 'în rețea ' + mw(r.exp) : mw(r.grid));
-    lab('f_gen', out === 2, mw(r.load));
-    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + pct(r.soc) + ' pline');
+    if (Scene3D.setState) {     // macheta noua: primeste megawatii si isi regleaza singura fluxurile, bateriile si ventilatoarele
+      var stt = { pvMW: out ? 0 : r.pv, loadMW: r.load, battMW: out ? 0 : o.dis - o.ch, soc: o.soc, gridMW: out ? 0 : o.gr - o.ex, genMW: so === 2 ? r.load : 0, refMW: Math.max(cache.dayRef || 0, ref) };
+      if (typeof r.fan === 'number') stt.fanK = r.fan;
+      if (typeof r.temp === 'number') stt.tempC = r.temp;
+      Scene3D.setState(stt);
+    } else {
+      if ((f = Scene3D.flow('pv'))) f.set(out ? 0 : r.pv / Math.max(st.pv * 0.8, ref), 1);
+      if ((f = Scene3D.flow('bess'))) { if (out) f.set(0, 1); else if (o.ch > eps) f.set(o.ch / ref, -1); else f.set(o.dis / ref, 1); }
+      if ((f = Scene3D.flow('grid'))) { if (out) f.set(0, 1, Scene3D.COL.grid); else if (o.ex > eps) f.set(o.ex / (ref * 1.6), -1, Scene3D.COL.sun); else f.set(o.gr / ref, 1, Scene3D.COL.grid); }
+      if ((f = Scene3D.flow('gen'))) f.set(so === 2 ? 0.85 : 0, 1);
+    }
+    lab('f_pv', !out && r.pv > eps, mw(r.pv));
+    lab('f_bess', !out && (o.ch > eps || o.dis > eps), o.ch > eps ? 'se încarcă ' + mw(o.ch) : 'dau ' + mw(o.dis));
+    lab('f_grid', out || o.gr > eps || o.ex > eps, out ? 'pană' : o.ex > eps ? 'dăm în rețea ' + mw(o.ex) : 'luăm din rețea ' + mw(o.gr));
+    lab('f_gen', so === 2, mw(r.load));
+    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + pct(o.soc) + ' pline');
   }
 
-  function render() { calc(); fill(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawFund(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }
+  function render() { calc(); fill(); drawOutage(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawFund(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }
   function syncUi() {
     [].forEach.call($('scen').children, function (b) { b.setAttribute('aria-pressed', b.dataset.s === st.scen); });
     [].forEach.call($('wx').children, function (b) { b.setAttribute('aria-pressed', +b.dataset.w === st.wx); });
     ['fund', 'fund2'].forEach(function (id) { [].forEach.call($(id).children, function (b) { b.setAttribute('aria-pressed', b.dataset.f === st.fund); }); });
     $('month').value = st.month; $('hour').value = st.hour;
+    var dk = $('dock'); if (dk) dk.classList.toggle('live', st.playing || playLeft > 0 || st.outage > 0 || chapters[st.ch].hasAttribute('data-dock') || chapters[st.ch].getAttribute('data-view') === 'power');
     $('o-pv').textContent = trim(num(st.pv, 2)) + ' MW'; $('o-bess').textContent = trim(num(st.bess, 2)) + ' MWh';
   }
 
@@ -4419,25 +4515,67 @@ var Scene3D = (function () {
     Scene3D.setThermal(on);
     if (on) { Scene3D.setRoof(true); roofUi(true); Scene3D.setAuto(false); Scene3D.go('thermal'); } else if (!quiet) { Scene3D.setRoof(false); roofUi(false); Scene3D.go('cooling'); }
   }
-  var outTimers = [];
-  function outStage(stage, step) {
-    st.outage = stage; if (has3d) Scene3D.setOutage(stage);
-    [].forEach.call($('outage-steps').children, function (li) { var s = +li.getAttribute('data-s'); li.classList.toggle('on', s === step); li.classList.toggle('done', step > 0 && s < step); });
-    tick();
+  /* ---------- pana de curent, pas cu pas ---------- */
+  var outTimers = [], outStep = 0, OUT_AT = [0, 2200, 4600, 8200, 15500, 20500];     // clipa reala (ms) la care incepe fiecare pas cand merge singura
+  function outPlan() { if (!M.outagePlan) return null; try { return M.outagePlan(st.it, st.pv, st.bess, A); } catch (e) { return null; } }
+  function outSteps() {
+    var p = outPlan() || {}, gs = p.genStartS || 15, gl = p.genLoadS || 45, um = p.upsMinutes || 10, rm = p.retransferMin || 5, fuel = '';
+    if (p.genCount && p.genMW) fuel += ' Sunt ' + p.genCount + ' generatoare de câte ' + mw(p.genMW) + (p.genNeeded && p.genNeeded < p.genCount ? '; ajung ' + p.genNeeded + ', restul sunt rezervă' : '') + '.';
+    if (p.fuelLph && p.fuelHours) fuel += ' Ard cam ' + num(Math.round(p.fuelLph / 5) * 5) + ' de litri de motorină pe oră, iar rezervorul' + (p.tankLiters ? ' de ' + num(Math.round(p.tankLiters / 100) * 100) + ' de litri' : '') + ' ajunge ' + trim(num(p.fuelHours, 0)) + ' de ore.';
+    return [
+      { t: 'Secunda 0', k: '0 s', h: 'Rețeaua cade.', d: 'Punctele albastre de pe cablul dinspre stație se opresc.', sc: 1, src: 'UPS-urile (bateriile din clădire)' },
+      { t: 'Aceeași clipă', k: 'UPS', h: 'UPS-urile țin calculatoarele pornite.', d: 'Preiau tot consumul fără nicio pauză și îl pot duce singure cam ' + um + ' minute. Luminițele lor devin portocalii.', sc: 1, src: 'UPS-urile (bateriile din clădire)' },
+      { t: 'Secunda ' + gs, k: gs + ' s', h: 'Generatoarele diesel pornesc.', d: 'Motoarele se turează. Până ajung la turație, UPS-urile duc în continuare tot consumul.', sc: 1, src: 'UPS-urile, generatoarele pornesc' },
+      { t: 'Secunda ' + gl, k: gl + ' s', h: 'Generatoarele duc tot consumul.', d: 'Se vede fumul la coșuri și curentul portocaliu dinspre ele.' + fuel, sc: 2, src: 'generatoarele' },
+      { t: 'Când revine rețeaua', k: 'revine', h: 'Centrul trece înapoi pe rețea.', d: 'Așteptăm ' + rm + ' minute ca rețeaua să fie stabilă, apoi generatoarele se răcesc și se opresc. Clienții nu au simțit nimic.', sc: 3, src: 'rețeaua; generatoarele se răcesc' }
+    ];
   }
+  function drawOutage() {
+    var L = outSteps();
+    $('outage-steps').innerHTML = L.map(function (x, i) { return '<li data-s="' + (i + 1) + '"><b>' + x.t + '.</b> ' + x.h + ' <span>' + x.d + '</span></li>'; }).join('');
+    $('out-bar').innerHTML = L.map(function (x, i) { return '<button type="button" data-s="' + (i + 1) + '" aria-label="Pasul ' + (i + 1) + ': ' + x.h + '"><i></i><span>' + x.k + '</span></button>'; }).join('');
+    markOutage();
+  }
+  function markOutage() {
+    var L = outSteps(), n = L.length, step = outStep, cur = step >= 1 && step <= n ? L[step - 1] : null;
+    [$('outage-steps'), $('out-bar')].forEach(function (host) {
+      [].forEach.call(host.children, function (el) { var k = +el.getAttribute('data-s'); el.classList.toggle('on', k === step); el.classList.toggle('done', step > 0 && k < step); });
+    });
+    $('out-now').innerHTML = cur ? '<b>Pasul ' + step + ' din ' + n + '.</b> Acum centrul este ținut de: ' + cur.src + '.' : step > n ? '<b>Gata.</b> Centrul merge din nou pe rețea.' : 'Apasă butonul sau mergi pas cu pas. Centrul merge acum pe rețea.';
+    $('out-prev').disabled = step < 1; $('out-next').disabled = step > n;
+    $('out-prev').textContent = step === 1 ? '◀ Înapoi la normal' : '◀ Pasul dinainte';
+    $('out-next').textContent = step === 0 ? 'Primul pas ▶' : step >= n ? 'Încheie ▶' : 'Pasul următor ▶';
+  }
+  function outSet(step) {     // 0 = normal, 1..5 = pasii, 6 = incheiat
+    var L = outSteps(), n = L.length, sc = step >= 1 && step <= n ? L[step - 1].sc : 0;
+    if (sc === 3 && !(has3d && Scene3D.outageInfo)) sc = 0;       // macheta veche nu are treapta de racire
+    st.outage = sc; if (has3d) Scene3D.setOutage(sc);
+    outStep = step; markOutage();
+    if (step > n) { outStep = 0; $('out-next').disabled = false; $('out-next').textContent = 'De la început ▶'; $('out-prev').disabled = true; }
+    tick(); syncUi();
+  }
+  function outRunning(on) { $('b-outage').setAttribute('aria-pressed', on); $('b-outage').textContent = on ? '❚❚ Pauză' : outStep > 0 ? '▶ Continuă' : 'Simulează o pană de curent'; }
+  function outClear() { outTimers.forEach(clearTimeout); outTimers = []; }
   function stopOutage() {
-    outTimers.forEach(clearTimeout); outTimers = [];
-    if ($('b-outage').getAttribute('aria-pressed') !== 'true' && !st.outage) return;
-    $('b-outage').setAttribute('aria-pressed', false); $('b-outage').textContent = 'Simulează o pană de curent'; outStage(0, 0);
+    outClear();
+    if ($('b-outage').getAttribute('aria-pressed') !== 'true' && !st.outage && !outStep) return;
+    outSet(0); outRunning(false);
   }
-  function startOutage() {
-    stopOutage(); $('b-outage').setAttribute('aria-pressed', true); $('b-outage').textContent = 'Oprește simularea';
+  function outAuto(from) {     // merge singura de la pasul dat pana la capat
+    outClear(); outRunning(true);
     if (has3d) { Scene3D.setAuto(false); Scene3D.go('power'); }
-    outStage(1, 1);
-    outTimers.push(setTimeout(function () { outStage(1, 2); }, 2600));
-    outTimers.push(setTimeout(function () { outStage(2, 3); }, 6200));
-    outTimers.push(setTimeout(function () { outStage(0, 4); }, 14500));
-    outTimers.push(setTimeout(function () { $('b-outage').setAttribute('aria-pressed', false); $('b-outage').textContent = 'Simulează din nou'; [].forEach.call($('outage-steps').children, function (li) { li.classList.remove('on'); li.classList.add('done'); }); }, 18500));
+    var n = outSteps().length, t0 = OUT_AT[from - 1];
+    outSet(from);
+    for (var k = from + 1; k <= n + 1; k++) (function (k) {
+      outTimers.push(setTimeout(function () { outSet(k); if (k > n) { outClear(); $('b-outage').setAttribute('aria-pressed', false); $('b-outage').textContent = 'Simulează din nou'; } }, OUT_AT[k - 1] - t0));
+    })(k);
+  }
+  function startOutage() { outAuto(outStep >= 1 && outStep <= outSteps().length ? outStep : 1); }
+  function outManual(step) {     // pas cu pas, cu mana: opreste mersul automat
+    var n = outSteps().length; outClear(); if (step < 1) { stopOutage(); return; } step = Math.min(n + 1, step);
+    if (has3d && step <= n) { Scene3D.setAuto(false); Scene3D.go('power'); }
+    outSet(step); outRunning(false);
+    if (step > n) $('b-outage').textContent = 'Simulează din nou';
   }
   function resetModes() {
     stopOutage(); stopBuild();
@@ -4469,6 +4607,7 @@ var Scene3D = (function () {
     roofUi(roof);
     if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview' || view === 'hero'); }
     [].forEach.call(document.querySelectorAll('.lbl'), function (l) { l.classList.toggle('hot', PICK_CH[l.dataset.id] === i); });
+    playUi();
   }
 
   function setScenario(k) {
@@ -4505,6 +4644,7 @@ var Scene3D = (function () {
     if (!has3d) {
       var d = document.createElement('div'); d.className = 'nogl'; d.textContent = 'Macheta 3D nu poate porni în acest browser. Explicațiile și calculele funcționează normal.';
       $('view').appendChild(d); $('gl').hidden = true;
+      ['.hud', '.zoom', '.north', '#hint'].forEach(function (q) { var el = document.querySelector(q); if (el) el.style.display = 'none'; });
     } else {
       Scene3D.makeLabels(['building', 'pv', 'bess', 'sub', 'gen', 'cool', 'fiber'].map(function (id) { return { id: id, text: PICK_NAME[id] }; })
         .concat(['f_pv', 'f_bess', 'f_grid', 'f_gen'].map(function (id) { return { id: id, text: '', cls: 'flow' }; }))
@@ -4529,7 +4669,7 @@ var Scene3D = (function () {
     $('s-loan').addEventListener('input', function () { A.loanShare = +this.value / 100; render(); });
     $('s-int').addEventListener('input', function () { A.interest = +this.value / 100; render(); });
     $('month').addEventListener('change', function () { st.month = +this.value; render(); });
-    $('hour').addEventListener('input', function () { st.hour = +this.value; stopPlay(); drawDay(); tick(); });
+    $('hour').addEventListener('input', function () { st.hour = +this.value; stopPlay(true); tick(); });
     var deb = null;
     function sized() { render(); clearTimeout(deb); deb = setTimeout(function () { rebuild(false); }, 140); }
     $('s-pv').addEventListener('input', function () { st.pv = +this.value; sized(); });
@@ -4556,10 +4696,16 @@ var Scene3D = (function () {
     $('b-top').addEventListener('click', function () { if (st.rack) setRack(false, true); if (has3d) { Scene3D.setAuto(false); Scene3D.go('top'); } });
     $('b-in').addEventListener('click', function () { if (has3d) Scene3D.zoom(0.8); });
     $('b-out').addEventListener('click', function () { if (has3d) Scene3D.zoom(1.25); });
-    $('play').addEventListener('click', function () { if (st.playing) stopPlay(); else startPlay(); });
+    function playClick() { if (st.playing) stopPlay(); else startPlay(); }
+    $('play').addEventListener('click', playClick); if ($('play2')) $('play2').addEventListener('click', playClick);
+    $('speed').addEventListener('click', function () { speedI = (speedI + 1) % SPEEDS.length; playUi(); });
+    $('out-prev').addEventListener('click', function () { outManual(outStep - 1); });
+    $('out-next').addEventListener('click', function () { outManual((outStep || 0) + 1); toView(); });
+    $('out-bar').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { outManual(+b.getAttribute('data-s')); toView(); } });
+    playUi();
     $('b-rack').addEventListener('click', function () { setRack(!st.rack); toView(); });
     $('b-thermal').addEventListener('click', function () { setThermal(!st.thermal); toView(); });
-    $('b-outage').addEventListener('click', function () { if (this.getAttribute('aria-pressed') === 'true') stopOutage(); else { startOutage(); toView(); } });
+    $('b-outage').addEventListener('click', function () { if (this.getAttribute('aria-pressed') === 'true') { outClear(); outRunning(false); } else { if (outStep > outSteps().length) outStep = 0; startOutage(); toView(); } });
     $('b-build').addEventListener('click', function () { if (st.building) stopBuild(); else { if (st.buildM === null) setBuildMonth(0); startBuild(); toView(); } });
     $('s-build').addEventListener('input', function () { stopBuild(); setBuildMonth(+this.value); });
 
@@ -4569,24 +4715,39 @@ var Scene3D = (function () {
       host.addEventListener('pointerleave', hideTip);
       host.addEventListener('click', function (e) { var t = e.target; if (t.classList && t.classList.contains('hit')) { if (clickFn) clickFn(+t.getAttribute(attr)); else showTip(tipFn(+t.getAttribute(attr)), e.clientX, e.clientY); } });
     }
-    chartHover($('c-day'), 'data-h', dayTip, function (h) { st.hour = h + 0.5; stopPlay(); syncUi(); drawDay(); tick(); });
+    chartHover($('c-day'), 'data-h', dayTip, function (h) { st.hour = h + 0.5; stopPlay(true); syncUi(); tick(); });
     chartHover($('c-months'), 'data-m', monthTip, function (m) { st.month = m; render(); });
     chartHover($('c-ten'), 'data-y', tenTip, null);
   }
 
-  var playRaf = 0, playLast = 0;
+  /* ---------- "Ruleaza 24 de ore": o zi intreaga de la ora aleasa, cu pauza, reluare si trei viteze ---------- */
+  var playRaf = 0, playLast = 0, playLeft = 0, speedI = 0;
+  var SPEEDS = [{ k: 1, n: 'normală' }, { k: 3, n: 'repede' }, { k: 0.4, n: 'încet' }];
+  function playUi() {
+    var t = st.playing ? '❚❚ Pauză' : playLeft > 0 ? '▶ Continuă' : '▶ Rulează 24 de ore';
+    ['play', 'play2'].forEach(function (id) { var b = $(id); if (b) { b.setAttribute('aria-pressed', st.playing); b.textContent = t; } });
+    var sp = $('speed'); if (sp) sp.textContent = 'Viteză: ' + SPEEDS[speedI].n;
+    var pl = $('play-left'); if (pl) pl.textContent = st.playing || playLeft > 0 ? (playLeft > 1 ? 'Mai sunt ' + (function (n) { return n + (n >= 20 ? ' de ore' : ' ore'); })(Math.ceil(playLeft - 0.01)) + ' din 24.' : 'Ultima oră.') : '';
+    var dk = $('dock'); if (dk) dk.classList.toggle('live', st.playing || playLeft > 0 || st.outage > 0 || chapters[st.ch].hasAttribute('data-dock') || chapters[st.ch].getAttribute('data-view') === 'power');
+  }
   function startPlay() {
-    st.playing = true; $('play').setAttribute('aria-pressed', true); $('play').textContent = '❚❚ Oprește';
-    playLast = performance.now(); var bin = Math.floor(st.hour);
+    if (playLeft <= 0) playLeft = 24;
+    st.playing = true; playLast = performance.now(); var shown = Math.ceil(playLeft); playUi();
     (function loop(t) {
       if (!st.playing) return;
-      var dt = Math.min(0.1, (t - playLast) / 1000 || 0); playLast = t;
-      st.hour = (st.hour + dt * 1.1) % 24; $('hour').value = st.hour; tick();
-      if (Math.floor(st.hour) !== bin) { bin = Math.floor(st.hour); drawDay(); }
+      var dt = Math.min(0.1, (t - playLast) / 1000 || 0), dh = dt * 1.1 * SPEEDS[speedI].k, end = dh >= playLeft; playLast = t;
+      if (end) dh = playLeft;
+      st.hour = (st.hour + dh) % 24; playLeft -= dh; $('hour').value = st.hour; tick();
+      if (end) { playLeft = 0; st.hour = Math.round(st.hour * 4) / 4 % 24; stopPlay(true); tick(); return; }
+      if (Math.ceil(playLeft) !== shown) { shown = Math.ceil(playLeft); playUi(); }
       playRaf = requestAnimationFrame(loop);
     })(playLast);
   }
-  function stopPlay() { if (!st.playing) return; st.playing = false; cancelAnimationFrame(playRaf); $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Rulează 24 de ore'; }
+  function stopPlay(reset) {     // fara argument = pauza (se poate relua); cu true = gata, urmatoarea apasare porneste o zi noua
+    if (reset) playLeft = 0;
+    if (st.playing) { st.playing = false; cancelAnimationFrame(playRaf); }
+    playUi();
+  }
 
   init();
 })();

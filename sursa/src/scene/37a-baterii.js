@@ -1,5 +1,5 @@
     // baterii (nord, intre cladire si panouri)
-    var bess = grp(root), xB0 = -W / 2 - 3, bessI = null;
+    var bess = grp(root), xB0 = -W / 2 - 4.4, bessI = null;      // mutat spre vest, ca santul de cabluri al panourilor (x = -W/2 + 3) sa treaca pe langa containere
     if (nB) {
       bessI = inst(bess, bessTpl(), nB);
       for (i = 0; i < nB; i++) { mtx.compose(pos.set(xB0 + (i % perRowB) * 8 + 3.05, 0.2, zB0 - Math.floor(i / perRowB) * 6), q0, one); bessI.setMatrixAt(i, mtx); }

@@ -15,15 +15,16 @@
     box(g, 0.8, 0.09, 0.5, SH.rackAlt, 0.12, 2.06, 0, false); box(g, 0.012, 0.04, 0.44, SH.led, 0.525, 2.06, 0, false);
     var out = { g: g, door: null, server: null, cover: null }, m;
     for (var i = 0; i < 4; i++) {
-      var s = new T.Group(); s.position.set(0.02, 0.32 + i * 0.42, 0); g.add(s);
-      if (i !== 2) {
-        box(s, 1.0, 0.36, 0.5, SH.dark, 0, 0.18, 0, false);
-        box(s, 0.02, 0.32, 0.48, SH.rackAlt, 0.51, 0.18, 0, false); box(s, 0.012, 0.03, 0.3, SH.led, 0.522, 0.3, 0, false);
-        for (m = 0; m < 6; m++) box(s, 0.014, 0.2, 0.05, SH.dark, 0.522, 0.15, -0.19 + m * 0.076, false);
-        box(s, 0.03, 0.05, 0.02, SH.silver, 0.53, 0.18, -0.235, false); box(s, 0.03, 0.05, 0.02, SH.silver, 0.53, 0.18, 0.235, false);            // manere
-        box(s, 0.06, 0.03, 0.03, SH.blue, -0.52, 0.26, -0.2, false); box(s, 0.06, 0.03, 0.03, SH.red, -0.52, 0.26, 0.2, false);                  // cuplele de lichid din spate
+      if (i !== 2) {       // serverele care nu se misca se lipesc de rack, ca sa nu coste desene in plus
+        var sy = 0.32 + i * 0.42;
+        box(g, 1.0, 0.36, 0.5, SH.dark, 0.02, sy + 0.18, 0, false);
+        box(g, 0.02, 0.32, 0.48, SH.rackAlt, 0.53, sy + 0.18, 0, false); box(g, 0.012, 0.03, 0.3, SH.led, 0.542, sy + 0.3, 0, false);
+        for (m = 0; m < 6; m++) box(g, 0.014, 0.2, 0.05, SH.dark, 0.542, sy + 0.15, -0.19 + m * 0.076, false);
+        box(g, 0.03, 0.05, 0.02, SH.silver, 0.55, sy + 0.18, -0.235, false); box(g, 0.03, 0.05, 0.02, SH.silver, 0.55, sy + 0.18, 0.235, false);          // manere
+        box(g, 0.06, 0.03, 0.03, SH.blue, -0.5, sy + 0.26, -0.2, false); box(g, 0.06, 0.03, 0.03, SH.red, -0.5, sy + 0.26, 0.2, false);                // cuplele de lichid din spate
         continue;
       }
+      var s = new T.Group(); s.position.set(0.02, 0.32 + i * 0.42, 0); g.add(s);
       out.server = s;
       box(s, 1.0, 0.02, 0.5, SH.steel, 0, 0.01, 0, false);
       box(s, 1.0, 0.34, 0.012, SH.rackAlt, 0, 0.18, -0.244, false); box(s, 1.0, 0.34, 0.012, SH.rackAlt, 0, 0.18, 0.244, false);

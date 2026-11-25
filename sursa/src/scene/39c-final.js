@@ -5,7 +5,7 @@
         building: [0, H + 3, 0], pv: nT ? [0, 7 * k, zPVmid] : null, bess: nB ? [xBc, 6, zBc] : null,
         sub: [xSub, 4 * subS + 5, zSub], gen: [xGen, 6, zGm],
         cool: [coolX0 + (coolCols - 1) * (coolLen + 2) / 2, 6, 0], fiber: [xF + 1.5, 2.5, zRoad - 7],
-        f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [xBc, 1.3 * k, (zB0 + 1.4 - D / 2) / 2] : null,
+        f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [xBc, 1.3 * k, (zB0 + 1.4 - D / 2 - 2.2) / 2] : null,
         f_grid: [xSub + subW / 2 + 3, 1.3 * k, (zSub + subD / 2 + 2 + D / 2 - 2.5) / 2], f_gen: [-W / 2 - 1.6, 1.3 * k, (zGen0 + zGm) / 2],
         r_gpu: [rackPos[0] + 1.21, 1.95, rackPos[1] - 0.1], r_cool: [rackPos[0] - 0.5, 2.42, rackPos[1] + 0.2], r_net: [rackPos[0] + 0.35, 2.5, rackPos[1]],
         r_srv: [rackPos[0] + 0.62, 0.95, rackPos[1] + 0.25], r_pow: [rackPos[0] + 0.55, 0.47, rackPos[1] + 0.28]
@@ -21,7 +21,7 @@
         bess: { t: [xBc, 1, zB0 - 3], dist: fit(Math.max(bN * 8, 26) * 0.9), az: 2.55, pol: 1.0 },
         fiber: { t: [xF, 0, D / 2 + 16], dist: fit(Math.max(W * 0.7, 44)), az: 0.2, pol: 0.95 },
         top: { t: [cx, 0, cz], dist: fit(RR * 0.9), az: 0, pol: 0.06 },
-        rack: { t: [rackPos[0] + 0.7, 1.4, rackPos[1] - 0.1], dist: fit(1.55), az: 1.02, pol: 0.98 },
+        rack: { t: [rackPos[0] + 0.7, 1.3, rackPos[1] - 0.1], dist: fit(1.55), az: 1.02, pol: 1.3 },
         thermal: { t: [W / 4 + coolW / 4, 1, 0], dist: fit(Math.max(W + coolW + 10, D) * 0.62), az: 0.5, pol: 0.72 }
       },
       land: { w: spanX, d: spanZ }

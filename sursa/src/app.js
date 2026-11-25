@@ -4,7 +4,7 @@
   var M = Model, A = M.A, FU = M.FUNDS;
   function $(id) { return document.getElementById(id); }
   var st = { scen: 'mediu', it: 1, pv: 4, bess: 4, hour: 13, month: 6, wx: 1, ch: 0, playing: false, fund: 'fptj', outage: 0, rack: false, thermal: false, buildM: null, building: false };
-  var cache = { key: '', days: {} };
+  var cache = { key: '', days: {}, fines: {} };
   var chapters = [].slice.call(document.querySelectorAll('.chapter'));
   var has3d = false;
   function chIndex(title) { for (var i = 0; i < chapters.length; i++) if (chapters[i].getAttribute('data-title') === title) return i; return 0; }
@@ -46,13 +46,17 @@
   function calc() {
     var key = [st.it, st.pv, st.bess].join('|');
     if (cache.key !== key) {
-      cache.key = key; cache.days = {};
+      cache.key = key; cache.days = {}; cache.fines = {};
       cache.year = M.simulateYear(st.it, st.pv, st.bess, A);
       cache.ph = M.physical(st.it, st.pv, st.bess, A);
     }
     var dk = st.month + '|' + st.wx;
     if (!cache.days[dk]) cache.days[dk] = M.simulateDay(st.month, st.wx, st.it, st.pv, st.bess, A);
     cache.day = cache.days[dk];
+    // pas de un sfert de ora pentru citiri line, daca modelul il are; altfel raman cele 24 de randuri
+    cache.fine = null;
+    if (M.simulateDayFine) { try { cache.fine = cache.fines[dk] || (cache.fines[dk] = M.simulateDayFine(st.month, st.wx, st.it, st.pv, st.bess, A, 4)); } catch (e) { cache.fine = null; } }
+    var mx = 0; cache.day.forEach(function (r) { mx = Math.max(mx, r.pv, r.load); }); cache.dayRef = mx;
     cache.fin = M.finance(st.it, st.pv, st.bess, A, SELL, cache.year);
     cache.ten = tenOf(st.it, st.pv, st.bess, cache.year, st.fund);
     cache.ten0 = st.fund === 'none' ? cache.ten : tenOf(st.it, st.pv, st.bess, cache.year, 'none');
@@ -82,7 +86,9 @@
     var ph = cache.ph, y = cache.year, f = cache.fin, v = {};
     v.it = mw(st.it); v.gpus = num(ph.gpus); v.servers = num(ph.servers); v.racks = num(ph.racks);
     v.buildingM2 = num(Math.round(ph.buildingM2 / 10) * 10); v.scenName = M.SCEN[st.scen].name;
-    v.loadAvg = mw(ph.loadAvg); v.annualMWh = num(Math.round(ph.annualMWh / 100) * 100); v.households = num(Math.round(ph.households / 100) * 100);
+    function rnd(x) { var q = x < 5000 ? 10 : 100; return Math.round(x / q) * q; }
+    v.loadAvg = mw(ph.loadAvg); v.annualMWh = num(rnd(ph.annualMWh)); v.households = num(rnd(ph.households));
+    v.pueRange = ph.pueMin && ph.pueMax ? 'Este o medie pe an: de la ' + trim(num(ph.pueMin, 2)) + ' în nopțile reci până la ' + trim(num(ph.pueMax, 2)) + ' în după-amiezile de vară, când răcirea muncește cel mai mult.' : 'Este o medie pe an: noaptea și iarna răcirea consumă mai puțin, vara la prânz mai mult.';
     v.gridNote = GRID_NOTE[st.scen]; v.heat = mw(st.it); v.overhead = mw(st.it * (A.pue - 1));
     v.landHa = trim(num(ph.landHa, 1)); v.pvHa = trim(num(ph.landPvHa, 1));
     v.coverage = pct(y.coverage); v.wasteShare = pct(y.wasteShare); v.pvGen = num(Math.round(y.pv / 10) * 10);
@@ -94,8 +100,8 @@
     v.calTotal = CAL_TOTAL[st.scen]; v.prudentLine = prudentLine();
     if (f.ebitda <= 0) v.paybackLine = 'La aceste cifre, veniturile nu acoperă nici cheltuielile de funcționare.';
     else if (f.profit <= 0) v.paybackLine = 'La aceste cifre, banii rămași nu acoperă uzura echipamentelor. Proiectul ar pierde aproximativ <b>' + mil(-f.profit) + ' pe an</b>.';
-    else v.paybackLine = 'La aceste cifre proiectul rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit și fonduri.';
-    if (st.pv > 0) v.solarLine = 'Panourile și bateriile reduc costul curentului cu aproximativ <b>' + mil(f.solarSaving) + ' pe an</b>. Fără ele, curentul ar costa ' + mil(f.energyNoSolar) + ' pe an. Investiția în ele (' + mil(f.capex.pv + f.capex.bess) + ') se plătește singură în circa ' + years(f.solarPayback) + '.';
+    else v.paybackLine = 'La aceste cifre, un an obișnuit rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. ' + (cache.ten.breakeven ? 'Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit și fonduri.' : '<b>Asta nu înseamnă că banii se întorc.</b> Cu clienți care vin treptat, rate la credit și GPU-uri noi în anul 6, capitolul „Zece ani” arată că la aceste prețuri banii nu se întorc în 10 ani.');
+    if (st.pv > 0) v.solarLine = 'Panourile și bateriile aduc aproximativ <b>' + mil(f.solarSaving) + ' pe an</b>: curent pe care nu îl mai cumpărăm și surplus vândut, minus întreținerea lor. Fără ele, curentul ar costa ' + mil(f.energyNoSolar) + ' pe an. Investiția în ele (' + mil(f.capex.pv + f.capex.bess) + ') se plătește singură în circa ' + years(f.solarPayback) + '.';
     else v.solarLine = 'Fără panouri, tot curentul vine din rețea și costă aproximativ <b>' + mil(f.energyNoSolar) + ' pe an</b>.';
     // cat costa o unitate vanduta
     var u = cache.unit, left = u.price - u.total;
@@ -160,8 +166,8 @@
     var W = 420, H = 222, ml = 34, mr = 6, mt = 26, mb = 22, pw = W - ml - mr, ph = H - mt - mb, base = mt + ph;
     var maxv = 0; day.forEach(function (r) { maxv = Math.max(maxv, r.pv, r.load); });
     var u = maxv < 1 ? 1000 : 1, un = maxv < 1 ? 'kW' : 'MW', step = niceStep(maxv * u * 1.08), top = Math.ceil(maxv * u * 1.08 / step) * step, sc = ph / top;
-    var slot = pw / 24, bw = Math.min(24, slot - 4), cur = Math.floor(st.hour) % 24, s = '';
-    s += '<rect x="' + (ml + cur * slot).toFixed(1) + '" y="' + mt + '" width="' + slot.toFixed(1) + '" height="' + ph + '" fill="var(--surface-2)"/>';
+    var slot = pw / 24, bw = Math.min(24, slot - 4), s = '';
+    dayGeo = { ml: ml, slot: slot, mt: mt, base: base, k: sc * u, W: W, mr: mr };
     for (var t = 0; t <= top + 1e-9; t += step) {
       var gy = base - t * sc;
       s += '<line class="gridl" x1="' + ml + '" x2="' + (W - mr) + '" y1="' + gy.toFixed(1) + '" y2="' + gy.toFixed(1) + '"/><text x="' + (ml - 6) + '" y="' + (gy + 3.5).toFixed(1) + '" text-anchor="end">' + trim(num(t, step < 1 ? 1 : 0)) + '</text>';
@@ -176,12 +182,27 @@
     });
     s += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--surface)" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
     s += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
-    if (peak.v > day[0].load * 1.12) s += '<circle cx="' + peak.x.toFixed(1) + '" cy="' + peak.y.toFixed(1) + '" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/><text class="val" x="' + peak.x.toFixed(1) + '" y="' + (peak.y - 9).toFixed(1) + '" text-anchor="middle">' + mw(peak.v) + '</text>';
+    var lmin = Infinity, lmax = 0; day.forEach(function (r) { lmin = Math.min(lmin, r.load); lmax = Math.max(lmax, r.load); });
+    if (peak.v > lmax * 1.12) s += '<circle cx="' + peak.x.toFixed(1) + '" cy="' + peak.y.toFixed(1) + '" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="2"/><text class="val" x="' + peak.x.toFixed(1) + '" y="' + (peak.y - 9).toFixed(1) + '" text-anchor="middle">' + mw(peak.v) + '</text>';
     if (day[0].pv < 0.001 && day[1].pv < 0.001) s += '<text x="' + (ml + 3) + '" y="' + (base - day[0].load * u * sc - 6).toFixed(1) + '">Consum: ' + mw(day[0].load) + '</text>';
     [0, 6, 12, 18, 24].forEach(function (h) { s += '<text x="' + (ml + h * slot).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + (h < 10 ? '0' : '') + h + ':00</text>'; });
     for (var h2 = 0; h2 < 24; h2++) s += '<rect class="hit" data-h="' + h2 + '" x="' + (ml + h2 * slot).toFixed(1) + '" y="' + mt + '" width="' + slot.toFixed(1) + '" height="' + ph + '" fill="transparent" style="cursor:pointer"/>';
-    var desc = 'Grafic pe ore: consumul este constant, ' + mw(day[0].load) + '. Panourile ating ' + mw(peak.v) + ' la prânz.';
+    // cursorul orei: o linie, un punct pe curba panourilor si ceasul deasupra; se muta fara sa redesenam graficul
+    s += '<g id="day-cur" pointer-events="none"><line x1="0" x2="0" y1="' + (mt - 6) + '" y2="' + base + '" stroke="var(--ink)" stroke-width="1.5"/>' +
+      '<circle id="day-dot" cx="0" cy="' + base + '" r="4.5" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/>' +
+      '<g id="day-tag"><rect x="-19" y="' + (mt - 23) + '" width="38" height="16" rx="8" fill="var(--ink)"/><text id="day-clk" class="cur" x="0" y="' + (mt - 11.5) + '" text-anchor="middle">00:00</text></g></g>';
+    var desc = 'Grafic pe ore: consumul ' + (lmax - lmin < 0.02 * lmax ? 'este aproape constant, ' + mw(lmax) : 'merge de la ' + mw(lmin) + ' noaptea la ' + mw(lmax) + ' în orele calde') + '. Panourile ating ' + mw(peak.v) + ' la prânz.';
     host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + desc + '">' + s + '</svg>';
+    moveCursor();
+  }
+  var dayGeo = null;
+  function moveCursor() {
+    var g = $('day-cur'); if (!g || !dayGeo) return;
+    var x = dayGeo.ml + (st.hour % 24) * dayGeo.slot, r = rowAt(st.hour);
+    g.setAttribute('transform', 'translate(' + x.toFixed(1) + ',0)');
+    $('day-dot').setAttribute('cy', (dayGeo.base - (r.pv || 0) * dayGeo.k).toFixed(1));
+    $('day-tag').setAttribute('transform', 'translate(' + (Math.max(dayGeo.ml + 19, Math.min(dayGeo.W - dayGeo.mr - 19, x)) - x).toFixed(1) + ',0)');
+    $('day-clk').textContent = clock(st.hour);
   }
   function dayTip(h) {
     var r = cache.day[h], rows = '';
@@ -368,7 +389,7 @@
     h += cmpRow(cols, 'din care calculatoarele', function (c) { return mil(c.cl.capex.gpu); });
     h += cmpRow(cols, 'venituri pe an', function (c) { return mil(c.cl.rev.total); });
     h += cmpRow(cols, 'profit pe an', function (c) { return sg(c.cl.profit); });
-    h += cmpRow(cols, 'grant posibil', function (c) { return mil(c.tc.grant); });
+    h += cmpRow(cols, 'grant, ' + fn, function (c) { return c.tc.grant > 0.0005 ? mil(c.tc.grant) : 'nimic'; });
     h += cmpRow(cols, 'bani proprii, ' + fn, function (c) { return mil(c.tc.equity); });
     h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.tc); });
     $('t-cmp').innerHTML = h + '</tbody>';
@@ -467,34 +488,63 @@
   }
   function clock(h) { var hh = Math.floor(h), mm = Math.round((h - hh) * 60); if (mm === 60) { hh++; mm = 0; } return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm; }
   function lab(id, on, text) { Scene3D.setLabelOn(id, on); if (on) Scene3D.setLabelText(id, text); }
+  // randul de calcul pentru o ora cu zecimale (pas de un sfert de ora daca modelul il da)
+  function rowAt(h) {
+    var d = cache.fine; h = ((h % 24) + 24) % 24;
+    if (d && d.length >= 24) return d[Math.min(d.length - 1, Math.floor(h * d.length / 24))];
+    return cache.day[Math.floor(h) % 24];
+  }
+  function simNow() {       // starea din clipa aleasa, in cuvinte simple; aceleasi texte in bara, sub grafic si in macheta
+    var r = rowAt(st.hour), so = st.outage, out = so === 1 || so === 2, eps = 0.0005;
+    var ch = r.charge || 0, dis = r.discharge || 0, gr = r.grid || 0, ex = r.exp || 0, soc = Math.max(0, Math.min(1, r.soc || 0));
+    var night = M.sunPos(st.month, st.hour).el <= 0;
+    var o = { r: r, out: out, ch: ch, dis: dis, gr: gr, ex: ex, soc: soc, eps: eps };
+    o.load = mw(r.load);
+    o.pv = st.pv === 0 ? 'fără panouri' : out ? 'oprite' : r.pv > eps ? 'produc ' + mw(r.pv) : night ? 'noapte, nu produc' : 'nu produc';
+    o.batt = st.bess === 0 ? 'fără baterii' : pct(soc) + ' pline, ' + (out ? 'așteaptă' : ch > eps ? 'se încarcă cu ' + mw(ch) : dis > eps ? 'dau ' + mw(dis) : 'așteaptă');
+    o.gridLbl = out ? 'Rețea' : ex > eps ? 'Dăm în rețea' : 'Luăm din rețea';
+    o.grid = out ? 'pană de curent' : ex > eps ? mw(ex) : gr > eps ? mw(gr) : 'nimic';
+    o.temp = typeof r.temp === 'number' && isFinite(r.temp) ? num(r.temp, 0) + ' °C' : '';
+    return o;
+  }
   function tick() {     // tot ce depinde de ora
-    var r = cache.day[Math.floor(st.hour) % 24], out = st.outage;
+    var o = simNow(), r = o.r, so = st.outage, out = o.out, eps = o.eps;
     $('clock').textContent = clock(st.hour);
-    $('f-load').textContent = mw(r.load);
-    $('f-pv').textContent = st.pv === 0 ? 'fără' : out ? 'oprite' : r.pv > 0.0005 ? mw(r.pv) : 'nu produc';
-    $('f-batt').textContent = st.bess === 0 ? 'fără' : out ? 'așteaptă' : r.charge > 0.0005 ? 'se încarcă, ' + mw(r.charge) : r.discharge > 0.0005 ? 'dau ' + mw(r.discharge) : r.soc > 0.9 ? 'pline' : r.soc < 0.08 ? 'goale' : 'așteaptă';
-    $('f-grid').textContent = out ? 'pană de curent' : r.exp > 0.0005 ? 'primește ' + mw(r.exp) : r.grid > 0.0005 ? 'dă ' + mw(r.grid) : 'nimic';
-    $('chip-gen').hidden = !out; $('f-gen').textContent = out === 2 ? mw(r.load) : 'pornesc';
+    $('f-load').textContent = o.load; $('f-pv').textContent = o.pv; $('f-batt').textContent = o.batt;
+    $('l-grid').textContent = o.gridLbl; $('f-grid').textContent = o.grid;
+    $('chip-temp').hidden = !o.temp; $('f-temp').textContent = o.temp;
+    $('chip-gen').hidden = !so; $('f-gen').textContent = so === 2 ? 'dau ' + mw(r.load) : so === 3 ? 'se răcesc' : outStep >= 3 ? 'pornesc' : 'gata de pornire';
+    var dn = $('day-now');
+    if (dn) dn.innerHTML = '<b>Ora ' + clock(st.hour) + '.</b> Consum: ' + o.load + '. Panourile: ' + o.pv + '. Bateriile: ' + o.batt + '. ' + (out ? 'Rețea: pană de curent.' : o.gridLbl + ': ' + o.grid + '.') + (o.temp ? ' Afară: ' + o.temp + '.' : '');
+    moveCursor();
     if (!has3d) return;
     var s = M.sunPos(st.month, st.hour); Scene3D.setSun(s.el, s.az, st.wx);
     var ref = Math.max(cache.ph.loadAvg * 1.5, 1e-6), f;
-    if ((f = Scene3D.flow('pv'))) f.set(out ? 0 : r.pv / Math.max(st.pv * 0.8, ref), 1);
-    if ((f = Scene3D.flow('bess'))) { if (out) f.set(0, 1); else if (r.charge > 0.0005) f.set(r.charge / ref, -1); else f.set(r.discharge / ref, 1); }
-    if ((f = Scene3D.flow('grid'))) { if (out) f.set(0, 1, Scene3D.COL.grid); else if (r.exp > 0.0005) f.set(r.exp / (ref * 1.6), -1, Scene3D.COL.sun); else f.set(r.grid / ref, 1, Scene3D.COL.grid); }
-    if ((f = Scene3D.flow('gen'))) f.set(out === 2 ? 0.85 : 0, 1);
-    lab('f_pv', !out && r.pv > 0.0005, mw(r.pv));
-    lab('f_bess', !out && (r.charge > 0.0005 || r.discharge > 0.0005), r.charge > 0.0005 ? 'încarcă ' + mw(r.charge) : 'dă ' + mw(r.discharge));
-    lab('f_grid', out > 0 || r.grid > 0.0005 || r.exp > 0.0005, out ? 'pană' : r.exp > 0.0005 ? 'în rețea ' + mw(r.exp) : mw(r.grid));
-    lab('f_gen', out === 2, mw(r.load));
-    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + pct(r.soc) + ' pline');
+    if (Scene3D.setState) {     // macheta noua: primeste megawatii si isi regleaza singura fluxurile, bateriile si ventilatoarele
+      var stt = { pvMW: out ? 0 : r.pv, loadMW: r.load, battMW: out ? 0 : o.dis - o.ch, soc: o.soc, gridMW: out ? 0 : o.gr - o.ex, genMW: so === 2 ? r.load : 0, refMW: Math.max(cache.dayRef || 0, ref) };
+      if (typeof r.fan === 'number') stt.fanK = r.fan;
+      if (typeof r.temp === 'number') stt.tempC = r.temp;
+      Scene3D.setState(stt);
+    } else {
+      if ((f = Scene3D.flow('pv'))) f.set(out ? 0 : r.pv / Math.max(st.pv * 0.8, ref), 1);
+      if ((f = Scene3D.flow('bess'))) { if (out) f.set(0, 1); else if (o.ch > eps) f.set(o.ch / ref, -1); else f.set(o.dis / ref, 1); }
+      if ((f = Scene3D.flow('grid'))) { if (out) f.set(0, 1, Scene3D.COL.grid); else if (o.ex > eps) f.set(o.ex / (ref * 1.6), -1, Scene3D.COL.sun); else f.set(o.gr / ref, 1, Scene3D.COL.grid); }
+      if ((f = Scene3D.flow('gen'))) f.set(so === 2 ? 0.85 : 0, 1);
+    }
+    lab('f_pv', !out && r.pv > eps, mw(r.pv));
+    lab('f_bess', !out && (o.ch > eps || o.dis > eps), o.ch > eps ? 'se încarcă ' + mw(o.ch) : 'dau ' + mw(o.dis));
+    lab('f_grid', out || o.gr > eps || o.ex > eps, out ? 'pană' : o.ex > eps ? 'dăm în rețea ' + mw(o.ex) : 'luăm din rețea ' + mw(o.gr));
+    lab('f_gen', so === 2, mw(r.load));
+    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + pct(o.soc) + ' pline');
   }
 
-  function render() { calc(); fill(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawFund(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }
+  function render() { calc(); fill(); drawOutage(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawFund(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }
   function syncUi() {
     [].forEach.call($('scen').children, function (b) { b.setAttribute('aria-pressed', b.dataset.s === st.scen); });
     [].forEach.call($('wx').children, function (b) { b.setAttribute('aria-pressed', +b.dataset.w === st.wx); });
     ['fund', 'fund2'].forEach(function (id) { [].forEach.call($(id).children, function (b) { b.setAttribute('aria-pressed', b.dataset.f === st.fund); }); });
     $('month').value = st.month; $('hour').value = st.hour;
+    var dk = $('dock'); if (dk) dk.classList.toggle('live', st.playing || playLeft > 0 || st.outage > 0 || chapters[st.ch].hasAttribute('data-dock') || chapters[st.ch].getAttribute('data-view') === 'power');
     $('o-pv').textContent = trim(num(st.pv, 2)) + ' MW'; $('o-bess').textContent = trim(num(st.bess, 2)) + ' MWh';
   }
 
@@ -512,25 +562,67 @@
     Scene3D.setThermal(on);
     if (on) { Scene3D.setRoof(true); roofUi(true); Scene3D.setAuto(false); Scene3D.go('thermal'); } else if (!quiet) { Scene3D.setRoof(false); roofUi(false); Scene3D.go('cooling'); }
   }
-  var outTimers = [];
-  function outStage(stage, step) {
-    st.outage = stage; if (has3d) Scene3D.setOutage(stage);
-    [].forEach.call($('outage-steps').children, function (li) { var s = +li.getAttribute('data-s'); li.classList.toggle('on', s === step); li.classList.toggle('done', step > 0 && s < step); });
-    tick();
+  /* ---------- pana de curent, pas cu pas ---------- */
+  var outTimers = [], outStep = 0, OUT_AT = [0, 2200, 4600, 8200, 15500, 20500];     // clipa reala (ms) la care incepe fiecare pas cand merge singura
+  function outPlan() { if (!M.outagePlan) return null; try { return M.outagePlan(st.it, st.pv, st.bess, A); } catch (e) { return null; } }
+  function outSteps() {
+    var p = outPlan() || {}, gs = p.genStartS || 15, gl = p.genLoadS || 45, um = p.upsMinutes || 10, rm = p.retransferMin || 5, fuel = '';
+    if (p.genCount && p.genMW) fuel += ' Sunt ' + p.genCount + ' generatoare de câte ' + mw(p.genMW) + (p.genNeeded && p.genNeeded < p.genCount ? '; ajung ' + p.genNeeded + ', restul sunt rezervă' : '') + '.';
+    if (p.fuelLph && p.fuelHours) fuel += ' Ard cam ' + num(Math.round(p.fuelLph / 5) * 5) + ' de litri de motorină pe oră, iar rezervorul' + (p.tankLiters ? ' de ' + num(Math.round(p.tankLiters / 100) * 100) + ' de litri' : '') + ' ajunge ' + trim(num(p.fuelHours, 0)) + ' de ore.';
+    return [
+      { t: 'Secunda 0', k: '0 s', h: 'Rețeaua cade.', d: 'Punctele albastre de pe cablul dinspre stație se opresc.', sc: 1, src: 'UPS-urile (bateriile din clădire)' },
+      { t: 'Aceeași clipă', k: 'UPS', h: 'UPS-urile țin calculatoarele pornite.', d: 'Preiau tot consumul fără nicio pauză și îl pot duce singure cam ' + um + ' minute. Luminițele lor devin portocalii.', sc: 1, src: 'UPS-urile (bateriile din clădire)' },
+      { t: 'Secunda ' + gs, k: gs + ' s', h: 'Generatoarele diesel pornesc.', d: 'Motoarele se turează. Până ajung la turație, UPS-urile duc în continuare tot consumul.', sc: 1, src: 'UPS-urile, generatoarele pornesc' },
+      { t: 'Secunda ' + gl, k: gl + ' s', h: 'Generatoarele duc tot consumul.', d: 'Se vede fumul la coșuri și curentul portocaliu dinspre ele.' + fuel, sc: 2, src: 'generatoarele' },
+      { t: 'Când revine rețeaua', k: 'revine', h: 'Centrul trece înapoi pe rețea.', d: 'Așteptăm ' + rm + ' minute ca rețeaua să fie stabilă, apoi generatoarele se răcesc și se opresc. Clienții nu au simțit nimic.', sc: 3, src: 'rețeaua; generatoarele se răcesc' }
+    ];
   }
+  function drawOutage() {
+    var L = outSteps();
+    $('outage-steps').innerHTML = L.map(function (x, i) { return '<li data-s="' + (i + 1) + '"><b>' + x.t + '.</b> ' + x.h + ' <span>' + x.d + '</span></li>'; }).join('');
+    $('out-bar').innerHTML = L.map(function (x, i) { return '<button type="button" data-s="' + (i + 1) + '" aria-label="Pasul ' + (i + 1) + ': ' + x.h + '"><i></i><span>' + x.k + '</span></button>'; }).join('');
+    markOutage();
+  }
+  function markOutage() {
+    var L = outSteps(), n = L.length, step = outStep, cur = step >= 1 && step <= n ? L[step - 1] : null;
+    [$('outage-steps'), $('out-bar')].forEach(function (host) {
+      [].forEach.call(host.children, function (el) { var k = +el.getAttribute('data-s'); el.classList.toggle('on', k === step); el.classList.toggle('done', step > 0 && k < step); });
+    });
+    $('out-now').innerHTML = cur ? '<b>Pasul ' + step + ' din ' + n + '.</b> Acum centrul este ținut de: ' + cur.src + '.' : step > n ? '<b>Gata.</b> Centrul merge din nou pe rețea.' : 'Apasă butonul sau mergi pas cu pas. Centrul merge acum pe rețea.';
+    $('out-prev').disabled = step < 1; $('out-next').disabled = step > n;
+    $('out-prev').textContent = step === 1 ? '◀ Înapoi la normal' : '◀ Pasul dinainte';
+    $('out-next').textContent = step === 0 ? 'Primul pas ▶' : step >= n ? 'Încheie ▶' : 'Pasul următor ▶';
+  }
+  function outSet(step) {     // 0 = normal, 1..5 = pasii, 6 = incheiat
+    var L = outSteps(), n = L.length, sc = step >= 1 && step <= n ? L[step - 1].sc : 0;
+    if (sc === 3 && !(has3d && Scene3D.outageInfo)) sc = 0;       // macheta veche nu are treapta de racire
+    st.outage = sc; if (has3d) Scene3D.setOutage(sc);
+    outStep = step; markOutage();
+    if (step > n) { outStep = 0; $('out-next').disabled = false; $('out-next').textContent = 'De la început ▶'; $('out-prev').disabled = true; }
+    tick(); syncUi();
+  }
+  function outRunning(on) { $('b-outage').setAttribute('aria-pressed', on); $('b-outage').textContent = on ? '❚❚ Pauză' : outStep > 0 ? '▶ Continuă' : 'Simulează o pană de curent'; }
+  function outClear() { outTimers.forEach(clearTimeout); outTimers = []; }
   function stopOutage() {
-    outTimers.forEach(clearTimeout); outTimers = [];
-    if ($('b-outage').getAttribute('aria-pressed') !== 'true' && !st.outage) return;
-    $('b-outage').setAttribute('aria-pressed', false); $('b-outage').textContent = 'Simulează o pană de curent'; outStage(0, 0);
+    outClear();
+    if ($('b-outage').getAttribute('aria-pressed') !== 'true' && !st.outage && !outStep) return;
+    outSet(0); outRunning(false);
   }
-  function startOutage() {
-    stopOutage(); $('b-outage').setAttribute('aria-pressed', true); $('b-outage').textContent = 'Oprește simularea';
+  function outAuto(from) {     // merge singura de la pasul dat pana la capat
+    outClear(); outRunning(true);
     if (has3d) { Scene3D.setAuto(false); Scene3D.go('power'); }
-    outStage(1, 1);
-    outTimers.push(setTimeout(function () { outStage(1, 2); }, 2600));
-    outTimers.push(setTimeout(function () { outStage(2, 3); }, 6200));
-    outTimers.push(setTimeout(function () { outStage(0, 4); }, 14500));
-    outTimers.push(setTimeout(function () { $('b-outage').setAttribute('aria-pressed', false); $('b-outage').textContent = 'Simulează din nou'; [].forEach.call($('outage-steps').children, function (li) { li.classList.remove('on'); li.classList.add('done'); }); }, 18500));
+    var n = outSteps().length, t0 = OUT_AT[from - 1];
+    outSet(from);
+    for (var k = from + 1; k <= n + 1; k++) (function (k) {
+      outTimers.push(setTimeout(function () { outSet(k); if (k > n) { outClear(); $('b-outage').setAttribute('aria-pressed', false); $('b-outage').textContent = 'Simulează din nou'; } }, OUT_AT[k - 1] - t0));
+    })(k);
+  }
+  function startOutage() { outAuto(outStep >= 1 && outStep <= outSteps().length ? outStep : 1); }
+  function outManual(step) {     // pas cu pas, cu mana: opreste mersul automat
+    var n = outSteps().length; outClear(); if (step < 1) { stopOutage(); return; } step = Math.min(n + 1, step);
+    if (has3d && step <= n) { Scene3D.setAuto(false); Scene3D.go('power'); }
+    outSet(step); outRunning(false);
+    if (step > n) $('b-outage').textContent = 'Simulează din nou';
   }
   function resetModes() {
     stopOutage(); stopBuild();
@@ -562,6 +654,7 @@
     roofUi(roof);
     if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview' || view === 'hero'); }
     [].forEach.call(document.querySelectorAll('.lbl'), function (l) { l.classList.toggle('hot', PICK_CH[l.dataset.id] === i); });
+    playUi();
   }
 
   function setScenario(k) {
@@ -598,6 +691,7 @@
     if (!has3d) {
       var d = document.createElement('div'); d.className = 'nogl'; d.textContent = 'Macheta 3D nu poate porni în acest browser. Explicațiile și calculele funcționează normal.';
       $('view').appendChild(d); $('gl').hidden = true;
+      ['.hud', '.zoom', '.north', '#hint'].forEach(function (q) { var el = document.querySelector(q); if (el) el.style.display = 'none'; });
     } else {
       Scene3D.makeLabels(['building', 'pv', 'bess', 'sub', 'gen', 'cool', 'fiber'].map(function (id) { return { id: id, text: PICK_NAME[id] }; })
         .concat(['f_pv', 'f_bess', 'f_grid', 'f_gen'].map(function (id) { return { id: id, text: '', cls: 'flow' }; }))
@@ -622,7 +716,7 @@
     $('s-loan').addEventListener('input', function () { A.loanShare = +this.value / 100; render(); });
     $('s-int').addEventListener('input', function () { A.interest = +this.value / 100; render(); });
     $('month').addEventListener('change', function () { st.month = +this.value; render(); });
-    $('hour').addEventListener('input', function () { st.hour = +this.value; stopPlay(); drawDay(); tick(); });
+    $('hour').addEventListener('input', function () { st.hour = +this.value; stopPlay(true); tick(); });
     var deb = null;
     function sized() { render(); clearTimeout(deb); deb = setTimeout(function () { rebuild(false); }, 140); }
     $('s-pv').addEventListener('input', function () { st.pv = +this.value; sized(); });
@@ -649,10 +743,16 @@
     $('b-top').addEventListener('click', function () { if (st.rack) setRack(false, true); if (has3d) { Scene3D.setAuto(false); Scene3D.go('top'); } });
     $('b-in').addEventListener('click', function () { if (has3d) Scene3D.zoom(0.8); });
     $('b-out').addEventListener('click', function () { if (has3d) Scene3D.zoom(1.25); });
-    $('play').addEventListener('click', function () { if (st.playing) stopPlay(); else startPlay(); });
+    function playClick() { if (st.playing) stopPlay(); else startPlay(); }
+    $('play').addEventListener('click', playClick); if ($('play2')) $('play2').addEventListener('click', playClick);
+    $('speed').addEventListener('click', function () { speedI = (speedI + 1) % SPEEDS.length; playUi(); });
+    $('out-prev').addEventListener('click', function () { outManual(outStep - 1); });
+    $('out-next').addEventListener('click', function () { outManual((outStep || 0) + 1); toView(); });
+    $('out-bar').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { outManual(+b.getAttribute('data-s')); toView(); } });
+    playUi();
     $('b-rack').addEventListener('click', function () { setRack(!st.rack); toView(); });
     $('b-thermal').addEventListener('click', function () { setThermal(!st.thermal); toView(); });
-    $('b-outage').addEventListener('click', function () { if (this.getAttribute('aria-pressed') === 'true') stopOutage(); else { startOutage(); toView(); } });
+    $('b-outage').addEventListener('click', function () { if (this.getAttribute('aria-pressed') === 'true') { outClear(); outRunning(false); } else { if (outStep > outSteps().length) outStep = 0; startOutage(); toView(); } });
     $('b-build').addEventListener('click', function () { if (st.building) stopBuild(); else { if (st.buildM === null) setBuildMonth(0); startBuild(); toView(); } });
     $('s-build').addEventListener('input', function () { stopBuild(); setBuildMonth(+this.value); });
 
@@ -662,24 +762,39 @@
       host.addEventListener('pointerleave', hideTip);
       host.addEventListener('click', function (e) { var t = e.target; if (t.classList && t.classList.contains('hit')) { if (clickFn) clickFn(+t.getAttribute(attr)); else showTip(tipFn(+t.getAttribute(attr)), e.clientX, e.clientY); } });
     }
-    chartHover($('c-day'), 'data-h', dayTip, function (h) { st.hour = h + 0.5; stopPlay(); syncUi(); drawDay(); tick(); });
+    chartHover($('c-day'), 'data-h', dayTip, function (h) { st.hour = h + 0.5; stopPlay(true); syncUi(); tick(); });
     chartHover($('c-months'), 'data-m', monthTip, function (m) { st.month = m; render(); });
     chartHover($('c-ten'), 'data-y', tenTip, null);
   }
 
-  var playRaf = 0, playLast = 0;
+  /* ---------- "Ruleaza 24 de ore": o zi intreaga de la ora aleasa, cu pauza, reluare si trei viteze ---------- */
+  var playRaf = 0, playLast = 0, playLeft = 0, speedI = 0;
+  var SPEEDS = [{ k: 1, n: 'normală' }, { k: 3, n: 'repede' }, { k: 0.4, n: 'încet' }];
+  function playUi() {
+    var t = st.playing ? '❚❚ Pauză' : playLeft > 0 ? '▶ Continuă' : '▶ Rulează 24 de ore';
+    ['play', 'play2'].forEach(function (id) { var b = $(id); if (b) { b.setAttribute('aria-pressed', st.playing); b.textContent = t; } });
+    var sp = $('speed'); if (sp) sp.textContent = 'Viteză: ' + SPEEDS[speedI].n;
+    var pl = $('play-left'); if (pl) pl.textContent = st.playing || playLeft > 0 ? (playLeft > 1 ? 'Mai sunt ' + (function (n) { return n + (n >= 20 ? ' de ore' : ' ore'); })(Math.ceil(playLeft - 0.01)) + ' din 24.' : 'Ultima oră.') : '';
+    var dk = $('dock'); if (dk) dk.classList.toggle('live', st.playing || playLeft > 0 || st.outage > 0 || chapters[st.ch].hasAttribute('data-dock') || chapters[st.ch].getAttribute('data-view') === 'power');
+  }
   function startPlay() {
-    st.playing = true; $('play').setAttribute('aria-pressed', true); $('play').textContent = '❚❚ Oprește';
-    playLast = performance.now(); var bin = Math.floor(st.hour);
+    if (playLeft <= 0) playLeft = 24;
+    st.playing = true; playLast = performance.now(); var shown = Math.ceil(playLeft); playUi();
     (function loop(t) {
       if (!st.playing) return;
-      var dt = Math.min(0.1, (t - playLast) / 1000 || 0); playLast = t;
-      st.hour = (st.hour + dt * 1.1) % 24; $('hour').value = st.hour; tick();
-      if (Math.floor(st.hour) !== bin) { bin = Math.floor(st.hour); drawDay(); }
+      var dt = Math.min(0.1, (t - playLast) / 1000 || 0), dh = dt * 1.1 * SPEEDS[speedI].k, end = dh >= playLeft; playLast = t;
+      if (end) dh = playLeft;
+      st.hour = (st.hour + dh) % 24; playLeft -= dh; $('hour').value = st.hour; tick();
+      if (end) { playLeft = 0; st.hour = Math.round(st.hour * 4) / 4 % 24; stopPlay(true); tick(); return; }
+      if (Math.ceil(playLeft) !== shown) { shown = Math.ceil(playLeft); playUi(); }
       playRaf = requestAnimationFrame(loop);
     })(playLast);
   }
-  function stopPlay() { if (!st.playing) return; st.playing = false; cancelAnimationFrame(playRaf); $('play').setAttribute('aria-pressed', false); $('play').textContent = '▶ Rulează 24 de ore'; }
+  function stopPlay(reset) {     // fara argument = pauza (se poate relua); cu true = gata, urmatoarea apasare porneste o zi noua
+    if (reset) playLeft = 0;
+    if (st.playing) { st.playing = false; cancelAnimationFrame(playRaf); }
+    playUi();
+  }
 
   init();
 })();

@@ -60,7 +60,7 @@
       }
       for (f = 0; f < nf; f++) for (j = -1; j <= 1; j += 2) {
         var fx = xw + (f + 0.5) * len / nf, fz = j * 0.58;
-        cyl(g, 0.48, 0.52, 0.22, SH.silver, fx, 2.35, fz, 14, null, F);                                 // duza ventilatorului
+        cyl(g, 0.48, 0.52, 0.22, SH.silver, fx, 2.35, fz, Q.lite ? 10 : 14, null, F);                                 // duza ventilatorului
         if (!Q.lite) disc(g, 0.455, SH.dark, fx, 2.4, fz);
         disc(g, 0.45, SH.fan, fx, 2.44, fz); disc(g, 0.48, SH.grille, fx, 2.47, fz);
         if (!Q.lite) cyl(g, 0.09, 0.11, 0.09, SH.dark, fx, 2.49, fz, 8, null, F);                        // motorul
@@ -68,8 +68,8 @@
       // colectoarele bateriei si cele doua racorduri: sus intra apa calda (rosu), jos iese apa racita (albastru)
       var yr = 1.95, yb = 1.38, zr = 0.45, zb = -0.45, xr = xw - 0.75, xb = xw - 1.35, rb = 0.065;
       cyl(g, 0.055, 0.055, 0.95, SH.red, xw - 0.055, 1.63, zr, 8, null, F); cyl(g, 0.055, 0.055, 0.95, SH.blue, xw - 0.055, 1.63, zb, 8, null, F);
-      rcSeg(g, SH.red, rb, xw - 0.05, yr, zr, xr, yr, zr, 8, F); sph(g, rb * 1.15, SH.red, xr, yr, zr, F, 1, 1); rcSeg(g, SH.red, rb, xr, yr, zr, xr, hl, zr, 8, F);
-      rcSeg(g, SH.blue, rb, xw - 0.05, yb, zb, xb, yb, zb, 8, F); sph(g, rb * 1.15, SH.blue, xb, yb, zb, F, 1, 1); rcSeg(g, SH.blue, rb, xb, yb, zb, xb, hl, zb, 8, F);
+      rcSeg(g, SH.red, rb, xw - 0.05, yr, zr, xr, yr, zr, 8, F); sph(g, rb * 1.15, SH.red, xr, yr, zr, F, 1, Q.lite ? 0 : 1); rcSeg(g, SH.red, rb, xr, yr, zr, xr, hl, zr, 8, F);
+      rcSeg(g, SH.blue, rb, xw - 0.05, yb, zb, xb, yb, zb, 8, F); sph(g, rb * 1.15, SH.blue, xb, yb, zb, F, 1, Q.lite ? 0 : 1); rcSeg(g, SH.blue, rb, xb, yb, zb, xb, hl, zb, 8, F);
       rcFlange(g, rb, xw - 0.2, yr, zr, RCX, F); rcFlange(g, rb, xw - 0.2, yb, zb, RCX, F);              // flansele racordurilor
       rcValve(g, rb, xw - 0.47, yr, zr, RCX, F); rcValve(g, rb, xw - 0.47, yb, zb, RCX, F);              // robinet pe fiecare ramura
       cyl(g, rb + 0.03, rb + 0.03, 0.05, SH.steel, xr, hl + rH + 0.02, zr, 10, null, F); cyl(g, rb + 0.03, rb + 0.03, 0.05, SH.steel, xb, hl + rH + 0.02, zb, 10, null, F);   // gulerul de pe colector

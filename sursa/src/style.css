@@ -105,6 +105,21 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .sw.sun { background: var(--sun); } .sw.batt { background: var(--batt); } .sw.grid { background: var(--grid); } .sw.load { background: var(--ink); } .sw.fiber { background: var(--fiber); }
 .sw.gen { background: var(--gen); }
 .sw.line { height: 3px; width: 14px; border-radius: 2px; background: var(--ink); }
+.chip b { white-space: nowrap; } .chip[hidden] { display: none; }
+/* ---- simularea: cursorul din grafic, citirile de sub el, pana de curent pe pasi ---- */
+.chart svg text.cur { fill: var(--surface); font-weight: 600; }
+.daynow { margin: 0; font-size: 13.5px; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
+.playrow { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.playrow .btn { box-shadow: none; }
+.tl { display: flex; gap: 4px; }
+.tl button { flex: 1 1 0; min-width: 0; border: 0; background: transparent; padding: 4px 0 2px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; align-items: stretch; font: 600 11.5px var(--font-display); color: var(--muted); text-align: left; }
+.tl button i { display: block; height: 8px; border-radius: 4px; background: var(--line); }
+.tl button.done i { background: var(--ink); } .tl button.done { color: var(--ink); }
+.tl button.on i { background: var(--gen); } .tl button.on { color: var(--ink); }
+.tl button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.outnow { margin: 0; font-size: 13.5px; }
+.steps { margin: 0; padding-left: 22px; } .steps li span { display: none; } .steps li.on span { display: inline; }
+.stepnav { display: flex; gap: 8px; flex-wrap: wrap; } .stepnav .btn { box-shadow: none; flex: 1 1 130px; } .stepnav .btn:disabled { opacity: .45; cursor: default; }
 
 /* ---- povestea ---- */
 .story { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
@@ -239,6 +254,10 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
   .view { position: relative; flex: none; height: 42vh; min-height: 240px; max-height: 380px; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
   .dock { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; gap: 6px; }
   .dock .chips { display: none; }
+  .dock.live .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 6px; }
+  .dock.live .chip { font-size: 12px; padding: 3px 8px; border-radius: 8px; min-width: 0; flex-wrap: wrap; gap: 2px 5px; }
+  .dock.live .chip.wide { grid-column: 1 / -1; }
+  .dock.live .chip[hidden] { display: none; }
   .dock .btn { padding: 5px 10px; }
   .time { flex-basis: 150px; }
   .story { margin-top: 10px; overflow: visible; }
@@ -261,6 +280,17 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
   table.sens td button { font-size: 11.5px; padding: 7px 0; }
   .pick > span { display: none; }
   #t-ten { font-size: 12px; } #t-ten th, #t-ten td { padding: 6px 2px; } #t-ten thead th { font-size: 11.5px; }
+}
+@media (pointer: coarse) {
+  /* tinte de apasat de 44 px pe ecrane cu degetul: in text crestem butonul; in bara de sub macheta si pe macheta ramane mic la vedere si marim doar zona care prinde degetul */
+  .seg button, .toc button, .pager .go, .btn.big, .playrow .btn, .stepnav .btn, .cases button, .cmp th button, table.sens td button { min-height: 44px; }
+  .dock .btn, .dock select, .hud .btn, .dock .seg button { min-height: 36px; position: relative; }
+  .zoom .btn.sq { width: 38px; height: 38px; position: relative; }
+  .dock .btn::after, .hud .btn::after, .dock .seg button::after { content: ''; position: absolute; inset: -4px 0; }
+  .zoom .btn.sq::after { content: ''; position: absolute; inset: -3px; }
+  input[type="range"] { height: 44px; } .dock input[type="range"] { height: 36px; }
+  .tl button { min-height: 44px; justify-content: center; }
+  details summary { padding: 12px 0; }
 }
 @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
 @media (max-width: 900px) and (max-height: 520px) { .view { height: 78vh; max-height: none; } .pager { position: static; } }
