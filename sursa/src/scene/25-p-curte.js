@@ -66,17 +66,32 @@
     cyl(parent, 0.28, 0.28, 1.1, SH.silver, x - 0.82, 0.86, z + 1.2, 12, [Math.PI / 2, 0, 0], false);               // rezervor
     ao(parent, 2.6, 8.4, x, 0.262, z, 1.3);
   }
-  function lampTpl() {                        // stalp de iluminat cu brat si corp LED
+  function lampTpl() {                        // stalp de iluminat de 9 m, pe fundatie de beton, cu brat si corp LED
     return tpl(function (g) {
-      box(g, 0.34, 0.04, 0.34, SH.dark, 0, 0.02, 0, false); cyl(g, 0.1, 0.13, 0.5, SH.dark, 0, 0.27, 0, 8, null, false);
-      cyl(g, 0.06, 0.1, 6.6, SH.steel, 0, 3.75, 0, 8);
-      beam(g, SH.steel, 0, 6.95, 0, 0, 7.12, 0.95, 0.075, false);
-      box(g, 0.3, 0.09, 0.72, SH.dark, 0, 7.12, 1.25, false); box(g, 0.24, 0.02, 0.56, SH.lampHead, 0, 7.065, 1.27, false);
+      box(g, 0.6, 0.14, 0.6, SH.base, 0, 0.07, 0, false); box(g, 0.36, 0.03, 0.36, SH.dark, 0, 0.155, 0, false);
+      [[-0.13, -0.13], [0.13, -0.13], [-0.13, 0.13], [0.13, 0.13]].forEach(function (c) { cyl(g, 0.02, 0.02, 0.05, SH.steel, c[0], 0.19, c[1], 6, null, false); });
+      cyl(g, 0.1, 0.13, 0.55, SH.dark, 0, 0.44, 0, 8, null, false); box(g, 0.02, 0.3, 0.12, SH.steel, 0, 0.5, 0.125, false);
+      cyl(g, 0.055, 0.1, 8.3, SH.steel, 0, 4.85, 0, 8);
+      beam(g, SH.steel, 0, 8.9, 0, 0, 9.08, 0.95, 0.075, false);
+      box(g, 0.3, 0.09, 0.72, SH.dark, 0, 9.08, 1.25, false); box(g, 0.24, 0.02, 0.56, SH.lampHead, 0, 9.025, 1.27, false);
     });
   }
-  function fenceRun(parent, posts, x0, z0, x1, z1, hgt) {   // plasa intre doua puncte + stalpii ei
+  function fenceRun(parent, posts, x0, z0, x1, z1, hgt, base) {   // plasa intre doua puncte + stalpii ei; base = grinda de beton la sol si sarma ghimpata sus
     var dx = x1 - x0, dz = z1 - z0, len = Math.sqrt(dx * dx + dz * dz), n = Math.max(1, Math.round(len / 3)), ang = Math.atan2(-dz, dx);
     addGeo(parent, unit('vplane', function () { return new T.PlaneGeometry(1, 1); }), SH.fence, (x0 + x1) / 2, hgt / 2 + 0.05, (z0 + z1) / 2, len, hgt, 1, [0, ang, 0], false);
     box(parent, len, 0.05, 0.05, SH.steel, (x0 + x1) / 2, hgt + 0.05, (z0 + z1) / 2, false, [0, ang, 0]);
+    if (base) {
+      box(parent, len, 0.3, 0.2, SH.base, (x0 + x1) / 2, 0.1, (z0 + z1) / 2, false, [0, ang, 0]);
+      box(parent, len, 0.015, 0.015, SH.steel, (x0 + x1) / 2, hgt + 0.16, (z0 + z1) / 2, false, [0, ang, 0]);
+    }
     for (var i = 0; i <= n; i++) posts.push([x0 + dx * i / n, z0 + dz * i / n, hgt]);
+  }
+  function gateLeaf(parent, xa, xb, z, yb, h) {   // canat de poarta: rama de teava, montanti si plasa
+    var len = xb - xa, xm = (xa + xb) / 2, n = Math.max(1, Math.round(len / 1.5)), i;
+    box(parent, len, 0.14, 0.1, SH.dark, xm, yb + 0.07, z, false); box(parent, len, 0.08, 0.08, SH.dark, xm, yb + h - 0.04, z, false);
+    for (i = 0; i <= n; i++) box(parent, i % n ? 0.05 : 0.09, h - 0.2, i % n ? 0.05 : 0.09, SH.dark, i === 0 ? xa + 0.045 : i === n ? xb - 0.045 : xa + len * i / n, yb + h / 2 + 0.02, z, false);
+    vpl(parent, len - 0.1, h - 0.22, SH.fence, xm, yb + h / 2 + 0.02, z);
+  }
+  function footing(parent, x, z, s) {         // fundatie mica de beton pentru stalpi si catarge, pe platforma
+    box(parent, s, 0.12, s, SH.base, x, 0.26, z, false); cyl(parent, s * 0.26, s * 0.3, 0.05, SH.dark, x, 0.345, z, 8, null, false);
   }

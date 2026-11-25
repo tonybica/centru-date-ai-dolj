@@ -3,9 +3,14 @@
     [[-0.57, -0.27], [-0.57, 0.27], [0.57, -0.27], [0.57, 0.27]].forEach(function (c) { box(g, 0.06, 2.2, 0.06, SH.rackBody, c[0], 1.1, c[1], false); });
     box(g, 1.2, 0.06, 0.6, SH.rackBody, 0, 2.17, 0); box(g, 1.2, 0.06, 0.6, SH.rackBody, 0, 0.03, 0, false);
     box(g, 1.14, 2.08, 0.02, SH.rackBody, 0, 1.1, -0.29, false); box(g, 0.02, 2.08, 0.56, SH.rackBody, -0.59, 1.1, 0, false);
-    cyl(g, 0.028, 0.028, 2.0, SH.blue, -0.5, 1.1, -0.2, 8, null, false); cyl(g, 0.028, 0.028, 2.0, SH.red, -0.5, 1.1, 0.2, 8, null, false);     // colectoarele de lichid
-    box(g, 0.05, 1.9, 0.05, SH.copper, -0.5, 1.1, 0, false);                                                                                   // bara de alimentare
-    box(g, 0.04, 1.9, 0.07, SH.dark, 0.5, 1.1, -0.255, false); for (var q = 0; q < 12; q++) box(g, 0.012, 0.02, 0.02, SH.led, 0.522, 0.35 + q * 0.14, -0.255, false);   // priza verticala
+    cyl(g, 0.025, 0.025, 2.0, SH.blue, -0.53, 1.1, -0.2, 8, null, false); cyl(g, 0.025, 0.025, 2.0, SH.red, -0.53, 1.1, 0.2, 8, null, false);   // colectoarele de lichid
+    beam(g, SH.blue, -0.53, 2.08, -0.2, -0.44, 2.47, -0.2, 0.04, false); beam(g, SH.red, -0.53, 2.08, 0.2, -0.56, 2.47, 0.2, 0.04, false);     // furtunurile care urca la tevile de rand
+    box(g, 0.05, 1.9, 0.05, SH.copper, -0.535, 1.1, 0, false);                                                                                 // bara de alimentare
+    box(g, 0.04, 1.9, 0.035, SH.dark, 0.5, 1.1, -0.272, false); for (var q = 0; q < 12; q++) box(g, 0.012, 0.02, 0.02, SH.led, 0.522, 0.35 + q * 0.14, -0.272, false);   // prizele verticale (PDU), una pe fiecare parte
+    box(g, 0.04, 1.9, 0.035, SH.dark, 0.5, 1.1, 0.272, false); box(g, 0.02, 1.72, 0.022, SH.stripe, 0.532, 1.2, 0.272, false);                 // manunchiul galben de fibra coboara de la comutator
+    for (q = 0; q < 3; q++) box(g, 0.012, 0.05, 0.5, SH.rackBody, 0.52, 0.71 + q * 0.42, 0, false);                                            // panouri oarbe intre servere
+    box(g, 0.012, 0.035, 0.5, SH.dark, 0.52, 1.975, 0, false); for (q = 0; q < 12; q++) box(g, 0.012, 0.016, 0.022, SH.silver, 0.527, 1.975, -0.2 + q * 0.036, false);   // panou de conexiuni
+    cyl(g, 0.014, 0.014, 0.42, SH.stripe, 0.14, 2.3, -0.04, 6, null, false); cyl(g, 0.014, 0.014, 0.42, SH.stripe, 0.14, 2.3, 0.04, 6, null, false);   // fibra urca in canalul galben
     box(g, 1.0, 0.2, 0.5, SH.silver, 0.02, 0.17, 0, false); box(g, 0.012, 0.03, 0.4, SH.led, 0.53, 0.17, 0, false);
     box(g, 0.8, 0.09, 0.5, SH.rackAlt, 0.12, 2.06, 0, false); box(g, 0.012, 0.04, 0.44, SH.led, 0.525, 2.06, 0, false);
     var out = { g: g, door: null, server: null, cover: null }, m;
@@ -15,6 +20,8 @@
         box(s, 1.0, 0.36, 0.5, SH.dark, 0, 0.18, 0, false);
         box(s, 0.02, 0.32, 0.48, SH.rackAlt, 0.51, 0.18, 0, false); box(s, 0.012, 0.03, 0.3, SH.led, 0.522, 0.3, 0, false);
         for (m = 0; m < 6; m++) box(s, 0.014, 0.2, 0.05, SH.dark, 0.522, 0.15, -0.19 + m * 0.076, false);
+        box(s, 0.03, 0.05, 0.02, SH.silver, 0.53, 0.18, -0.235, false); box(s, 0.03, 0.05, 0.02, SH.silver, 0.53, 0.18, 0.235, false);            // manere
+        box(s, 0.06, 0.03, 0.03, SH.blue, -0.52, 0.26, -0.2, false); box(s, 0.06, 0.03, 0.03, SH.red, -0.52, 0.26, 0.2, false);                  // cuplele de lichid din spate
         continue;
       }
       out.server = s;
