@@ -516,7 +516,7 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
         <article class="chapter" data-title="Bateriile și rețeaua" data-dock data-view="bess" hidden>
           <p class="eyebrow"></p>
           <h2>Bateriile mută soarele spre seară</h2>
-          <p>La prânz panourile dau mai mult decât consumăm. Bateriile se încarcă atunci și dau curentul înapoi seara. Eticheta lor din machetă arată cât de pline sunt.</p>
+          <p>La prânz panourile dau mai mult decât consumăm. Bateriile se încarcă atunci și dau curentul înapoi seara. Eticheta lor din machetă arată cât de pline sunt la sfârșitul orei alese.</p>
           <div class="ctrl">
             <label for="s-bess">Capacitatea bateriilor</label><output id="o-bess" for="s-bess"></output>
             <input type="range" id="s-bess" min="0" max="12" step="0.5" value="4">
@@ -2132,9 +2132,10 @@ var Scene3D = (function () {
       var F = false, yb = hl - rH, j;
       box(g, 1.2, 0.15, 0.4, SH.concrete, 0, 0.075, 0, F);
       for (j = -1; j <= 1; j += 2) {
-        box(g, 0.2, 0.015, 0.2, SH.steel, j * 0.3, 0.158, 0, F); box(g, 0.09, yb - 0.14 - 0.15, 0.09, SH.steel, j * 0.3, (yb - 0.14 + 0.15) / 2, 0, F);
+        if (!Q.lite) box(g, 0.2, 0.015, 0.2, SH.steel, j * 0.3, 0.158, 0, F);
+        box(g, 0.09, yb - 0.14 - 0.15, 0.09, SH.steel, j * 0.3, (yb - 0.14 + 0.15) / 2, 0, F);
         box(g, 0.16, 0.04, 0.3, SH.steel, j * 0.3, yb - 0.02, 0, F);                                     // papucul conductei
-        cyl(g, rH + 0.013, rH + 0.013, 0.04, SH.steel, j * 0.3, hl, 0, 12, RCZ, F);                      // brida
+        if (!Q.lite) cyl(g, rH + 0.013, rH + 0.013, 0.04, SH.steel, j * 0.3, hl, 0, 12, RCZ, F);        // brida
       }
       box(g, 1.0, 0.1, 0.12, SH.steel, 0, yb - 0.09, 0, F);
     });
@@ -3109,7 +3110,33 @@ var Scene3D = (function () {
         box(bess, 1.1, 1.0, 0.25, SH.trafoFin, xB0 - 2.6, 0.95, zB0 - 6.65, false); box(bess, 1.1, 1.0, 0.25, SH.trafoFin, xB0 - 2.6, 0.95, zB0 - 5.35, false);
         for (j = -1; j <= 1; j++) cyl(bess, 0.05, 0.08, 0.35, SH.ceramic, xB0 - 2.6 + j * 0.4, 1.8, zB0 - 6, 8, null, false);
       }
+      // cablurile bateriilor: de la statia de conversie un canal cu capace merge pe latura de sud a containerelor
+      // si se uneste, intr-un camin, cu santul panourilor (x = -W/2 + 3), care duce la dulapul de pe peretele de nord
+      var bTx = -W / 2 + 3, bTz = zB0 + 1.9, bPx = xB0 - 1.75;
+      box(bess, 0.5, 0.5, 0.2, SH.steel, bPx, 0.72, zB0 + 1.1, false);                                                      // cutia de iesire a cablurilor din statia de conversie
+      for (j = -1; j <= 1; j++) cyl(bess, 0.04, 0.04, 0.16, SH.dark, bPx + j * 0.14, 0.41, zB0 + 1.13, 6, null, false);
+      [[bPx, zB0 + 1.3, bPx, bTz + 0.3], [bPx - 0.3, bTz, bTx - 0.5, bTz]].forEach(function (e) {
+        var ax = Math.abs(e[2] - e[0]) > Math.abs(e[3] - e[1]), len = ax ? Math.abs(e[2] - e[0]) : Math.abs(e[3] - e[1]), mx = (e[0] + e[2]) / 2, mz = (e[1] + e[3]) / 2, t, sd2;
+        box(bess, ax ? len : 0.6, 0.05, ax ? 0.6 : len, SH.concrete, mx, 0.22, mz, false);
+        for (sd2 = -1; sd2 <= 1; sd2 += 2) box(bess, ax ? len : 0.04, 0.062, ax ? 0.04 : len, SH.dark, mx + (ax ? 0 : sd2 * 0.32), 0.226, mz + (ax ? sd2 * 0.32 : 0), false);
+        if (!Q.lite) for (t = 1; t < len; t += 2) box(bess, ax ? 0.025 : 0.6, 0.012, ax ? 0.6 : 0.025, SH.dark, ax ? Math.min(e[0], e[2]) + t : mx, 0.247, ax ? mz : Math.min(e[1], e[3]) + t, false);
+      });
+      box(bess, 1.1, 0.07, 1.1, SH.concrete, bTx, 0.235, bTz, false); box(bess, 0.76, 0.02, 0.76, SH.steel, bTx, 0.28, bTz, false);      // caminul de legatura
       tag(bess, 'bess');
+    }
+    // dulapul de cabluri de pe peretele de nord: aici ies din sant cablurile de la panouri si de la baterii si trec prin perete in sala electrica
+    if (nB || nT) {
+      var bCx = -W / 2 + 3, bCz = -D / 2 - 0.33, bCf = bCz - 0.25;
+      box(bess, 1.9, 0.14, 0.75, SH.concrete, bCx, 0.27, -D / 2 - 0.42, false);                                              // soclu de beton, santul intra in el
+      box(bess, 1.6, 1.55, 0.5, SH.silver, bCx, 1.115, bCz);                                                                 // dulapul, cu spatele la perete
+      box(bess, 1.72, 0.04, 0.62, SH.dark, bCx, 1.91, bCz - 0.04, false);                                                    // copertina
+      box(bess, 0.02, 1.45, 0.012, SH.dark, bCx, 1.115, bCf - 0.004, false);                                                 // rostul dintre cele doua usi
+      for (j = -1; j <= 1; j += 2) {
+        box(bess, 0.03, 0.2, 0.03, SH.steel, bCx + j * 0.1, 1.15, bCf - 0.015, false);                                       // manere
+        box(bess, 0.2, 0.2, 0.012, SH.hazard, bCx + j * 0.42, 1.5, bCf - 0.006, false);                                      // semn de pericol electric
+        box(bess, 0.5, 0.16, 0.014, SH.louver, bCx + j * 0.4, 0.52, bCf - 0.006, false);                                     // aerisiri jos
+        box(bess, 0.035, 0.1, 0.02, SH.steel, bCx + j * 0.77, 1.6, bCf - 0.006, false); box(bess, 0.035, 0.1, 0.02, SH.steel, bCx + j * 0.77, 0.65, bCf - 0.006, false);     // balamale
+      }
     }
     var bN = Math.min(nB, perRowB), xBc = xB0 + bN * 4, zBc = zB0 - (Math.max(1, rowsB) - 1) * 3;
 
@@ -3487,7 +3514,7 @@ var Scene3D = (function () {
     /* --- zone de apasare --- */
     if (nT) zone(root, 'pv', -fieldW / 2 - 2, fieldW / 2 + 2, zPVend - 2, zPV0 + 6.5, 3.2);
     if (nB) zone(root, 'bess', xB0 - 5, xB0 + bN * 8 + 1, zB0 - (Math.max(1, rowsB) - 1) * 6 - 2.5, zB0 + 2.5, 3.4);
-    zone(root, 'cool', W / 2 + 1.5, W / 2 + 4 + coolW, -Math.min(perCol, nCool) * 2 - 1, Math.min(D / 2, Math.min(perCol, nCool) * 2 + 3.5), 3.4);
+    zone(root, 'cool', W / 2 + 0.3, W / 2 + 4 + coolW, Math.min(-Math.min(perCol, nCool) * 2 - 1, hzz - 6), Math.min(D / 2, Math.max(Math.min(perCol, nCool) * 2 + 3.5, hzz + 1.5)), 3.4);      // cuprinde si statia de pompe de langa perete
     zone(root, 'gen', xGen - genLen / 2 - 1, -W / 2 - 1, zGen0 - 4.4 * genS - 0.3, zGen0 + (nGen - 1) * gStep + 4.5, 3.6);
     zone(root, 'sub', xSub - subW / 2, xSub + subW / 2, zSub - subD / 2, zSub + subD / 2, 4 * subS + 2);
     zone(root, 'fiber', xF - 3, xF + 6, D / 2 + 0.6, zRoad - 4.5, 0.8);
@@ -3496,8 +3523,9 @@ var Scene3D = (function () {
     /* --- fluxuri --- */
     var fg = grp(root), xPvIn = -W / 2 + 3;      // panourile si bateriile intra in sala electrica prin peretele de nord, la dulapul de cabluri
     if (nT) flows.pv = new Flow(fg, [[0, zPVmid], [0, zPV0 + 8], [xPvIn, zPV0 + 8], [xPvIn, -D / 2]], COL.sun, k, 14);
-    if (nB) flows.bess = new Flow(fg, [[xBc, zB0 + 1.4], [xBc, -D / 2 - 2.2], [xPvIn - 0.8, -D / 2 - 2.2], [xPvIn - 0.8, -D / 2]], COL.batt, k, 6);
-    flows.grid = new Flow(fg, [[xSub - subW / 2 - 30 * k, zSub + subD / 2 + 2], [xSub, zSub + subD / 2 + 2], [xSub + subW / 2 + 3, zSub + subD / 2 + 2], [xSub + subW / 2 + 3, D / 2 - 2.5], [-W / 2, D / 2 - 2.5]], COL.grid, k, 12);
+    if (nB) flows.bess = new Flow(fg, [[xB0 - 1.75, zB0 + 1.3], [xB0 - 1.75, zB0 + 1.9], [xPvIn - 0.8, zB0 + 1.9], [xPvIn - 0.8, -D / 2]], COL.batt, k, 6);      // pe canalul de cabluri al bateriilor, apoi pe langa santul panourilor
+    var xGr = xSub - subW / 2 + (huge ? 28.7 : big ? subW - 1.3 : 6.3);      // unde coteste curentul in statie: pe canalul de cabluri de dupa transformator
+    flows.grid = new Flow(fg, [[xSub - subW / 2 - 30 * k, stLz], [xGr, stLz], [xGr, D / 2 - 2.5], [-W / 2, D / 2 - 2.5]], COL.grid, k, 12);      // pe sub linie, prin statie, apoi pe canalul de cabluri pana la peretele de vest
     flows.fiberA = new Flow(fg, [[xF, D / 2], [xF, zRoad - 6.2], [x0 - 60 * k, zRoad - 6.2]], COL.fiber, k * 0.7, 8);
     flows.fiberB = new Flow(fg, [[xF + 3, D / 2], [xF + 3, zRoad - 9], [x1 + 60 * k, zRoad - 9]], COL.fiber, k * 0.7, 8);
     flows.fiberA.set(0.5, 1); flows.fiberB.set(0.5, -1);
@@ -3513,9 +3541,9 @@ var Scene3D = (function () {
         building: [0, H + 3, 0], pv: nT ? [0, 7 * k, zPVmid] : null, bess: nB ? [xBc, 6, zBc] : null,
         sub: [xSub, 4 * subS + 5, zSub], gen: [xGen, 6, zGm],
         cool: [coolX0 + (coolCols - 1) * (coolLen + 2) / 2, 6, 0], fiber: [xF + 1.5, 2.5, zRoad - 7],
-        f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [xBc, 1.3 * k, (zB0 + 1.4 - D / 2 - 2.2) / 2] : null,
-        f_grid: [xSub + subW / 2 + 3, 1.3 * k, (zSub + subD / 2 + 2 + D / 2 - 2.5) / 2], f_gen: [-W / 2 - 1.6, 1.3 * k, (zGen0 + zGm) / 2],
-        r_gpu: [rackPos[0] + 1.21, 1.95, rackPos[1] - 0.1], r_cool: [rackPos[0] - 0.5, 2.42, rackPos[1] + 0.2], r_net: [rackPos[0] + 0.35, 2.5, rackPos[1]],
+        f_pv: nT ? [xPvIn / 2, 1.3 * k, zPV0 + 8] : null, f_bess: nB ? [(xB0 - 1.75 + xPvIn - 0.8) / 2, 1.3 * k, zB0 + 1.9] : null,
+        f_grid: [xSub + subW / 2 + 4, 1.3 * k, D / 2 - 2.5], f_gen: [-W / 2 - 1.6, 1.3 * k, (zGen0 + zGm) / 2],
+        r_gpu: [rackPos[0] + 1.21, 1.95, rackPos[1] - 0.1], r_cool: [rackPos[0] - 0.53, 2.42, rackPos[1] + 0.2], r_net: [rackPos[0] + 0.35, 2.5, rackPos[1]],
         r_srv: [rackPos[0] + 0.62, 0.95, rackPos[1] + 0.25], r_pow: [rackPos[0] + 0.55, 0.47, rackPos[1] + 0.28]
       },
       views: {
@@ -4454,7 +4482,8 @@ var Scene3D = (function () {
     var o = { r: r, out: out, ch: ch, dis: dis, gr: gr, ex: ex, soc: soc, eps: eps };
     o.load = mw(r.load);
     o.pv = st.pv === 0 ? 'fără panouri' : out ? 'oprite' : r.pv > eps ? 'produc ' + mw(r.pv) : night ? 'noapte, nu produc' : 'nu produc';
-    o.batt = st.bess === 0 ? 'fără baterii' : pct(soc) + ' pline, ' + (out ? 'așteaptă' : ch > eps ? 'se încarcă cu ' + mw(ch) : dis > eps ? 'dau ' + mw(dis) : 'așteaptă');
+    // procentul este cel de la sfarsitul orei: cand se incarca sau dau curent spunem unde ajung, ca sa nu apara „100% pline, se incarca”
+    o.batt = st.bess === 0 ? 'fără baterii' : out ? pct(soc) + ' pline, așteaptă' : ch > eps ? 'se încarcă cu ' + mw(ch) + ', ajung la ' + pct(soc) : dis > eps ? 'dau ' + mw(dis) + ', coboară la ' + pct(soc) : pct(soc) + ' pline, așteaptă';
     o.gridLbl = out ? 'Rețea' : ex > eps ? 'Dăm în rețea' : 'Luăm din rețea';
     o.grid = out ? 'pană de curent' : ex > eps ? mw(ex) : gr > eps ? mw(gr) : 'nimic';
     o.temp = typeof r.temp === 'number' && isFinite(r.temp) ? num(r.temp, 0) + ' °C' : '';
@@ -4488,7 +4517,7 @@ var Scene3D = (function () {
     lab('f_bess', !out && (o.ch > eps || o.dis > eps), o.ch > eps ? 'se încarcă ' + mw(o.ch) : 'dau ' + mw(o.dis));
     lab('f_grid', out || o.gr > eps || o.ex > eps, out ? 'pană' : o.ex > eps ? 'dăm în rețea ' + mw(o.ex) : 'luăm din rețea ' + mw(o.gr));
     lab('f_gen', so === 2, mw(r.load));
-    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + pct(o.soc) + ' pline');
+    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + (out ? pct(o.soc) + ' pline' : o.ch > eps ? 'ajung la ' + pct(o.soc) : o.dis > eps ? 'coboară la ' + pct(o.soc) : pct(o.soc) + ' pline'));
   }
 
   function render() { calc(); fill(); drawOutage(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawFund(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }

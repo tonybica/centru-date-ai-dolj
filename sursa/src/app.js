@@ -501,7 +501,8 @@
     var o = { r: r, out: out, ch: ch, dis: dis, gr: gr, ex: ex, soc: soc, eps: eps };
     o.load = mw(r.load);
     o.pv = st.pv === 0 ? 'fără panouri' : out ? 'oprite' : r.pv > eps ? 'produc ' + mw(r.pv) : night ? 'noapte, nu produc' : 'nu produc';
-    o.batt = st.bess === 0 ? 'fără baterii' : pct(soc) + ' pline, ' + (out ? 'așteaptă' : ch > eps ? 'se încarcă cu ' + mw(ch) : dis > eps ? 'dau ' + mw(dis) : 'așteaptă');
+    // procentul este cel de la sfarsitul orei: cand se incarca sau dau curent spunem unde ajung, ca sa nu apara „100% pline, se incarca”
+    o.batt = st.bess === 0 ? 'fără baterii' : out ? pct(soc) + ' pline, așteaptă' : ch > eps ? 'se încarcă cu ' + mw(ch) + ', ajung la ' + pct(soc) : dis > eps ? 'dau ' + mw(dis) + ', coboară la ' + pct(soc) : pct(soc) + ' pline, așteaptă';
     o.gridLbl = out ? 'Rețea' : ex > eps ? 'Dăm în rețea' : 'Luăm din rețea';
     o.grid = out ? 'pană de curent' : ex > eps ? mw(ex) : gr > eps ? mw(gr) : 'nimic';
     o.temp = typeof r.temp === 'number' && isFinite(r.temp) ? num(r.temp, 0) + ' °C' : '';
@@ -535,7 +536,7 @@
     lab('f_bess', !out && (o.ch > eps || o.dis > eps), o.ch > eps ? 'se încarcă ' + mw(o.ch) : 'dau ' + mw(o.dis));
     lab('f_grid', out || o.gr > eps || o.ex > eps, out ? 'pană' : o.ex > eps ? 'dăm în rețea ' + mw(o.ex) : 'luăm din rețea ' + mw(o.gr));
     lab('f_gen', so === 2, mw(r.load));
-    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + pct(o.soc) + ' pline');
+    if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + (out ? pct(o.soc) + ' pline' : o.ch > eps ? 'ajung la ' + pct(o.soc) : o.dis > eps ? 'coboară la ' + pct(o.soc) : pct(o.soc) + ' pline'));
   }
 
   function render() { calc(); fill(); drawOutage(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawFund(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }

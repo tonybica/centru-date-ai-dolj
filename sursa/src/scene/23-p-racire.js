@@ -90,9 +90,10 @@
       var F = false, yb = hl - rH, j;
       box(g, 1.2, 0.15, 0.4, SH.concrete, 0, 0.075, 0, F);
       for (j = -1; j <= 1; j += 2) {
-        box(g, 0.2, 0.015, 0.2, SH.steel, j * 0.3, 0.158, 0, F); box(g, 0.09, yb - 0.14 - 0.15, 0.09, SH.steel, j * 0.3, (yb - 0.14 + 0.15) / 2, 0, F);
+        if (!Q.lite) box(g, 0.2, 0.015, 0.2, SH.steel, j * 0.3, 0.158, 0, F);
+        box(g, 0.09, yb - 0.14 - 0.15, 0.09, SH.steel, j * 0.3, (yb - 0.14 + 0.15) / 2, 0, F);
         box(g, 0.16, 0.04, 0.3, SH.steel, j * 0.3, yb - 0.02, 0, F);                                     // papucul conductei
-        cyl(g, rH + 0.013, rH + 0.013, 0.04, SH.steel, j * 0.3, hl, 0, 12, RCZ, F);                      // brida
+        if (!Q.lite) cyl(g, rH + 0.013, rH + 0.013, 0.04, SH.steel, j * 0.3, hl, 0, 12, RCZ, F);        // brida
       }
       box(g, 1.0, 0.1, 0.12, SH.steel, 0, yb - 0.09, 0, F);
     });
