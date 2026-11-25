@@ -550,6 +550,15 @@
 
   /* ---------- capitole ---------- */
   function isPhone() { return window.matchMedia && window.matchMedia('(max-width: 900px)').matches; }
+  var REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function viewTop() { return document.querySelector('.main').getBoundingClientRect().top + window.pageYOffset - 6; }
+  function toView(always) {       // pe telefon: aduce macheta in ecran cand apesi ceva care o schimba
+    if (!isPhone()) return;
+    var r = $('view').getBoundingClientRect();
+    if (!always && r.top > -r.height * 0.35) return;
+    var y = viewTop(); if (window.pageYOffset <= y) return;
+    try { window.scrollTo({ top: y, behavior: REDUCED ? 'auto' : 'smooth' }); } catch (e) { window.scrollTo(0, y); }
+  }
   function goChapter(i, instant) {
     i = Math.max(0, Math.min(chapters.length - 1, i));
     resetModes(); st.ch = i;
@@ -557,13 +566,7 @@
     [].forEach.call($('toc').children, function (b, k) { b.setAttribute('aria-current', k === i); if (k === i) { var t = $('toc'); t.scrollLeft = Math.max(0, b.offsetLeft - t.clientWidth / 2 + b.clientWidth / 2); } });
     $('pos').textContent = (i + 1) + ' din ' + chapters.length; $('prev').disabled = i === 0; $('next').disabled = i === chapters.length - 1;
     $('scroll').scrollTop = 0;
-    if (!instant && isPhone()) {      // pe telefon macheta ramane sus; aducem inceputul capitolului sub ea
-      var main = document.querySelector('.main'), view = $('view'), story = document.querySelector('.story');
-      var top0 = main.getBoundingClientRect().top + window.pageYOffset, stuck = getComputedStyle(view).position === 'sticky';
-      // capitolele care folosesc ora, luna si vremea raman cu bara la vedere; la celelalte textul incepe imediat sub macheta
-      var y = chapters[i].hasAttribute('data-dock') ? top0 : story.getBoundingClientRect().top + window.pageYOffset - (stuck ? view.offsetHeight + 8 : 0);
-      if (window.pageYOffset > y) window.scrollTo(0, y);
-    }
+    if (!instant) toView(true);      // pe telefon macheta sta in capul paginii: la capitol nou ne intoarcem la ea
     var view = chapters[i].getAttribute('data-view'), roof = view === 'inside';
     roofUi(roof);
     if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview'); }
@@ -644,6 +647,8 @@
     });
     $('prev').addEventListener('click', function () { goChapter(st.ch - 1); });
     $('next').addEventListener('click', function () { goChapter(st.ch + 1); });
+    $('to-view').addEventListener('click', function () { toView(true); });
+    if (window.IntersectionObserver) new IntersectionObserver(function (en) { var away = !en[0].isIntersecting && isPhone(); $('to-view').hidden = !away; document.querySelector('.pager').classList.toggle('away', away); }, { threshold: 0.05 }).observe($('view'));
     document.addEventListener('keydown', function (e) {
       var tg = e.target && e.target.tagName; if (tg === 'INPUT' || tg === 'SELECT' || tg === 'TEXTAREA') return;
       if (e.key === 'ArrowRight') goChapter(st.ch + 1); else if (e.key === 'ArrowLeft') goChapter(st.ch - 1);
@@ -658,10 +663,10 @@
     $('b-in').addEventListener('click', function () { if (has3d) Scene3D.zoom(0.8); });
     $('b-out').addEventListener('click', function () { if (has3d) Scene3D.zoom(1.25); });
     $('play').addEventListener('click', function () { if (st.playing) stopPlay(); else startPlay(); });
-    $('b-rack').addEventListener('click', function () { setRack(!st.rack); });
-    $('b-thermal').addEventListener('click', function () { setThermal(!st.thermal); });
-    $('b-outage').addEventListener('click', function () { if (this.getAttribute('aria-pressed') === 'true') stopOutage(); else startOutage(); });
-    $('b-build').addEventListener('click', function () { if (st.building) stopBuild(); else { if (st.buildM === null) setBuildMonth(0); startBuild(); } });
+    $('b-rack').addEventListener('click', function () { setRack(!st.rack); toView(); });
+    $('b-thermal').addEventListener('click', function () { setThermal(!st.thermal); toView(); });
+    $('b-outage').addEventListener('click', function () { if (this.getAttribute('aria-pressed') === 'true') stopOutage(); else { startOutage(); toView(); } });
+    $('b-build').addEventListener('click', function () { if (st.building) stopBuild(); else { if (st.buildM === null) setBuildMonth(0); startBuild(); toView(); } });
     $('s-build').addEventListener('input', function () { stopBuild(); setBuildMonth(+this.value); });
 
     // tooltip-uri pe grafice

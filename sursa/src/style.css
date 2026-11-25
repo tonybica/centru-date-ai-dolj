@@ -227,14 +227,16 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
 .pager .go { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 16px; cursor: pointer; font: 600 14px var(--font-display); }
 .pager .go.next { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .pager .go:disabled { opacity: .35; cursor: default; }
+.pager .go.up { padding: 8px 12px; color: var(--muted); }
+.pager.away #pos { display: none; }
 
 @media (max-width: 900px) {
-  /* Pe telefon: macheta ramane lipita sus, bara cu ora si vremea aluneca sub ea cand citesti, iar butoanele Inapoi / Inainte stau jos. */
+  /* Pe telefon: macheta sta in capul paginii si pleaca din ecran cand derulezi sa citesti; butoanele Inapoi / Inainte raman jos, iar "Macheta" te duce inapoi la ea. */
   html, body { height: auto; }
   .app { height: auto; padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }
   .main { display: flex; flex-direction: column; gap: 0; }
   .stage { display: contents; }
-  .view { position: sticky; top: 0; z-index: 20; flex: none; height: 38vh; min-height: 230px; max-height: 340px; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
+  .view { position: relative; flex: none; height: 42vh; min-height: 240px; max-height: 380px; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
   .dock { margin-top: 8px; border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; gap: 6px; }
   .dock .chips { display: none; }
   .dock .btn { padding: 5px 10px; }
@@ -260,4 +262,4 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
   .pick > span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
-@media (max-width: 900px) and (max-height: 520px) { .view { position: relative; height: 78vh; max-height: none; } .pager { position: static; } }
+@media (max-width: 900px) and (max-height: 520px) { .view { height: 78vh; max-height: none; } .pager { position: static; } }
