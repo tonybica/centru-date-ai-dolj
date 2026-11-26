@@ -1,80 +1,132 @@
-    /* --- parcul fotovoltaic --- */
-    // mese de 30 kWp (52 de module), pas intre randuri 9,8 m (la 44 de grade nord randurile nu se umbresc iarna la pranz): circa 1,1 ha pe MWp
-    var nT = Math.ceil(p.pv * 1000 / 30), pitch = 9.8, colW = 32;
-    var nc = Math.max(1, Math.round(Math.sqrt(nT * 0.42))), nr = Math.max(1, Math.ceil(nT / nc));
-    function colX(c) { return c * colW + Math.floor(c / 4) * 6; }
-    var fieldW = nT ? colX(nc - 1) + 30 : 0, fieldD = nT ? nr * pitch : 0, tables = null, inv = null, pvG = grp(root);
-    if (nT > 0) {
-      tables = inst(root, pvTableTpl(), nT);
-      for (i = 0; i < nT; i++) { mtx.compose(pos.set(colX(i % nc) + 15 - fieldW / 2, 0, zPV0 - Math.floor(i / nc) * pitch - 2.3), q0, one); tables.setMatrixAt(i, mtx); }
-      inv = grp(root);
+    /* --- panouri fotovoltaice pe acoperisurile halelor --- */
+    // Baza nu are teren liber, deci modulele stau pe acoperisuri: 2,28 x 1,13 m, 580 Wp, culcate pe tabla pe ambele ape (panta de 5 grade, fara cadre inclinate),
+    // cu latura lunga pe directia coamei. Raman libere: 1 m la streasina, la coama si la capete, plus o trecere de 0,7 m dupa fiecare bloc de 5 module (11,5 m).
+    // Ordinea de umplere: hala centrului, apoi halele 1, 3, 4, 5, 6, 8, 9 si, cat mai lipseste pana la tinta, hala 2.
+    // La tinta de 1,2 MWp: hala centrului 146 kWp (252 de module), 1: 244, 3: 209, 4: 116, 5: 87, 6: 70, 8: 35, 9: 52, 2: 244 (din 296 posibili) => 2 072 de module, 1 202 kWp.
+    // Pe metrul patrat de acoperis: 159 W pe hala centrului, 153 pe hala 1, intre 84 si 133 pe halele inguste (blocurile intregi de 5 module lasa capete libere).
+    // Toate cele noua acoperisuri pline ar da 1 254 kWp, deci tinta de 1,2 MWp le foloseste aproape in intregime.
+    var pvG = grp(root), tables = null, inv = null, nT = 0, pvZs = [], pvA = [62.75, H + 6, 0], pvPath = null, pv_kw = {}, pv_hall = grp(roofGroup);
+    (function () {
+      var need = Math.ceil(p.pv * 1e6 / PV_WP - 1e-6);
+      if (!(need > 0)) return;
+      pvMats();
+      var a = Math.atan(BZ_SLOPE), ca = Math.cos(a), rowP = PV_MD + PV_GAP, modP = PV_MW + PV_GAP, blkL = PV_NB * modP - PV_GAP, walk = 0.7, placed = 0, lay = {}, blocks = [];
+      function nRows(b) { return Math.max(0, Math.floor((bzRoof(b).half / ca - 2 + PV_GAP) / rowP)); }
+      function rowD(n) { return (1 + PV_MD / 2 + n * rowP) * ca; }                // distanta in plan de la coama la mijlocul randului n
+
+      // 1. hala centrului: modulele stau in pv_hall, un grup din roofGroup, ca sa se ridice si sa se stinga odata cu acoperisul
       (function () {
-        var hw = fieldW / 2, zT = zPV0 + 0.55, zs = zPV0 + 2.9, xR = -W / 2 + 3, a, b, c, r, n, x, z, st = [], si = [], lines = {}, xa, xb;
-        // santuri: pe pamant capace de beton la 0,10, pe platforma la 0,245; rame de otel pe margini si rosturi la 2 m
-        function trench(x0, z0, x1, z1, top, h) {
-          var alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), len = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, t, sdd;
-          if (len < 0.05) return;
-          box(pvG, alongX ? len : 0.6, h, alongX ? 0.6 : len, SH.concrete, mx, top - h / 2, mz, false);
-          for (sdd = -1; sdd <= 1; sdd += 2) box(pvG, alongX ? len : 0.04, h + 0.012, alongX ? 0.04 : len, SH.dark, mx + (alongX ? 0 : sdd * 0.32), top - h / 2 + 0.006, mz + (alongX ? sdd * 0.32 : 0), false);
-          if (!Q.lite) for (t = 1; t < len; t += 2) box(pvG, alongX ? 0.025 : 0.6, 0.012, alongX ? 0.6 : 0.025, SH.dark, alongX ? Math.min(x0, x1) + t : mx, top + 0.002, alongX ? mz : Math.min(z0, z1) + t, false);
+        var r = bzRoof(HALL), nr = nRows(HALL), Lu = r.len - 2, n = Math.floor((Lu + PV_GAP) / modP), g = 1, gN = [], ord = [], q, sdd, row, x, tot, z;
+        while (n > 0) { g = Math.ceil(n / PV_NB); if (n * modP - PV_GAP + (g - 1) * 0.8 <= Lu) break; n--; }      // grupuri de cel mult 5 module, cu treceri de 0,8 m
+        if (n < 1 || nr < 1) return;
+        for (q = 0; q < g; q++) gN.push(Math.floor(n / g) + (q < n % g ? 1 : 0));
+        gN.forEach(function (v, q2) { if (q2 % 2) ord.push(v); else ord.unshift(v); });
+        tot = n * modP - PV_GAP + (g - 1) * 0.8;
+        for (sdd = -1; sdd <= 1; sdd += 2) for (row = 0; row < nr; row++) {
+          x = -tot / 2; z = r.cz + sdd * rowD(row);
+          for (q = 0; q < g; q++) {
+            var gl2 = ord[q] * modP - PV_GAP;
+            if (placed < need) { pvRow(pv_hall, SH.pvRoof, ord[q], r.cx + x + gl2 / 2, bzRoofY(HALL, r.cx, z), z, sdd * a, true); placed += ord[q]; }
+            x += gl2 + 0.8;
+          }
         }
-        function pit(x, z, top) { box(pvG, 1.1, top, 1.1, SH.concrete, x, top / 2, z, false); box(pvG, 0.76, 0.02, 0.76, SH.steel, x, top + 0.01, z, false); }
-        function marker(x, z) { box(pvG, 0.1, 0.5, 0.1, SH.concrete, x, 0.25, z, false); box(pvG, 0.11, 0.09, 0.11, SH.stripe, x, 0.545, z, false); }
-
-        // statii de transformare: una la cel mult 5 MWp, langa un drum, niciodata pe el
-        n = Math.max(1, Math.ceil(p.pv / 5));
-        for (a = 0; a < n; a++) {
-          x = -hw + (a + 0.5) * fieldW / n;
-          for (c = 4; c < nc; c += 4) { b = colX(c) - 4 - hw; if (Math.abs(x - b) < 6.5) x = b + 7.5; }
-          st.push(x); inverterStation(inv, x, zs);
-          trench(x + 2.05, zT + 0.3, x + 2.05, zs - 1.6, 0.1, 0.1); trench(x + 3.4, zT + 0.3, x + 3.4, zs - 1.6, 0.1, 0.1);      // intrarea de joasa tensiune si iesirea de medie tensiune
-        }
-        tag(inv, 'pv');
-
-        // invertoare de sir: unul la 8 mese (2 randuri x 4 coloane), la capatul vestic al mesei din fata
-        for (c = 0; c < nc; c += 4) for (r = 0; r < nr; r += 2) {
-          n = 0;
-          for (a = r; a < Math.min(nr, r + 2); a++) for (b = c; b < Math.min(nc, c + 4); b++) if (a * nc + b < nT) n++;
-          if (n >= 4) { si.push([colX(c) - 0.3 - hw, zPV0 - r * pitch - 2.871]); lines[c] = zPV0 - r * pitch - 2.871; }
-        }
-        var siI = inst(inv, pvStringInvTpl(), si.length);
-        si.forEach(function (q, k) { mtx.compose(pos.set(q[0], 0, q[1]), q0, one); siI.setMatrixAt(k, mtx); });
-
-        // santuri ingropate de joasa tensiune: fasie de pamant proaspat astupat si borne de marcaj, de la invertoare pana la coridorul din sud
-        xa = xb = st[0];
-        for (c = 0; c < nc; c += 4) if (lines[c] !== undefined) {
-          x = colX(c) - 1.2 - hw; xa = Math.min(xa, x); xb = Math.max(xb, x);
-          flat(pvG, 0.5, zT - lines[c], SH.soil, x, 0.068, (zT + lines[c]) / 2);
-        }
-        si.forEach(function (q, k) { flat(pvG, 0.9, 0.35, SH.soil, q[0] - 0.55, 0.069, q[1]); if (!Q.lite && k % 2 === 0) marker(q[0] - 1.25, q[1] + 0.6); });
-        st.forEach(function (x) { xa = Math.min(xa, x + 2.05); xb = Math.max(xb, x + 3.4); });
-        flat(pvG, xb - xa + 0.6, 0.7, SH.soil, (xa + xb) / 2, 0.068, zT);
-        if (!Q.lite) for (x = xa + 15; x < xb - 5; x += 30) marker(x, zT - 0.55);
-
-        // sant de medie tensiune cu capace: de la statii pe coridorul din sud, apoi spre sud pe x = -W/2 + 3 pana la dulapul de pe peretele nordic
-        xa = Math.min(xR, st[0] + 3.4); xb = Math.max(xR, st[st.length - 1] + 3.4);
-        trench(xa - 0.3, zT, xb + 0.3, zT, 0.1, 0.1);
-        pit(xR, zT, 0.16);
-        trench(xR, zT + 0.55, xR, platZ0 - 0.15, 0.1, 0.1);
-        trench(xR, platZ0 + 0.15, xR, -D / 2 - 0.3, 0.245, 0.05);
-
-        // drumuri de intretinere din pietris, late de 4 m, legate de platforma; fasii batatorite intre randuri
-        for (c = 4; c < nc; c += 4) flat(pvG, 4, fieldD + 6.85, SH.gravel, colX(c) - 4 - hw, 0.075, zPV0 - fieldD / 2 + 1.425);
-        flat(pvG, fieldW + 12, 4, SH.gravel, 0, 0.07, zPV0 - fieldD - 3.2);
-        for (sd = -1; sd <= 1; sd += 2) flat(pvG, 4, fieldD + 10.05, SH.gravel, sd * (hw + 4), 0.072, zPV0 - fieldD / 2 - 0.175);
-        for (r = 0; r < nr; r++) flat(pvG, fieldW, 1.6, SH.soil, 0, 0.065, zPV0 - r * pitch - 2.3 - pitch / 2);
-
-        // statie meteo pe fundatie, in coltul de sud-vest
-        var wmx = -hw + 2, wmz = zPV0 + 2.4;
-        box(pvG, 0.6, 0.25, 0.6, SH.concrete, wmx, 0.125, wmz, false);
-        cyl(pvG, 0.04, 0.06, 5, SH.steel, wmx, 2.7, wmz, 8); box(pvG, 1.3, 0.05, 0.05, SH.steel, wmx, 4.8, wmz, false); sph(pvG, 0.11, SH.silver, wmx - 0.6, 4.95, wmz, false, 1, 0);
-        box(pvG, 0.03, 0.1, 0.03, SH.steel, wmx + 0.55, 4.86, wmz, false); box(pvG, 0.4, 0.03, 0.3, SH.panel, wmx + 0.55, 4.92, wmz, false, [0.436, 0, 0]); box(pvG, 0.35, 0.45, 0.2, SH.white, wmx, 1.5, wmz + 0.12, false);
-        cyl(pvG, 0.02, 0.02, 1.3, SH.dark, wmx + 0.07, 0.65, wmz + 0.12, 6, null, false);
-        // container de piese de schimb, pe traverse de beton
-        var spx = hw + 7.6, spz = zPV0 - 9;
-        for (a = -1; a <= 1; a++) box(pvG, 2.7, 0.15, 0.3, SH.concrete, spx, 0.075, spz + a * 2.7, false);
-        box(pvG, 2.44, 2.6, 6.06, SH.contDark, spx, 1.45, spz); box(pvG, 2.2, 2.3, 0.05, SH.cont, spx, 1.42, spz + 3.04, false); box(pvG, 0.04, 1.6, 0.04, SH.steel, spx - 0.3, 1.42, spz + 3.08, false); box(pvG, 0.04, 1.6, 0.04, SH.steel, spx + 0.3, 1.42, spz + 3.08, false);
-        ao(pvG, 2.6, 6.2, spx, 0.08, spz, 1.4);
+        pv_kw[0] = placed * PV_WP / 1000; lay[0] = { nr: nr };
       })();
-    }
-    var zPVmid = zPV0 - fieldD / 2, zPVend = zPV0 - fieldD;
+
+      // 2. celelalte hale: blocuri de 5 module, desenate ca instante (numarul lor creste in timpul santierului)
+      [1, 3, 4, 5, 6, 8, 9, 2].forEach(function (id) {
+        var b = bzGet(id); if (!b || placed >= need) return;
+        var r = bzRoof(b), nr = nRows(b), nb = Math.floor((r.len - 2 + walk) / (blkL + walk)), tot = nb * blkL + (nb - 1) * walk, cnt = 0, sdd, row, q, al, d;
+        if (nb < 1 || nr < 1) return;
+        for (sdd = -1; sdd <= 1; sdd += 2) for (row = 0; row < nr; row++) for (q = 0; q < nb; q++) {
+          if (placed >= need) break;
+          al = -tot / 2 + blkL / 2 + q * (blkL + walk); d = sdd * rowD(row);
+          blocks.push(r.alongX ? [r.cx + al, bzRoofY(b, r.cx + al, r.cz + d), r.cz + d, 0, sdd] : [r.cx + d, bzRoofY(b, r.cx + d, r.cz + al), r.cz + al, 1, sdd]);
+          placed += PV_NB; cnt++;
+        }
+        lay[id] = { b: b, r: r, nr: nr, nb: nb, tot: tot, n: cnt };
+        pv_kw[id] = cnt * PV_NB * PV_WP / 1000;
+        pvZs.push([b.x0, b.x1, b.z0, b.z1, b.h + r.rise + 0.6]);
+      });
+      nT = blocks.length;
+      if (nT) {
+        var xAx = new T.Vector3(1, 0, 0), zAx = new T.Vector3(0, 0, 1), qYaw = new T.Quaternion().setFromAxisAngle(yAx, Math.PI / 2), qT = {};
+        [-1, 1].forEach(function (s) {
+          qT['0' + s] = new T.Quaternion().setFromAxisAngle(xAx, s * a);
+          qT['1' + s] = new T.Quaternion().setFromAxisAngle(zAx, -s * a).multiply(qYaw);
+        });
+        tables = inst(root, pvBlockTpl(), nT, !Q.lite); tag(tables, 'pv');
+        // modulele de pe hala centrului apar in santier odata cu primele blocuri de pe celelalte hale (etapa „panouri”)
+        tables.onBeforeRender = function () { var v = this.count > 0; if (pv_hall.visible !== v) { pv_hall.visible = v; shadowDirty = true; } };
+        blocks.forEach(function (e, q) { mtx.compose(pos.set(e[0], e[1], e[2]), qT['' + e[3] + e[4]], one); tables.setMatrixAt(q, mtx); });
+        tables.instanceMatrix.needsUpdate = true;
+      }
+
+      // 3. invertoare pe pereti, jgheaburi de curent continuu pe acoperis si pe perete, trasee ingropate pana la caminul de la (15, zCor)
+      inv = grp(pvG);
+      var xS = 115, yTop = 0.05, sets = [], zMin = zCor, zMax = zCor, xTr = 15.55;
+      // jgheab culcat pe tabla, de la randul cel mai de jos de pe apa opusa, peste coama, pana dincolo de streasina peretelui cu invertoare
+      function roofTray(b, r, al, nearS, nr) {
+        [[nearS, r.half + 0.53], [-nearS, (1 + nr * rowP) * ca + 0.15]].forEach(function (e) {
+          var dm = e[1] / 2, y = b.h + r.rise * (1 - dm / r.half) + 0.04, len = e[1] / ca;
+          if (r.alongX) box(inv, 0.2, 0.07, len, SH.steel, al, y, r.cz + e[0] * dm, false, [e[0] * a, 0, 0]);
+          else box(inv, len, 0.07, 0.2, SH.steel, r.cx + e[0] * dm, y, al, false, [0, 0, -e[0] * a]);
+        });
+      }
+      function gapNear(L, target) {             // trecerea dintre blocuri cea mai apropiata de locul dorit (masurat de la mijlocul coamei)
+        var best = null, q, g2;
+        if (L.nb < 2) return (target < 0 ? -1 : 1) * (L.tot / 2 + 0.5);
+        for (q = 0; q < L.nb - 1; q++) { g2 = -L.tot / 2 + blkL + walk / 2 + q * (blkL + walk); if (best === null || Math.abs(g2 - target) < Math.abs(best - target)) best = g2; }
+        return best;
+      }
+      // host = hala pe al carei perete stau invertoarele; side = peretele (N = -z, S = +z, W = -x, E = +x); at = locul dorit de-a lungul peretelui;
+      // out = pana unde iese traseul de la perete inainte sa coteasca spre magistrala (null = merge drept pana la ea)
+      function addSet(host, kw, side, at, fixed, y0, out) {
+        var L = lay[host] || (fixed && lay[0] ? { b: bzGet(host), r: bzRoof(bzGet(host)), nr: 0, nb: 0, tot: 0, n: 1 } : null); if (!L || !L.n || !(kw > 0)) return;
+        var b = L.b, r = L.r, ns = side === 'N' || side === 'W' ? -1 : 1, al = fixed ? at : (r.alongX ? r.cx : r.cz) + gapNear(L, at - (r.alongX ? r.cx : r.cz));
+        var n = Math.max(1, Math.ceil(kw / 125)), o = { n: n, y0: y0, yE: b.h - r.rise * 0.53 / r.half + 0.075, side: 1 };
+        if (r.alongX) { o.x = al; o.z = ns < 0 ? b.z0 : b.z1; o.ux = 1; o.uz = 0; o.nx = 0; o.nz = ns; } else { o.x = ns < 0 ? b.x0 : b.x1; o.z = al; o.ux = 0; o.uz = 1; o.nx = ns; o.nz = 0; }
+        roofTray(b, r, al, ns, Math.max(L.nr, lay[0] && fixed ? lay[0].nr : 0));
+        pvInvSet(inv, o);
+        var uc = n * 0.625, ex = o.x + o.ux * uc + o.nx * 0.75, ez = o.z + o.uz * uc + o.nz * 0.75;      // iesirea din camin
+        sets.push({ ex: ex, ez: ez, alongX: r.alongX, out: out, y0: y0 });
+      }
+      addSet(1, pv_kw[0], 'N', W / 2 + 0.6, true, 0.2, null);          // hala centrului: jgheabul ei coboara pe peretele halei vecine, imediat dupa rost (peretii centrului se coboara cand se ridica acoperisul)
+      addSet(1, pv_kw[1], 'N', 62.75, false, 0, null);
+      addSet(3, pv_kw[3], 'W', -43, false, 0, null);
+      addSet(4, pv_kw[4], 'W', -98.7, false, 0, null);
+      addSet(5, pv_kw[5], 'E', -118.9, false, 0, null);
+      addSet(6, pv_kw[6], 'S', 81.7, false, 0, -99.3);
+      addSet(8, pv_kw[8], 'E', 25.7, false, 0, null);
+      addSet(9, pv_kw[9], 'N', 47, false, 0, 60.3);
+      addSet(2, pv_kw[2], 'S', 115.6, false, 0, -231.6);
+
+      // trasee: pe curtea veche o fasie de beton nou peste santul astupat, cu borne de marcaj; pe platforma noua un canal cu capace
+      function seg(xa, za, xb, zb, onPlat) {
+        var alongX = Math.abs(xb - xa) > Math.abs(zb - za), len = alongX ? Math.abs(xb - xa) : Math.abs(zb - za), mx = (xa + xb) / 2, mz = (za + zb) / 2, t, s2;
+        if (len < 0.05) return;
+        if (onPlat) {
+          box(inv, alongX ? len : 0.6, 0.05, alongX ? 0.6 : len, SH.concrete, mx, 0.225, mz, false);
+          for (s2 = -1; s2 <= 1; s2 += 2) box(inv, alongX ? len : 0.04, 0.062, alongX ? 0.04 : len, SH.dark, mx + (alongX ? 0 : s2 * 0.32), 0.231, mz + (alongX ? s2 * 0.32 : 0), false);
+          if (!Q.lite) for (t = 1; t < len; t += 2) box(inv, alongX ? 0.025 : 0.6, 0.012, alongX ? 0.6 : 0.025, SH.dark, alongX ? Math.min(xa, xb) + t : mx, 0.252, alongX ? mz : Math.min(za, zb) + t, false);
+          return;
+        }
+        box(inv, alongX ? len + 0.5 : 0.5, yTop, alongX ? 0.5 : len + 0.5, SH.concrete, mx, yTop / 2, mz, false);
+        for (t = 12; t < len - 6; t += 24) marker(alongX ? Math.min(xa, xb) + t : mx + 0.42, alongX ? mz - 0.42 : Math.min(za, zb) + t);
+      }
+      function marker(x, z) { box(inv, 0.1, 0.5, 0.1, SH.concrete, x, 0.25, z, false); box(inv, 0.11, 0.09, 0.11, SH.stripe, x, 0.545, z, false); }
+      function pit(x, z, y0) { box(inv, 1.0, 0.1, 1.0, SH.concrete, x, y0 + 0.05, z, false); box(inv, 0.7, 0.02, 0.7, SH.steel, x, y0 + 0.11, z, false); }
+      sets.forEach(function (s) {
+        var plat = s.y0 > 0.1;
+        if (s.alongX) {                          // perete de nord sau de sud: traseul pleaca pe z
+          var zo = s.out === null ? zCor : s.out;
+          if (s.out === null) { seg(s.ex, s.ez, s.ex, zo + (s.ez > zo ? 0.3 : -0.3), plat); xTr = Math.max(xTr, s.ex); if (!plat) pit(s.ex, zo, 0); }
+          else { seg(s.ex, s.ez, s.ex, zo, false); seg(s.ex, zo, xS, zo, false); zMin = Math.min(zMin, zo); zMax = Math.max(zMax, zo); pit(xS, zo, 0); }
+        } else { seg(s.ex, s.ez, xS, s.ez, false); zMin = Math.min(zMin, s.ez); zMax = Math.max(zMax, s.ez); pit(xS, s.ez, 0); }
+      });
+      if (zMin < zCor || zMax > zCor) { seg(xS, zMin, xS, zMax, false); xTr = xS; pit(xS, zCor, 0); }       // magistrala dintre halele 4 si 5
+      // colectorul de-a lungul peretelui de nord al halei lungi, pana la caminul de la capatul santului comun
+      if (xTr > platX1 + 0.4) { seg(platX1 + 0.4, zCor, xTr, zCor, false); seg(15.55, zCor, platX1 - 0.15, zCor, true); } else seg(15.55, zCor, xTr + 0.3, zCor, true);
+      tag(pvG, 'pv');
+      pvPath = (zMin < zCor ? [[xS, zMin], [xS, zCor]] : [[xTr, zCor]]).concat([[15, zCor], [xInB, zCor], [xInB, zNw]]);
+    })();

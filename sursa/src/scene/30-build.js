@@ -1,5 +1,5 @@
 
-  /* ---------- campusul pentru un scenariu ---------- */
+  /* ---------- baza cu centrul de date, pentru un scenariu ---------- */
   function grp(parent) { var g = new T.Group(); parent.add(g); return g; }
   function vpl(parent, w, h, m, x, y, z, rotY) {       // placa subtire in picioare; fara rotatie priveste spre sud
     addGeo(parent, unit('vplane', function () { return new T.PlaneGeometry(1, 1); }), m, x, y, z, w, h, 1, rotY ? [0, rotY, 0] : null, false);
@@ -46,6 +46,8 @@
     var R = rng(11), i, j, sd;
     var mtx = new T.Matrix4(), q0 = new T.Quaternion(), yAx = new T.Vector3(0, 1, 0), qPi = new T.Quaternion().setFromAxisAngle(yAx, Math.PI), one = new T.Vector3(1, 1, 1), pos = new T.Vector3(), qq = new T.Quaternion(), sc = new T.Vector3(), tc = new T.Color();
 
-    var area = 120 + 650 * p.it, W = Math.sqrt(area * 1.5), D = area / W, H = p.it >= 3 ? 9 : 7;
-    var big = p.it >= 0.8, huge = p.it >= 3;
-    var zRoad = D / 2 + 34;
+    // Centrul sta in hala libera 1 a bazei (capatul dinspre calea ferata al halei lungi): 46 x 20 m, streasina la 7 m.
+    // Marimile cladirii nu mai depind de putere, pentru ca hala exista deja. Vezi 34-plan.js pentru planul bazei.
+    var W = 46, D = 20, H = 7;
+    var big = p.it >= 0.8, huge = false;
+    root.rotation.y = NORTH_ROT;

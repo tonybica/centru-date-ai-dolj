@@ -1,13 +1,19 @@
 /* ================= APLICATIA: capitole, cifre, grafice, legatura cu macheta ================= */
 (function () {
   'use strict';
-  var M = Model, A = M.A, FU = M.FUNDS;
+  var M = Model, A = M.A, FU = M.FUNDS, BZ = M.BASE, BK = M.BANK, S0 = M.SCEN.mediu;
   function $(id) { return document.getElementById(id); }
-  var st = { scen: 'mediu', it: 1, pv: 4, bess: 4, hour: 13, month: 6, wx: 1, ch: 0, playing: false, fund: 'fptj', outage: 0, rack: false, thermal: false, buildM: null, building: false };
+  // o singura marime: Mediu, 1 MW, in hala libera 1. Panourile si bateriile se pot muta din cursoare; grantul este o suma aleasa de cititor (0 = planul).
+  var st = { it: S0.it, pv: S0.pv, bess: S0.bess, hour: 13, month: 6, wx: 1, ch: 0, playing: false, fund: FU.plan, outage: 0, rack: false, thermal: false, buildM: null, building: false };
   var cache = { key: '', days: {}, fines: {} };
   var chapters = [].slice.call(document.querySelectorAll('.chapter'));
   var has3d = false;
-  function chIndex(title) { for (var i = 0; i < chapters.length; i++) if (chapters[i].getAttribute('data-title') === title) return i; return 0; }
+  function chIndex(title) { for (var i = 0; i < chapters.length; i++) if (chapters[i].getAttribute('data-title') === title) return i; return -1; }
+  var CH_PLACE = chIndex('Locul');
+  // doua cifre care nu sunt in model: cat loc liber cere centrul in hala si cat iese daca locul nu ajunge (din evaluarea bazei)
+  var HALL_MIN_M2 = 800, IT_IF_SMALL = 0.9;
+  // planul dinainte, pe teren nou: 4 MWp de panouri si 4 MWh de baterii. Folosit doar ca sa aratam de unde vine diferenta de investitie.
+  var OLD_PLAN = { pv: 4, bess: 4 };
 
   /* ---------- formatare romaneasca ---------- */
   function num(x, d) {
@@ -17,16 +23,18 @@
   }
   function trim(s) { return s.indexOf(',') < 0 ? s : s.replace(/0+$/, '').replace(/,$/, ''); }
   function mw(x) { return x < 0.9995 ? num(x * 1000, 0) + ' kW' : trim(num(x, x < 10 ? 2 : 1)) + ' MW'; }
+  function mwp(x) { return trim(num(x, 2)) + ' MWp'; }
   function mil(x) { var a = Math.abs(x); return trim(num(x, a >= 100 ? 0 : a >= 10 ? 1 : 2)) + ' mil. €'; }
   function pct(x) { return num(x * 100, 0) + '%'; }
   function years(x) { return isFinite(x) ? trim(num(x, x < 10 ? 1 : 0)) + ' ani' : 'niciodată'; }
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function eur(x) { return trim(num(x, Math.abs(x) < 10 ? 2 : 0)) + ' €'; }
+  function dscr(x) { return typeof x === 'number' ? num(x, 2) : String(x); }
+  function grantName(g) { return g > 0 ? 'grant de ' + mil(g) : 'fără grant'; }
 
   /* ---------- trei feluri in care poate merge piata ---------- */
   var CASES = [{ k: 'prudent', name: 'Prudent', p: 3.5, o: 0.65 }, { k: 'piata', name: 'Piața de azi', p: 4.5, o: 0.75 }, { k: 'bun', name: 'Bun', p: 5.5, o: 0.85 }];
   var SELL = 'cloud';   // se vand doar ore de GPU (GPU-uri proprii); modelul primeste inca acest cuvant
-  var FUND_NAME = { none: 'fără fonduri', imm: 'grantul pentru IMM', fptj: 'Fondul de Participare Tranziție Justă' };
   function getPO() { return { p: A.gpuHourPrice, o: A.occupancy }; }
   function setPO(p, o) { A.gpuHourPrice = p; A.occupancy = o; }
   function withPO(p, o, fn) { var old = getPO(); setPO(p, o); try { return fn(); } finally { setPO(old.p, old.o); } }
@@ -34,13 +42,14 @@
   function caseText(c) { return trim(num(c.p, 1)) + ' € pe oră, ' + pct(c.o) + ' ocupare'; }
   var scenYears = {};
   function scenYear(k) { var s = M.SCEN[k]; if (!scenYears[k]) scenYears[k] = M.simulateYear(s.it, s.pv, s.bess, A); return scenYears[k]; }
-  function tenOf(it, pv, bess, year, fundKey) {
-    var f = M.finance(it, pv, bess, A, SELL, year), fu = M.funding(fundKey, f, bess, A);
+  function tenOf(it, pv, bess, year, grant) {       // grant = suma ceruta, in mil. EUR; modelul o taie la cat permite apelul
+    var f = M.finance(it, pv, bess, A, SELL, year), fu = M.funding(grant || 0, f);
     var t = M.tenYear(it, pv, bess, A, SELL, year, fu); t.fund = fu; return t;
   }
   function breakTxt(t) { return t.breakeven ? 'în anul ' + t.breakeven : 'nu în 10 ani'; }
   function backCell(t) { return t.breakeven ? 'în anul ' + t.breakeven : 'nu'; }
   function backSent(t) { return t.breakeven ? 'banii se întorc în anul ' + t.breakeven : 'banii nu se întorc în 10 ani'; }
+  function bankRow(g) { for (var i = 0; i < BK.rows.length; i++) if (BK.rows[i].grant === g) return BK.rows[i]; return null; }
 
   /* ---------- calcule ---------- */
   function calc() {
@@ -48,6 +57,7 @@
     if (cache.key !== key) {
       cache.key = key; cache.days = {}; cache.fines = {};
       cache.year = M.simulateYear(st.it, st.pv, st.bess, A);
+      cache.year0 = st.bess > 0 ? M.simulateYear(st.it, st.pv, 0, A) : cache.year;      // acelasi an fara baterii, ca sa aratam cat schimba ele
       cache.ph = M.physical(st.it, st.pv, st.bess, A);
     }
     var dk = st.month + '|' + st.wx;
@@ -59,49 +69,71 @@
     var mx = 0; cache.day.forEach(function (r) { mx = Math.max(mx, r.pv, r.load); }); cache.dayRef = mx;
     cache.fin = M.finance(st.it, st.pv, st.bess, A, SELL, cache.year);
     cache.ten = tenOf(st.it, st.pv, st.bess, cache.year, st.fund);
-    cache.ten0 = st.fund === 'none' ? cache.ten : tenOf(st.it, st.pv, st.bess, cache.year, 'none');
+    cache.ten0 = st.fund === 0 ? cache.ten : tenOf(st.it, st.pv, st.bess, cache.year, 0);
     cache.unit = M.unitCost(st.it, st.pv, st.bess, A, SELL, cache.year);
   }
 
-  var GRID_NOTE = {
-    pilot: 'La mărimea Pilot ajunge un racord de medie tensiune (20 kV), ca la o fabrică mică.',
-    mediu: 'La 1 MW este nevoie de un racord de medie tensiune (20 kV) cu post de transformare propriu.',
-    mare: 'La 5 MW se discută un racord dedicat de medie tensiune sau o stație proprie de 110 kV, în funcție de ce capacitate are rețeaua din zonă.'
-  };
-  // la preturi prudente, pe fiecare marime: se intorc banii in 10 ani? (calculat pe loc, nu scris de mana)
-  function prudentLine() {
-    var c = CASES[0], res = ['pilot', 'mediu', 'mare'].map(function (k) {
-      var s = M.SCEN[k], y = scenYear(k);
-      return withPO(c.p, c.o, function () { return { name: s.name, t0: tenOf(s.it, s.pv, s.bess, y, 'none'), tf: tenOf(s.it, s.pv, s.bess, y, 'fptj') }; });
-    });
-    function list(key) { return res.filter(function (r) { return r[key].breakeven; }).map(function (r) { return r.name + ' (anul ' + r[key].breakeven + ')'; }); }
-    var a = list('t0'), b = list('tf'), head = 'La prețuri prudente (' + trim(num(c.p, 1)) + ' € pe GPU pe oră și ' + pct(c.o) + ' ocupare), ';
-    var s0 = a.length === 0 ? '<b>banii nu se întorc în 10 ani la nicio mărime</b>, dacă nu luăm fonduri' : a.length === 3 ? 'banii se întorc în 10 ani la toate mărimile și fără fonduri: ' + a.join(', ') : 'fără fonduri banii se întorc în 10 ani doar la: ' + a.join(', ');
-    var s1 = b.length === 0 ? (a.length === 0 ? ' Nici cu Fondul de Participare Tranziție Justă nu se întorc.' : ' Cu Fondul de Participare Tranziție Justă nu se întorc la nicio mărime.') : ' Cu Fondul de Participare Tranziție Justă se întorc la: ' + b.join(', ') + '.';
-    return head + s0 + '.' + s1 + ' Planul are sens doar cu prețuri mai bune decât cele prudente sau cu un contract semnat dinainte.';
+  // la preturi prudente: se intorc banii in 10 ani, fara grant si cu grantul cel mai mare? (calculat pe loc, nu scris de mana)
+  function prudent() {
+    var c = CASES[0];
+    return withPO(c.p, c.o, function () { return { c: c, t0: tenOf(st.it, st.pv, st.bess, cache.year, 0), tm: tenOf(st.it, st.pv, st.bess, cache.year, FU.grantMax) }; });
   }
-  var CAL_TOTAL = { pilot: 22, mediu: 27, mare: 34 };
+  function prudentLine(pr) {
+    var c = pr.c, head = 'La prețuri prudente (' + trim(num(c.p, 1)) + ' € pe GPU pe oră și ' + pct(c.o) + ' ocupare), ';
+    var s = !pr.t0.breakeven && !pr.tm.breakeven ? '<b>banii nu se întorc în 10 ani</b>, nici fără grant, nici cu un grant de ' + mil(pr.tm.grant) + '.'
+      : !pr.t0.breakeven ? '<b>banii nu se întorc în 10 ani fără grant</b>. Cu un grant de ' + mil(pr.tm.grant) + ' s-ar întoarce în anul ' + pr.tm.breakeven + '.'
+        : 'banii se întorc în anul ' + pr.t0.breakeven + ', fără grant.';
+    return head + s + ' Planul are sens doar cu prețuri mai bune decât cele prudente sau cu contracte ferme semnate dinainte.';
+  }
+  var CAL_TOTAL = 23;
 
   function values() {
     var ph = cache.ph, y = cache.year, f = cache.fin, v = {};
-    v.it = mw(st.it); v.gpus = num(ph.gpus); v.servers = num(ph.servers); v.racks = num(ph.racks);
-    v.buildingM2 = num(Math.round(ph.buildingM2 / 10) * 10); v.scenName = M.SCEN[st.scen].name;
     function rnd(x) { var q = x < 5000 ? 10 : 100; return Math.round(x / q) * q; }
+    v.it = mw(st.it); v.gpus = num(ph.gpus); v.servers = num(ph.servers); v.racks = num(ph.racks);
+    v.buildingM2 = num(Math.round(ph.buildingM2 / 10) * 10);
     v.loadAvg = mw(ph.loadAvg); v.annualMWh = num(rnd(ph.annualMWh)); v.households = num(rnd(ph.households));
     v.pueRange = ph.pueMin && ph.pueMax ? 'Este o medie pe an: de la ' + trim(num(ph.pueMin, 2)) + ' în nopțile reci până la ' + trim(num(ph.pueMax, 2)) + ' în după-amiezile de vară, când răcirea muncește cel mai mult.' : 'Este o medie pe an: noaptea și iarna răcirea consumă mai puțin, vara la prânz mai mult.';
-    v.gridNote = GRID_NOTE[st.scen]; v.heat = mw(st.it); v.overhead = mw(st.it * (A.pue - 1));
-    v.landHa = trim(num(ph.landHa, 1)); v.pvHa = trim(num(ph.landPvHa, 1));
+    v.heat = mw(st.it); v.overhead = mw(st.it * (A.pue - 1));
+    // baza: tot ce se stie despre loc vine din model
+    v.baseHa = trim(num(BZ.areaHa, 1)); v.baseLen = num(BZ.lenM); v.baseWid = num(BZ.widM); v.baseBuildings = num(BZ.buildings); v.baseRoofM2 = num(BZ.roofM2);
+    v.hallL = num(BZ.hallL); v.hallW = num(BZ.hallW); v.hallM2 = num(BZ.hallM2);
+    v.needM2 = num(Math.round(ph.buildingM2 / 10) * 10) + '–' + num(HALL_MIN_M2); v.hallMinM2 = num(HALL_MIN_M2); v.itSmall = trim(num(IT_IF_SMALL, 2)) + ' MW';
+    v.yardAHa = trim(num(BZ.yardAHa, 1)); v.yardBHa = trim(num(BZ.yardBHa, 1)); v.freeHa = trim(num(BZ.yardAHa + BZ.yardBHa, 1));
+    v.gridReq = mw(BZ.gridReqMW); v.line110m = num(BZ.line110m); v.st1 = BZ.st1; v.st1km = trim(num(BZ.st1km, 1)); v.st2 = BZ.st2; v.st2km = trim(num(BZ.st2km, 1));
+    v.outPanels = 'Panourile obișnuite se opresc singure când cade rețeaua, din motive de siguranță.' + (st.bess > 0 ? ' Bateriile mari din curte pot ajuta la o pană doar dacă invertorul lor este făcut să lucreze și fără rețea. Este o opțiune care se cere din proiectare.' : '');
+    // soarele
+    var yieldYear = 0; M.YIELD.forEach(function (k) { yieldYear += k; });
+    v.pvPlan = mwp(S0.pv); v.pvMax = mwp(BZ.pvMaxMWp); v.roofPerMWp = num(BZ.roofM2PerMWp); v.roofM2 = num(Math.round(ph.roofM2 / 100) * 100);
+    v.yieldKwh = num(Math.round(yieldYear / 10) * 10);
     v.coverage = pct(y.coverage); v.wasteShare = pct(y.wasteShare); v.pvGen = num(Math.round(y.pv / 10) * 10);
-    v.pvFull = trim(num(ph.annualMWh / 1345, 1)) + ' MW de panouri';
-    v.directShare = pct(y.directShare); v.battShare = pct(y.battShare); v.gridShare = pct(1 - y.directShare - y.battShare);
+    var full = ph.annualMWh / yieldYear; v.pvFull = trim(num(full, 1)) + ' MWp'; v.pvFullTimes = num(full / BZ.pvMaxMWp, 0);
+    v.pvLine = 'Centrul consumă aproape la fel zi și noapte, iar soarele produce doar ziua, mai ales vara. ' +
+      (st.pv === 0 ? 'Fără panouri, tot curentul vine din rețea.' : y.exp < 0.5 ? 'La ' + mwp(st.pv) + ', panourile nu produc niciodată mai mult decât consumă centrul. Deci nu se vinde nimic și nu se pierde nimic.'
+        : 'La ' + mwp(st.pv) + ', în zilele senine de vară panourile dau la prânz puțin peste consum. Pleacă în rețea ' + (y.wasteShare < 0.005 ? 'sub 1%' : pct(y.wasteShare)) + ' din ce produc.');
+    // bateriile
+    v.bessCost = mil(A.capexBessPerMWh);
+    var same = Math.round(y.coverage * 100) === Math.round(cache.year0.coverage * 100);
+    v.bessLine = st.bess === 0 ? '<b>Fără baterii mari:</b> soarele acoperă ' + pct(y.coverage) + ' din consum. Acesta este planul.'
+      : '<b>Cu ' + trim(num(st.bess, 1)) + ' MWh de baterii:</b> soarele acoperă ' + (same ? 'tot ' + pct(y.coverage) + ' din consum, la fel ca fără ele' : pct(y.coverage) + ' din consum, față de ' + pct(cache.year0.coverage) + ' fără ele') + '. Investiția crește cu <b>' + mil(f.capex.bess) + '</b>.';
+    v.yearLine = 'Pe tot anul: <b>' + pct(y.directShare) + '</b> direct din panouri, ' + (st.bess > 0 ? '<b>' + pct(y.battShare) + '</b> din baterii, ' : '') + '<b>' + pct(1 - y.directShare - y.battShare) + '</b> din rețea.';
+    v.monthsTitle = st.bess > 0 ? 'Cât din consum acoperă soarele și bateriile, pe luni' : 'Cât din consum acoperă soarele, pe luni';
     v.nightMWh = num(Math.round(ph.loadAvg * 15.2 * 2) / 2, ph.loadAvg < 0.5 ? 1 : 0);
     v.monthName = M.MONTHS[st.month]; v.wxName = M.WEATHER[st.wx].label.toLowerCase();
+    // banii
     v.capexTotal = mil(f.capex.total); v.capexGpu = mil(f.capex.gpu);
-    v.calTotal = CAL_TOTAL[st.scen]; v.prudentLine = prudentLine();
+    v.calTotal = CAL_TOTAL;
+    var pr = prudent(); v.prudentLine = prudentLine(pr);
+    v.prudentShort = pr.t0.breakeven ? 'la prețuri prudente, banii se întorc abia în anul ' + pr.t0.breakeven + '.' : 'la prețuri prudente, investiția nu își scoate banii în 10 ani.';
+    // cat scuteste faptul ca hala si terenul sunt ale firmei: diferenta fata de planul dinainte, minus ce vine din panouri mai putine si din lipsa bateriilor
+    var f0 = M.finance(S0.it, S0.pv, S0.bess, A, SELL, scenYear('mediu')), gap = BK.dolj.capex - f0.capex.total;
+    var gapPv = (OLD_PLAN.pv - S0.pv) * A.capexPvPerMWp + (OLD_PLAN.bess - S0.bess) * A.capexBessPerMWh, own = gap - gapPv;
+    v.saveLine = 'Faptul că hala și terenul sunt ale firmei scutește doar circa <b>' + mil(Math.round(own * 10) / 10) + '</b> din circa ' + mil(Math.round(BK.dolj.capex)) + ', cât costa același centru pe un teren nou. Cea mai mare parte din diferența până la ' + mil(f0.capex.total) + ' vine din panouri mai puține și din lipsa bateriilor. Calculatoarele sunt ' + (Math.abs(f.capex.gpu / f.capex.total - 0.75) < 0.04 ? 'circa trei sferturi' : pct(f.capex.gpu / f.capex.total)) + ' din bani.';
     if (f.ebitda <= 0) v.paybackLine = 'La aceste cifre, veniturile nu acoperă nici cheltuielile de funcționare.';
     else if (f.profit <= 0) v.paybackLine = 'La aceste cifre, banii rămași nu acoperă uzura echipamentelor. Proiectul ar pierde aproximativ <b>' + mil(-f.profit) + ' pe an</b>.';
-    else v.paybackLine = 'La aceste cifre, un an obișnuit rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. ' + (cache.ten.breakeven ? 'Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit și fonduri.' : '<b>Asta nu înseamnă că banii se întorc.</b> Cu clienți care vin treptat, rate la credit și GPU-uri noi în anul 6, capitolul „Zece ani” arată că la aceste prețuri banii nu se întorc în 10 ani.');
-    if (st.pv > 0) v.solarLine = 'Panourile și bateriile aduc aproximativ <b>' + mil(f.solarSaving) + ' pe an</b>: curent pe care nu îl mai cumpărăm și surplus vândut, minus întreținerea lor. Fără ele, curentul ar costa ' + mil(f.energyNoSolar) + ' pe an. Investiția în ele (' + mil(f.capex.pv + f.capex.bess) + ') se plătește singură în circa ' + years(f.solarPayback) + '.';
+    else v.paybackLine = 'La aceste cifre, un an obișnuit rămâne pe plus și după ce punem deoparte bani pentru înlocuirea echipamentelor. ' + (cache.ten.breakeven ? 'Capitolul „Zece ani” arată când se întorc banii, cu tot cu credit.' : '<b>Asta nu înseamnă că banii se întorc.</b> Cu clienți care vin treptat, rate la credit și GPU-uri noi în anul 6, capitolul „Zece ani” arată că la aceste prețuri banii nu se întorc în 10 ani.');
+    var gear = st.bess > 0 ? 'Panourile și bateriile' : 'Panourile';
+    if (st.pv > 0) v.solarLine = gear + ' aduc aproximativ <b>' + mil(f.solarSaving) + ' pe an</b>: curent pe care nu îl mai cumpărăm, minus întreținerea lor. Fără ele, curentul ar costa ' + mil(f.energyNoSolar) + ' pe an. Investiția în ele (' + mil(f.capex.pv + f.capex.bess) + ') se plătește singură în circa <b>' + years(f.solarPayback) + '</b>.';
     else v.solarLine = 'Fără panouri, tot curentul vine din rețea și costă aproximativ <b>' + mil(f.energyNoSolar) + ' pe an</b>.';
     // cat costa o unitate vanduta
     var u = cache.unit, left = u.price - u.total;
@@ -109,23 +141,34 @@
       (left >= 0 ? 'Rămân ' + eur(left) + ' la fiecare oră de GPU.' : 'Pierdem ' + eur(-left) + ' la fiecare oră de GPU.');
     // zece ani
     var t = cache.ten, t0 = cache.ten0, last = t.rows[10].cum;
-    v.tenEquity = mil(t.equity); v.tenGrant = t.grant > 0.0005 ? mil(t.grant) : 'nimic';
-    v.tenGrantSub = st.fund === 'none' ? 'nicio cerere depusă' : st.fund === 'imm' ? 'grant, cel mult ' + mil(FU.immCap) : 'plus ' + mil(t.soft) + ' credit avantajos';
+    v.tenEquity = mil(t.equity); v.tenGrant = t.grant > 0.0005 ? mil(t.grant) : '0';
+    v.tenGrantSub = st.fund === 0 ? 'pe atât se sprijină planul' : st.fund >= FU.grantMax ? 'plafonul apelului, scenariu optimist' : 'scenariu optimist, nu promisiune';
     v.tenBreak = breakTxt(t); v.tenCum = mil(last);
     var po = getPO(), at = trim(num(po.p, 1)) + ' € pe oră și ' + pct(po.o) + ' ocupare';
     v.caseNow = 'Calcul la valorile alese acum: ' + at + '.';
-    if (st.fund === 'none') v.tenLine = 'La ' + at + ', fără fonduri: sunt necesari <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '. ' + cap(backSent(t)) + '.';
-    else v.tenLine = 'La ' + at + ', cu ' + FUND_NAME[st.fund] + ': sunt necesari <b>' + mil(t.equity) + '</b> bani proprii, în loc de ' + mil(t0.equity) + '. ' +
-      (!t.breakeven ? 'La aceste prețuri banii nu se întorc în 10 ani, cu sau fără fonduri.' : !t0.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '.</b> Fără fonduri nu s-ar întoarce în 10 ani.'
-        : t0.breakeven === t.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '</b>, la fel ca fără fonduri, dar cu mai puțini bani proprii puși în joc.' : '<b>Banii se întorc în anul ' + t.breakeven + '</b>, față de anul ' + t0.breakeven + ' fără fonduri.');
+    if (st.fund === 0) v.tenLine = 'La ' + at + ', fără grant: sunt necesari <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '. ' + cap(backSent(t)) + '.';
+    else v.tenLine = 'La ' + at + ', cu un grant de ' + mil(t.grant) + ': sunt necesari <b>' + mil(t.equity) + '</b> bani proprii, în loc de ' + mil(t0.equity) + '. ' +
+      (!t.breakeven ? 'La aceste prețuri banii nu se întorc în 10 ani, cu sau fără grant.' : !t0.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '.</b> Fără grant nu s-ar întoarce în 10 ani.'
+        : t0.breakeven === t.breakeven ? '<b>Banii se întorc în anul ' + t.breakeven + '</b>, la fel ca fără grant, dar cu mai puțini bani proprii puși în joc.' : '<b>Banii se întorc în anul ' + t.breakeven + '</b>, față de anul ' + t0.breakeven + ' fără grant.');
     var res = CASES.map(function (c) { return withPO(c.p, c.o, function () { return { c: c, t: tenOf(st.it, st.pv, st.bess, cache.year, st.fund) }; }); });
-    v.tenNote = '<b>Mărimea ' + M.SCEN[st.scen].name + '.</b> ' + res.map(function (r) { return r.c.name + ': ' + backSent(r.t) + '.'; }).join(' ') +
+    v.tenNote = '<b>' + cap(grantName(t.grant)) + '.</b> ' + res.map(function (r) { return r.c.name + ': ' + backSent(r.t) + '.'; }).join(' ') +
       ' Totul atârnă de preț și de cât de pline sunt calculatoarele. De aceea primul contract semnat valorează mai mult decât orice grant.';
-    v.fundLine = st.fund === 'none' ? 'Fără fonduri, la mărimea ' + M.SCEN[st.scen].name + ' trebuie aduși <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '.'
-      : 'Cu ' + FUND_NAME[st.fund] + ', la mărimea ' + M.SCEN[st.scen].name + ': grant de <b>' + mil(t.grant) + '</b>' + (t.soft > 0 ? ' și credit avantajos de ' + mil(t.soft) : '') + '. Banii proprii scad de la ' + mil(t0.equity) + ' la <b>' + mil(t.equity) + '</b>, iar creditul obișnuit de la ' + mil(t0.loan) + ' la ' + mil(t.loan) + '.';
+    v.fundLine = st.fund === 0 ? '<b>Fără grant</b>, cum este planul: trebuie aduși <b>' + mil(t.equity) + '</b> bani proprii și un credit de ' + mil(t.loan) + '. ' + cap(backSent(t)) + '.'
+      : '<b>Cu un grant de ' + mil(t.grant) + '</b>: banii proprii scad de la ' + mil(t0.equity) + ' la <b>' + mil(t.equity) + '</b>, iar creditul de la ' + mil(t0.loan) + ' la ' + mil(t.loan) + '. ' + cap(backSent(t)) + (t0.breakeven && t.breakeven ? (t0.breakeven === t.breakeven ? ', la fel ca fără grant.' : ', față de anul ' + t0.breakeven + ' fără grant.') : t.breakeven ? '. Fără grant nu s-ar întoarce.' : ', cu sau fără grant.');
+    // calculul pentru banca: cifre fixe din model
+    var b0 = bankRow(0), bg = bankRow(st.fund);
+    v.dscrTarget = dscr(BK.dscrTarget); v.dscr0 = b0 ? dscr(b0.dscr) : ''; v.bankNeed = mil(BK.need);
+    v.firmGpu = num(BK.firmContractsGpu); v.firmShare = pct(BK.firmContractsShare);
+    v.refreshYear = BK.refreshYear; v.refreshCost = mil(BK.refreshCost); v.refreshCash = mil(BK.refreshFromCash);
+    v.bankLine = bg ? 'În calculul mai aspru făcut pentru bancă, ' + (st.fund === 0 ? 'fără grant' : 'cu același grant') + ': bani proprii ' + num(bg.equity, 2) + ' mil. €, credit ' + num(bg.loan, 2) + ' mil. €, iar acoperirea ratelor (DSCR) este <b>' + dscr(bg.dscr) + '</b>, ' + (bg.dscr >= BK.dscrTarget ? 'peste' : 'sub') + ' pragul de ' + dscr(BK.dscrTarget) + ' cerut de bănci.' : 'Calculul pentru bancă este făcut doar pentru treptele de grant de mai sus.';
+    var lv4 = BK.levers[2], b6 = bankRow(6);
+    v.leverLine = '<b>Grantul nu este pârghia principală.</b> Un an în plus de contracte ferme, cu creditul pentru echipamente întins tot pe patru ani, aduce mai mult decât un grant de ' + mil(b6 ? b6.grant : 6) + (lv4 && b6 ? ': ' + dscr(lv4.dscr) + ' față de ' + dscr(b6.dscr) : '') + '.';
+    v.noContractLine = 'Fără contracte ferme, acoperirea este ' + dscr(BK.sens[0].dscr) + '. Deci <b>proiectul nu poate fi finanțat fără contracte ferme</b>.';
+    // fonduri
+    v.fundPlan = num(FU.plan); v.fundOpt = trim(num(FU.optimistic[0], 1)) + '–' + trim(num(FU.optimistic[1], 1)); v.fundCap = trim(num(FU.grantMax, 1));
     return v;
   }
-  var HTML_KEYS = { prudentLine: 1, paybackLine: 1, solarLine: 1, unitLine: 1, tenLine: 1, tenNote: 1, fundLine: 1 };
+  var HTML_KEYS = { prudentLine: 1, paybackLine: 1, solarLine: 1, unitLine: 1, tenLine: 1, tenNote: 1, fundLine: 1, bessLine: 1, yearLine: 1, saveLine: 1, bankLine: 1, leverLine: 1, noContractLine: 1 };
   function fill() {
     var v = values();
     [].forEach.call(document.querySelectorAll('[data-v]'), function (el) {
@@ -207,8 +250,8 @@
   function dayTip(h) {
     var r = cache.day[h], rows = '';
     function row(c, name, v) { rows += '<div class="row"><i>' + (c ? '<span class="key" style="background:var(--' + c + ')"></span>' : '') + name + '</i><b>' + mw(v) + '</b></div>'; }
-    row('ink', 'Panourile produc', r.pv); row('sun', 'Direct din panouri', r.direct); row('batt', 'Din baterii', r.discharge); row('grid', 'Din rețea', r.grid);
-    if (r.charge > 0.0005) row('', 'Intră în baterii', r.charge);
+    row('ink', 'Panourile produc', r.pv); row('sun', 'Direct din panouri', r.direct); if (st.bess > 0) row('batt', 'Din baterii', r.discharge); row('grid', 'Din rețea', r.grid);
+    if (st.bess > 0 && r.charge > 0.0005) row('', 'Intră în baterii', r.charge);
     if (r.exp > 0.0005) row('', 'Surplus în rețea', r.exp);
     return '<b>' + (h < 10 ? '0' : '') + h + ':00–' + (h + 1 < 10 ? '0' : '') + (h + 1) + ':00</b>' + rows;
   }
@@ -225,17 +268,18 @@
       s += '<rect class="hit" data-m="' + i + '" x="' + (ml + i * slot).toFixed(1) + '" y="' + mt + '" width="' + slot.toFixed(1) + '" height="' + (ph + mb) + '" fill="transparent" style="cursor:pointer"/>';
     });
     var cov = y.months.map(function (m) { return (m.direct + m.batt) / m.load; }), hi = cov.indexOf(Math.max.apply(null, cov)), lo = cov.indexOf(Math.min.apply(null, cov));
-    host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Acoperirea din soare și baterii pe luni: cel mai mult în ' + M.MONTHS[hi] + ', ' + pct(cov[hi]) + '; cel mai puțin în ' + M.MONTHS[lo] + ', ' + pct(cov[lo]) + '.">' + s + '</svg>' +
-      '<p class="fine">În ' + M.MONTHS[hi] + ' soarele și bateriile acoperă ' + pct(cov[hi]) + ' din consum. În ' + M.MONTHS[lo] + ', doar ' + pct(cov[lo]) + '. Apasă pe o lună ca să o vezi în machetă.</p>';
-    var t = '<table><thead><tr><th>Luna</th><th>Panouri</th><th>Baterii</th><th>Rețea</th></tr></thead><tbody>';
-    y.months.forEach(function (m, i) { t += '<tr><td>' + cap(M.MONTHS[i]) + '</td><td>' + pct(m.direct / m.load) + '</td><td>' + pct(m.batt / m.load) + '</td><td>' + pct(1 - (m.direct + m.batt) / m.load) + '</td></tr>'; });
+    var hasB = st.bess > 0, who = hasB ? 'soarele și bateriile acoperă ' : 'soarele acoperă ';
+    host.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Acoperirea din soare' + (hasB ? ' și baterii' : '') + ' pe luni: cel mai mult în ' + M.MONTHS[hi] + ', ' + pct(cov[hi]) + '; cel mai puțin în ' + M.MONTHS[lo] + ', ' + pct(cov[lo]) + '.">' + s + '</svg>' +
+      '<p class="fine">În ' + M.MONTHS[hi] + ' ' + who + pct(cov[hi]) + ' din consum. În ' + M.MONTHS[lo] + ', doar ' + pct(cov[lo]) + '. Apasă pe o lună ca să o vezi în machetă.</p>';
+    var t = '<table><thead><tr><th>Luna</th><th>Panouri</th>' + (hasB ? '<th>Baterii</th>' : '') + '<th>Rețea</th></tr></thead><tbody>';
+    y.months.forEach(function (m, i) { t += '<tr><td>' + cap(M.MONTHS[i]) + '</td><td>' + pct(m.direct / m.load) + '</td>' + (hasB ? '<td>' + pct(m.batt / m.load) + '</td>' : '') + '<td>' + pct(1 - (m.direct + m.batt) / m.load) + '</td></tr>'; });
     $('t-months-body').innerHTML = t + '</tbody></table>';
   }
   function monthTip(i) {
     var m = cache.year.months[i];
     return '<b>' + cap(M.MONTHS[i]) + '</b>' +
       '<div class="row"><i><span class="key" style="background:var(--sun)"></span>Direct din panouri</i><b>' + pct(m.direct / m.load) + '</b></div>' +
-      '<div class="row"><i><span class="key" style="background:var(--batt)"></span>Din baterii</i><b>' + pct(m.batt / m.load) + '</b></div>' +
+      (st.bess > 0 ? '<div class="row"><i><span class="key" style="background:var(--batt)"></span>Din baterii</i><b>' + pct(m.batt / m.load) + '</b></div>' : '') +
       '<div class="row"><i><span class="key" style="background:var(--grid)"></span>Din rețea</i><b>' + pct(1 - (m.direct + m.batt) / m.load) + '</b></div>';
   }
 
@@ -247,10 +291,10 @@
   }
   function drawMoney() {
     var f = cache.fin, c = f.capex, rows = [
-      ['Calculatoare: servere GPU, rețea, stocare', c.gpu], ['Clădire, instalații electrice, răcire, generatoare', c.facility],
-      ['Panouri fotovoltaice', c.pv], ['Baterii', c.bess], ['Teren', c.land]
+      ['Calculatoare: servere GPU, rețea, stocare', c.gpu], ['Reamenajarea halei, instalații electrice, răcire, generatoare', c.facility],
+      ['Panouri pe acoperișuri', c.pv], ['Baterii', c.bess]
     ].filter(function (r) { return r[1] > 0.0005; });
-    $('c-capex').innerHTML = barsHtml(rows, mil);
+    $('c-capex').innerHTML = barsHtml(rows, mil) + '<div class="bar"><span>Teren și hală: sunt ale firmei</span><span>0</span><i></i></div>';
     function tr(name, v, cls, sign) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td><td' + (sign ? ' class="' + (v < 0 ? 'neg' : 'pos') + '"' : '') + '>' + num(v, 2) + '</td></tr>'; }
     var h = '<thead><tr><th>Într-un an</th><th>mil. €</th></tr></thead><tbody>';
     h += tr('Venituri din închirierea GPU-urilor', f.rev.main);
@@ -262,7 +306,9 @@
     $('t-pl').innerHTML = h + '</tbody>';
     $('s-price').value = A.gpuHourPrice; $('s-occ').value = A.occupancy * 100;
     $('o-price').textContent = trim(num(A.gpuHourPrice, 2)) + ' € pe oră'; $('o-occ').textContent = pct(A.occupancy);
-    $('c-unit').innerHTML = barsHtml(cache.unit.parts, eur);
+    // modelul numeste randul al doilea „uzura cladirii, panourilor si bateriilor”; aici nu este cladire noua, iar bateriile lipsesc de obicei
+    var parts = cache.unit.parts.map(function (p) { return /^Uzura (cl|halei)/.test(p[0]) ? [st.bess > 0 ? 'Uzura instalațiilor din hală, a panourilor și a bateriilor' : 'Uzura instalațiilor din hală și a panourilor', p[1]] : p; });
+    $('c-unit').innerHTML = barsHtml(parts, eur);
   }
 
   /* ---------- zece ani ---------- */
@@ -273,7 +319,7 @@
       return { name: c.name, t: t, sel: c.k === cur };
     });
     if (!cur) series.push({ name: 'Alegerea ta', t: sel, sel: true });
-    var base0 = st.fund !== 'none' ? { name: 'fără fonduri', t: cache.ten0, dash: true } : null;
+    var base0 = st.fund !== 0 ? { name: 'fără grant', t: cache.ten0, dash: true } : null;
     var all = series.concat(base0 ? [base0] : []), lo = 0, hi = 0;
     all.forEach(function (s) { s.t.rows.forEach(function (r) { lo = Math.min(lo, r.cum); hi = Math.max(hi, r.cum); }); });
     var W = 420, H = 250, ml = 40, mr = 78, mt = 22, mb = 24, pw = W - ml - mr, ph = H - mt - mb;
@@ -319,7 +365,7 @@
   }
   function drawSens() {
     var P = [2.5, 3.5, 4.5, 5.5, 6.5], O = [0.5, 0.65, 0.75, 0.85, 0.95], c0 = getPO();
-    var h = '<thead><tr><th><span>€ pe oră ↓</span> <span>ocupare →</span></th>' + O.map(function (o) { return '<th>' + pct(o) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    var h = '<thead><tr><th><span>€ pe oră</span></th>' + O.map(function (o) { return '<th>' + pct(o) + '</th>'; }).join('') + '</tr></thead><tbody>';
     P.forEach(function (p) {
       h += '<tr><td>' + trim(num(p, 1)) + '</td>' + O.map(function (o) {
         var t = withPO(p, o, function () { return tenOf(st.it, st.pv, st.bess, cache.year, st.fund); });
@@ -330,90 +376,111 @@
     $('t-sens').innerHTML = h + '</tbody>';
   }
 
-  /* ---------- fonduri europene ---------- */
-  function scenCols() {
-    return ['pilot', 'mediu', 'mare'].map(function (k) {
-      var s = M.SCEN[k], y = scenYear(k);
-      return { s: s, y: y, ph: M.physical(s.it, s.pv, s.bess, A), cl: M.finance(s.it, s.pv, s.bess, A, SELL, y) };
-    });
-  }
-  function cmpHead(cols) { return '<thead><tr><th></th>' + cols.map(function (c) { return '<th' + (c.s.key === st.scen ? ' class="on"' : '') + '><button type="button" data-s="' + c.s.key + '" aria-pressed="' + (c.s.key === st.scen) + '">' + c.s.name + '</button></th>'; }).join('') + '</tr></thead><tbody>'; }
-  function cmpRow(cols, name, fn, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td>' + cols.map(function (c) { return '<td' + (c.s.key === st.scen ? ' class="on"' : '') + '>' + fn(c) + '</td>'; }).join('') + '</tr>'; }
+  /* ---------- fonduri europene: lista vine din model, aici doar se deseneaza ---------- */
+  var FUND_BADGE = { open: 'Apel deschis', wait: 'Anunțat', no: 'Nu se aplică', help: 'Ajută, nu este grant' };
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function drawFund() {
-    var cols = scenCols();
-    cols.forEach(function (c) {
-      c.f = c.cl;
-      c.fu = M.funding('none', c.f, c.s.bess, A);
-      c.t0 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'none'); c.t1 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'imm'); c.t2 = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, 'fptj');
-    });
-    var h = cmpHead(cols);
-    h += cmpRow(cols, 'Investiție', function (c) { return mil(c.f.capex.total); });
-    h += cmpRow(cols, '<b>Grant pentru IMM</b><small>până la 70%, cel mult 1,5 mil. €</small>', function (c) { return mil(c.fu.immPossible); }, 'sum');
-    h += cmpRow(cols, 'bani proprii necesari', function (c) { return mil(c.t1.equity); });
-    h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.t1); });
-    h += cmpRow(cols, '<b>Fond Tranziție Justă</b><small>grant, cel mult jumătate din finanțare</small>', function (c) { return mil(c.fu.fptjPossible); }, 'sum');
-    h += cmpRow(cols, 'credit avantajos, pe 12 ani', function (c) { return mil(c.fu.fptjFin - c.fu.fptjPossible); });
-    h += cmpRow(cols, 'bani proprii necesari', function (c) { return mil(c.t2.equity); });
-    h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.t2); });
-    h += cmpRow(cols, '<b>Fără fonduri</b><small>bani proprii necesari</small>', function (c) { return mil(c.t0.equity); }, 'sum');
-    h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.t0); });
-    h += cmpRow(cols, '<b>Cât acoperă grantul cel mai mare</b>', function (c) { return pct(Math.max(c.fu.immPossible, c.fu.fptjPossible) / c.f.capex.total); }, 'sum');
-    h += cmpRow(cols, 'Baterii, proiect separat<small>Fondul pentru Modernizare</small>', function (c) { return c.fu.bessPossible > 0 ? mil(c.fu.bessPossible) : 'prea mici'; });
-    $('t-fund').innerHTML = h + '</tbody>';
+    $('funds').innerHTML = M.FUND_LIST.map(function (p) {
+      return '<div class="prog ' + esc(p.cls) + '"><h4>' + esc(p.name) + ' <span class="tagc ' + esc(p.cls) + '">' + (FUND_BADGE[p.cls] || '') + '</span></h4>' +
+        '<p class="status"><b>Starea:</b> ' + esc(p.st) + '</p>' +
+        '<p><b>Cât:</b> ' + esc(p.sum) + '</p>' +
+        '<p><b>Ce este:</b> ' + esc(p.what) + '</p>' +
+        '<p><b>Se potrivește?</b> ' + esc(p.fit) + '</p>' +
+        (p.href ? '<p class="status">Sursa: <a href="' + esc(p.href) + '" target="_blank" rel="noopener">' + esc(p.src || 'pagina sursă') + '</a></p>' : '') + '</div>';
+    }).join('');
+  }
+  // butoanele cu treptele de grant, aceleasi in „Zece ani” si in „Fonduri europene”
+  function fundBtns() {
+    return FU.steps.map(function (g) {
+      return '<button type="button" data-f="' + g + '" aria-pressed="' + (g === st.fund) + '">' + (g === 0 ? 'Fără grant' : mil(g)) + (g > 0 && g >= FU.grantMax ? '<small>plafonul apelului</small>' : '') + '</button>';
+    }).join('');
   }
 
+  /* ---------- calculul pentru banca: cifre fixe din model ---------- */
+  function drawBank() {
+    var h = '<thead><tr><th>Grant</th><th>Bani proprii</th><th>Credit</th><th>DSCR minim</th><th>Banii proprii se întorc în</th></tr></thead><tbody>';
+    BK.rows.forEach(function (r) {
+      h += '<tr' + (r.grant === st.fund ? ' class="on"' : '') + '><td>' + (r.grant ? num(r.grant) : 'fără') + '</td><td>' + num(r.equity, 2) + '</td><td>' + num(r.loan, 2) + '</td><td class="' + (r.dscr >= BK.dscrTarget ? 'pos' : 'neg') + '">' + dscr(r.dscr) + '</td><td>' + trim(num(r.back, 1)) + ' ani</td></tr>';
+    });
+    $('t-bank').innerHTML = h + '</tbody>';
+    h = '<thead><tr><th>Ce se schimbă</th><th>Bani proprii</th><th>Credit</th><th>DSCR</th></tr></thead><tbody>';
+    BK.levers.forEach(function (l) { h += '<tr><td>' + esc(l.name) + '</td><td>' + num(l.equity, 2) + '</td><td>' + num(l.loan, 2) + '</td><td><b>' + esc(String(l.dscr).replace(/ · /g, ', ')) + '</b></td></tr>'; });
+    $('t-levers').innerHTML = h + '</tbody>';
+    $('l-sens').innerHTML = BK.sens.map(function (s) { return '<li>' + esc(s.name) + ': acoperirea este <b>' + dscr(s.dscr) + '</b>, ' + (s.dscr >= BK.dscrTarget ? 'peste prag' : 'sub prag') + '.</li>'; }).join('');
+  }
+
+  /* ---------- locul: ce incape in baza ---------- */
+  function drawPlace() {
+    var pil = M.SCEN.pilot, need = function (it) { return M.physical(it, 0, 0, A).buildingM2; };
+    var h = '<thead><tr><th>Mărime</th><th>Loc necesar</th><th>Unde ar sta</th></tr></thead><tbody>';
+    h += '<tr><td><b>' + pil.name + '</b>, ' + mw(pil.it) + '</td><td>circa ' + num(Math.round(need(pil.it) / 10) * 10) + ' m²</td><td>Încape ușor în ' + pil.hall + ' (' + num(pil.hallM2) + ' m²).</td></tr>';
+    h += '<tr class="on"><td><b>' + S0.name + '</b>, ' + mw(S0.it) + '</td><td>' + num(Math.round(need(S0.it) / 10) * 10) + '–' + num(HALL_MIN_M2) + ' m²</td><td><b>La limită</b> în ' + S0.hall + ' (' + num(S0.hallM2) + ' m²).</td></tr>';
+    h += '<tr><td><b>Mare</b>, 5 MW</td><td>' + num(BZ.mareNeedM2[0]) + '–' + num(BZ.mareNeedM2[1]) + ' m²</td><td><b>Nu încape.</b> Toată hala lungă are circa ' + num(BZ.longHallM2) + ' m².</td></tr>';
+    $('t-fit').innerHTML = h + '</tbody>';
+  }
+
+  /* ---------- echipa: o singura marime ---------- */
+  var TEAM = [['Conducere', 1], ['Tehnicieni în ture, zi și noapte', 4], ['Electric și răcire', 2], ['Rețea și sisteme', 1], ['Vânzări și clienți', 1], ['Financiar și administrativ', 1]];
+  function teamTotal() { var n = 0; TEAM.forEach(function (r) { n += r[1]; }); return n; }
   function drawTeam() {
-    var cols = scenCols(), R = [['Conducere', 1, 1, 1], ['Tehnicieni în ture, zi și noapte', 2, 4, 12], ['Electric și răcire', 1, 2, 4], ['Rețea și sisteme', 1, 1, 3], ['Vânzări și clienți', 1, 1, 3], ['Financiar și administrativ', 0, 1, 2]];
-    var h = cmpHead(cols);
-    R.forEach(function (r) { h += cmpRow(cols, r[0], function (c) { var n = r[['pilot', 'mediu', 'mare'].indexOf(c.s.key) + 1]; return n ? n : 'din afară'; }); });
-    h += cmpRow(cols, 'Total oameni', function (c) { return { pilot: 6, mediu: 10, mare: 25 }[c.s.key]; }, 'sum');
-    h += cmpRow(cols, 'Salarii pe an', function (c) { return mil(c.cl.opex.staff); });
+    var h = '<thead><tr><th>Rol</th><th>Oameni</th></tr></thead><tbody>';
+    TEAM.forEach(function (r) { h += '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; });
+    h += '<tr class="sum"><td>Total oameni</td><td>' + teamTotal() + '</td></tr>';
+    h += '<tr><td>Salarii pe an</td><td>' + mil(cache.fin.opex.staff) + '</td></tr>';
     $('t-team').innerHTML = h + '</tbody>';
   }
 
+  /* ---------- de ce marimea Medie: Pilot si Mediu calculate, Mare in cuvinte ---------- */
   function drawCompare() {
-    var cols = scenCols();
-    cols.forEach(function (c) { c.tc = tenOf(c.s.it, c.s.pv, c.s.bess, c.y, st.fund); });
-    function sg(v) { return '<span style="color:var(--' + (v < 0 ? 'bad' : 'good') + ')">' + mil(v) + '</span>'; }
-    var h = cmpHead(cols), fn = st.fund === 'none' ? 'fără fonduri' : st.fund === 'imm' ? 'cu grant IMM' : 'cu Fondul Tranziție Justă';
-    h += cmpRow(cols, 'Puterea calculatoarelor', function (c) { return mw(c.s.it); });
-    h += cmpRow(cols, 'GPU-uri', function (c) { return num(c.ph.gpus); });
-    h += cmpRow(cols, 'Clădire', function (c) { return num(Math.round(c.ph.buildingM2 / 10) * 10) + ' m²'; });
-    h += cmpRow(cols, 'Panouri', function (c) { return trim(num(c.s.pv, 1)) + ' MW'; });
-    h += cmpRow(cols, 'Baterii', function (c) { return trim(num(c.s.bess, 1)) + ' MWh'; });
-    h += cmpRow(cols, 'Teren', function (c) { return trim(num(c.ph.landHa, 1)) + ' ha'; });
-    h += cmpRow(cols, 'Curent din soare și baterii', function (c) { return pct(c.y.coverage); });
-    h += cmpRow(cols, 'Oameni', function (c) { return { pilot: 6, mediu: 10, mare: 25 }[c.s.key]; });
-    h += cmpRow(cols, 'Durată până la pornire', function (c) { return CAL_TOTAL[c.s.key] + ' luni'; });
-    h += cmpRow(cols, '<b>Investiție</b>', function (c) { return mil(c.cl.capex.total); }, 'sum');
-    h += cmpRow(cols, 'din care calculatoarele', function (c) { return mil(c.cl.capex.gpu); });
-    h += cmpRow(cols, 'venituri pe an', function (c) { return mil(c.cl.rev.total); });
-    h += cmpRow(cols, 'profit pe an', function (c) { return sg(c.cl.profit); });
-    h += cmpRow(cols, 'grant, ' + fn, function (c) { return c.tc.grant > 0.0005 ? mil(c.tc.grant) : 'nimic'; });
-    h += cmpRow(cols, 'bani proprii, ' + fn, function (c) { return mil(c.tc.equity); });
-    h += cmpRow(cols, 'banii se întorc în 10 ani', function (c) { return backCell(c.tc); });
-    $('t-cmp').innerHTML = h + '</tbody>';
+    var cols = ['pilot', 'mediu'].map(function (k) {
+      var s = M.SCEN[k], y = scenYear(k), c = { s: s, y: y, ph: M.physical(s.it, s.pv, s.bess, A), cl: M.finance(s.it, s.pv, s.bess, A, SELL, y) };
+      c.back = CASES.slice(0, 2).map(function (cs) { return withPO(cs.p, cs.o, function () { return tenOf(s.it, s.pv, s.bess, y, 0); }); });
+      return c;
+    });
+    function sg(v) { return '<span style="color:var(--' + (v < 0 ? 'bad' : 'good') + ')">' + num(v, 2) + '</span>'; }
+    var rest = 0, h = '<thead><tr><th></th>' + cols.map(function (c) { return '<th' + (c.s.key === 'mediu' ? ' class="on"' : '') + '>' + c.s.name + '</th>'; }).join('') + '<th>Mare</th></tr></thead><tbody>';
+    function row(name, fn, mare, cls, wrap) {       // mare: textul din coloana a treia; null = randul intra in casuta „nu se calculeaza”
+      var third = mare != null ? '<td>' + mare + '</td>' : rest++ === 0 ? '<td class="nofit" rowspan="@@RS@@">Nu se calculează: nu are unde sta.</td>' : '';
+      h += '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td>' + cols.map(function (c) { return '<td class="' + (c.s.key === 'mediu' ? 'on' : '') + (wrap ? '' : ' n') + '">' + fn(c) + '</td>'; }).join('') + third + '</tr>';
+    }
+    row('Puterea calculatoarelor', function (c) { return mw(c.s.it); }, '5 MW');
+    row('Loc necesar în hală', function (c) { return num(Math.round(c.ph.buildingM2 / 10) * 10) + ' m²'; }, num(BZ.mareNeedM2[0]) + '–' + num(BZ.mareNeedM2[1]) + ' m²');
+    row('Unde ar sta', function (c) { return c.s.hall + '<small>' + num(c.s.hallM2) + ' m²</small>'; }, '<b>nu încape</b><small>hala lungă: ' + num(BZ.longHallM2) + ' m²</small>', '', true);
+    row('GPU-uri', function (c) { return num(c.ph.gpus); });
+    row('Panouri pe acoperișuri', function (c) { return mwp(c.s.pv); });
+    row('Curent din soare', function (c) { return pct(c.y.coverage); });
+    row('<b>Investiție</b><small>milioane de euro</small>', function (c) { return '<b>' + num(c.cl.capex.total, 2) + '</b>'; }, null, 'sum');
+    row('din care calculatoarele', function (c) { return num(c.cl.capex.gpu, 2); });
+    row('venituri pe an', function (c) { return num(c.cl.rev.total, 2); });
+    row('profit pe an', function (c) { return sg(c.cl.profit); });
+    row('<b>Banii se întorc în 10 ani</b><small>fără grant, ' + CASES[0].name.toLowerCase() + '</small>', function (c) { return backCell(c.back[0]); }, null, 'sum');
+    row('<small>fără grant, ' + CASES[1].name.toLowerCase() + '</small>', function (c) { return backCell(c.back[1]); });
+    $('t-cmp').innerHTML = h.replace('@@RS@@', rest) + '</tbody>';
   }
 
   function drawAssumptions() {
+    var yieldYear = 0; M.YIELD.forEach(function (k) { yieldYear += k; });
     var L = [
       'Consum total = puterea calculatoarelor × ' + trim(num(A.pue, 2)) + ' (PUE), la o încărcare medie de ' + pct(A.loadFactor) + '.',
       num(A.gpuPerMW) + ' GPU-uri de generație nouă la 1 MW; ' + A.kwPerRack + ' kW pe rack.',
-      'Clădire și instalații: ' + mil(A.capexFacilityFixed) + ' fix, plus ' + mil(A.capexFacilityPerMW) + ' pentru fiecare MW.',
+      'Reamenajarea halei și instalațiile (electrice, răcire, UPS, generatoare): ' + mil(A.capexFacilityFixed) + ' fix, plus ' + mil(A.capexFacilityPerMW) + ' pentru fiecare MW. Este cu 15% sub o clădire nouă, pentru că hala există.',
+      'Teren și hală: 0. Sunt ale firmei și nu se cumpără nimic.',
       'Calculatoare (servere GPU, rețea, stocare): ' + mil(A.capexGpuPerMW) + ' pentru fiecare MW.',
-      'Panouri: ' + mil(A.capexPvPerMWp) + ' pe MW instalat, ' + trim(num(A.haPerMWp, 1)) + ' ha pe MW, 1.345 kWh pe an din fiecare kW (zona Craiova, panouri fixe spre sud).',
-      'Baterii: ' + mil(A.capexBessPerMWh) + ' pe MWh, descărcare completă în ' + A.bessHours + ' ore, randament ' + pct(A.bessEff) + '.',
-      'Curent din rețea: ' + A.gridPrice + ' €/MWh cu tarife și taxe, fără TVA. Energia singură era ofertată la 620–700 lei/MWh în august 2026.',
-      'Surplusul de la prânz se vinde cu ' + A.exportPrice + ' €/MWh.',
-      'Teren: 15 €/m² pentru platforma clădirii, 1,5 €/m² pentru parcul de panouri.',
+      'Panouri: ' + mil(A.capexPvPerMWp) + ' pe MWp, circa ' + num(BZ.roofM2PerMWp) + ' m² de acoperiș bun pentru 1 MWp, cel mult ' + mwp(BZ.pvMaxMWp) + ' în toată baza.',
+      'Producția panourilor: circa ' + num(Math.round(yieldYear / 10) * 10) + ' kWh pe an din fiecare kW. Este cu 10% sub zona Craiovei, pentru că la Râmnicu Vâlcea este ceva mai puțin soare, iar panourile stau culcate pe acoperișuri, jumătate pe panta dinspre nord.',
+      'Baterii: planul nu are baterii mari. Dacă se pun, costă ' + mil(A.capexBessPerMWh) + ' pe MWh, se descarcă complet în ' + A.bessHours + ' ore și au un randament de ' + pct(A.bessEff) + '.',
+      'Curent din rețea: ' + A.gridPrice + ' € pe MWh cu tarife și taxe, fără TVA. Energia singură era ofertată la 620–700 lei pe MWh în august 2026.',
+      'Dacă apare surplus la prânz, se vinde cu ' + A.exportPrice + ' € pe MWh.',
       'Vindem doar ore de GPU, pe calculatoarele noastre. ' + CASES.map(function (c) { return c.name + ': ' + trim(num(c.p, 1)) + ' € pe GPU pe oră și ' + pct(c.o) + ' ocupare'; }).join('. ') + '.',
       'Vremea: jumătate din zile senine, o treime cu nori, restul închise, cu producția lunară păstrată.',
-      'Durată de folosire: GPU-uri ' + A.gpuLifeYears + ' ani, clădire ' + A.facilityLifeYears + ', panouri ' + A.pvLifeYears + ', baterii ' + A.bessLifeYears + '.',
-      'Oameni: 6, 10 sau 25 de angajați, în funcție de mărime. Mentenanță: 2,5% pe an din valoarea clădirii și 1,5% din panouri și baterii.',
+      'Durată de folosire: GPU-uri ' + A.gpuLifeYears + ' ani, instalațiile din hală ' + A.facilityLifeYears + ', panouri ' + A.pvLifeYears + ', baterii ' + A.bessLifeYears + '.',
+      'Oameni: ' + teamTotal() + ' angajați. Mentenanță: 2,5% pe an din valoarea instalațiilor și 1,5% din panouri și baterii.',
       'Zece ani: anul 1 la 50% din clienții țintă, anul 2 la 80%. Chiria unui GPU scade cu 8% pe an de vechime. GPU-uri noi în anul 6, la 80% din prețul primelor.',
       'Credit obișnuit: plătit în ' + A.loanYears + ' ani, în rate egale. Dobânda și partea de credit se aleg în capitolul „Zece ani”.',
-      'Fonduri: grant IMM de 70% din costurile eligibile, cel mult ' + mil(FU.immCap) + '. Fondul de Participare: cel mult ' + mil(FU.fptjMaxInv) + ' și trei sferturi din investiție, jumătate grant, restul credit cu 4,5% pe 12 ani, din care 3 ani doar dobândă.',
-      'După 10 ani am socotit că rămân jumătate din valoarea clădirii, 60% din panouri și 30% din baterii.',
+      'Grant: planul se sprijină pe ' + num(FU.plan) + '. Treptele arătate (' + FU.steps.filter(function (g) { return g > 0; }).join(', ') + ' milioane de euro) sunt scenarii. Apelul deschis dă între ' + trim(num(FU.grantMin, 1)) + ' și ' + trim(num(FU.grantMax, 1)) + ' milioane de euro și cel mult ' + pct(FU.intensity) + ' din cheltuieli la o firmă mijlocie.',
+      'Calculul pentru bancă: contracte ferme pe 3 ani pentru ' + pct(BK.firmContractsShare) + ' din capacitate, credit pentru echipamente pe 3 ani, credit pentru instalații pe 10 ani cu un an în care se plătește doar dobânda, dobândă 7%, bani proprii 35% din ce rămâne după grant.',
+      'Baza: măsurători din imagini din satelit, cu eroare de circa 15%, și din harta rețelei electrice. Nimic nu este verificat la fața locului.',
+      'După 10 ani am socotit că rămân jumătate din valoarea instalațiilor, 60% din panouri și 30% din baterii.',
       'O locuință consumă ' + trim(num(A.householdMWh, 1)) + ' MWh pe an.',
       'Nu sunt incluse: impozit pe profit, TVA, inflație.'
     ];
@@ -421,14 +488,17 @@
   }
 
   /* ---------- calendar si constructie pe etape ---------- */
+  // ph = etapa din macheta: 0 platforma, 1 racord, 2 hala, 3 instalatii, 4 calculatoare, 5 panouri, 6 baterii, 7 pornire
   var PH = [
-    { n: 'Studiu, clienți, alegerea terenului', a: 0, b: 6 }, { n: 'Aviz de racordare și autorizații', a: 3, b: 15 }, { n: 'Finanțare: bancă și fonduri europene', a: 4, b: 15 },
-    { n: 'Proiectare și comenzi de echipamente', a: 9, b: 16 }, { n: 'Teren și platformă', a: 15, b: 18, ph: 0 }, { n: 'Racord și stație electrică', a: 16, b: 22, ph: 1 },
-    { n: 'Clădirea', a: 17, b: 23, ph: 2 }, { n: 'Parcul fotovoltaic', a: 19, b: 24, ph: 5 }, { n: 'Răcire, generatoare, tablouri', a: 21, b: 25, ph: 3 },
-    { n: 'Baterii', a: 23, b: 25, ph: 6 }, { n: 'Calculatoare', a: 24, b: 26.5, ph: 4 }, { n: 'Probe și primul client', a: 26, b: 27, ph: 7 }
+    { n: 'Teste de loc: coroziune, vibrații, măsurarea halei', a: 0, b: 3 }, { n: 'Studiu și discuții cu clienți', a: 0, b: 5 },
+    { n: 'Aviz de racordare și autorizații', a: 2, b: 13 }, { n: 'Finanțare: bancă și fonduri europene', a: 3, b: 13 },
+    { n: 'Proiectare și comenzi de echipamente', a: 7, b: 14 }, { n: 'Platforma din curte', a: 13, b: 15, ph: 0 },
+    { n: 'Reamenajarea halei', a: 13, b: 18, ph: 2 }, { n: 'Racord la 20 kV și post de transformare', a: 14, b: 19, ph: 1 },
+    { n: 'Panouri pe acoperișuri', a: 16, b: 20, ph: 5 }, { n: 'Răcire, generatoare, tablouri', a: 17, b: 21, ph: 3 },
+    { n: 'Baterii', a: 19, b: 21, ph: 6, bess: true }, { n: 'Calculatoare', a: 20, b: 22.5, ph: 4 }, { n: 'Probe și primul client', a: 22, b: 23, ph: 7 }
   ];
-  function calT() { return CAL_TOTAL[st.scen]; }
-  function phases() { var k = calT() / 27; return PH.map(function (p) { return { n: p.n, a: Math.round(p.a * k * 2) / 2, b: Math.round(p.b * k * 2) / 2, ph: p.ph }; }); }
+  function calT() { return CAL_TOTAL; }
+  function phases() { return PH.filter(function (p) { return !p.bess || st.bess > 0; }); }
   function drawGantt() {
     var T = calT(), P = phases(), h = '';
     P.forEach(function (p, i) {
@@ -471,23 +541,91 @@
 
   /* ---------- macheta: etichete, soare, fluxuri ---------- */
   var PICK_CH = { building: chIndex('Calculatoarele'), sub: chIndex('Curentul'), gen: chIndex('Curentul'), cool: chIndex('Răcirea'), pv: chIndex('Soarele'), bess: chIndex('Bateriile și rețeaua'), fiber: chIndex('Internetul') };
-  var PICK_NAME = { building: 'Clădirea cu calculatoare', sub: 'Stația electrică', gen: 'Generatoare de rezervă', cool: 'Răcitoare', pv: 'Parcul fotovoltaic', bess: 'Baterii', fiber: 'Fibră optică' };
-  var PART_NAME = { r_gpu: 'GPU cu placă de răcire', r_cool: 'Lichid rece și cald', r_net: 'Switch de rețea', r_srv: 'Server cu 8 GPU-uri', r_pow: 'Alimentare' };
+  var PICK_NAME = { building: 'Hala centrului de date', sub: 'Post de transformare', gen: 'Generatoare de rezervă', cool: 'Răcitoare', pv: 'Panouri pe acoperișuri', bess: 'Baterii', fiber: 'Fibră optică' };
+  var PART_NAME = { r_gpu: 'GPU cu placă de răcire', r_cool: 'Lichid rece și cald', r_net: 'Comutator de rețea', r_srv: 'Server cu 8 GPU-uri', r_pow: 'Alimentare' };
+  // etichetele locului: se vad doar in capitolul „Locul”
+  var PLACE_NAME = { p_long: 'Restul halei lungi', p_hall2: 'Hala liberă 2', p_yardA: 'Curtea A: aici stau instalațiile', p_yardB: 'Curtea B', p_rail: 'Triajul de cale ferată', p_gate: 'Poarta', p_line: 'Linie de 110 kV', p_chem: 'Spre platforma chimică' };
+  var PLACE_IDS = Object.keys(PLACE_NAME), OBJ_IDS = Object.keys(PICK_NAME);
+  function inPlace() { return st.ch === CH_PLACE; }
   function labelTexts() {
     return {
-      building: 'Clădire · ' + num(cache.ph.gpus) + ' GPU-uri', pv: 'Panouri · ' + trim(num(st.pv, 2)) + ' MW',
-      sub: 'Stație electrică', gen: 'Generatoare', cool: 'Răcire', fiber: 'Fibră optică'
+      building: PICK_NAME.building + ' · ' + num(cache.ph.gpus) + ' GPU-uri', pv: PICK_NAME.pv + ' · ' + mwp(st.pv),
+      sub: PICK_NAME.sub, gen: PICK_NAME.gen, cool: PICK_NAME.cool, fiber: PICK_NAME.fiber
     };
+  }
+  // ce etichete sunt aprinse in capitolul de acum: in „Locul” raman hala centrului si etichetele locului, ca sa nu se calce intre ele
+  function applyLabels() {
+    if (!has3d) return;
+    var place = inPlace();
+    OBJ_IDS.forEach(function (id) { Scene3D.setLabelOn(id, id === 'building' ? true : id === 'bess' ? st.bess > 0 && !place : !place); });
+    PLACE_IDS.forEach(function (id) { Scene3D.setLabelOn(id, place); });
+    placeLoop();
+  }
+  // Macheta asaza singura etichetele pe care le cunoaste. Cat timp nu le cunoaste pe cele ale locului, le asezam aici, cu aceeasi camera
+  // (Scene3D._cam, unghi de 38 de grade) si aceleasi ancore (Scene3D.layout().anchors). Cum scrie macheta ceva in ele, ne retragem definitiv.
+  var plc = { raf: 0, own: true, last: {}, size: {}, n: 0 }, CAM_FOV = 38, PLACE_EDGE = { p_chem: 1, p_line: 1 };
+  function placeEls() { return [].slice.call($('labels').querySelectorAll('.lbl.place')); }
+  function placeWrite(el, hidden, tr) { el.hidden = hidden; if (tr !== null) el.style.transform = tr; plc.last[el.dataset.id] = { h: hidden, t: el.style.transform }; }
+  function placeLoop() {
+    cancelAnimationFrame(plc.raf); plc.raf = 0;
+    if (!has3d || !plc.own) return;
+    if (!inPlace()) { placeEls().forEach(function (el) { var k = plc.last[el.dataset.id]; if (k && !k.h) placeWrite(el, true, null); }); return; }
+    plc.raf = requestAnimationFrame(placeStep);
+  }
+  function placeStep() {
+    plc.raf = 0;
+    if (!plc.own || !inPlace()) return;
+    var els = placeEls(), i, el, k;
+    for (i = 0; i < els.length; i++) {       // a scris altcineva in etichete de la ultimul nostru cadru? atunci macheta le stie si le asaza ea
+      el = els[i]; k = plc.last[el.dataset.id] || { h: true, t: '' };
+      if (el.hidden !== k.h || el.style.transform !== k.t) { plc.own = false; els.forEach(function (e) { e.classList.remove('edge'); }); return; }
+    }
+    plc.raf = requestAnimationFrame(placeStep);
+    var L = Scene3D.layout && Scene3D.layout(), c = Scene3D._cam, host = $('view'), w = host.clientWidth, h = host.clientHeight;
+    if (!L || !L.anchors || !c || !w || !h) { els.forEach(function (e) { placeWrite(e, true, null); }); return; }
+    var hr = host.getBoundingClientRect(); if (hr.bottom < 0 || hr.top > window.innerHeight) return;       // macheta nu se vede (pe telefon, cand ai derulat la text): nu calculam nimic
+    var sp = Math.sin(c.pol), cp = Math.cos(c.pol), px = c.tx + c.dist * sp * Math.sin(c.az), py = c.ty + c.dist * cp, pz = c.tz + c.dist * sp * Math.cos(c.az);
+    var fx = c.tx - px, fy = c.ty - py, fz = c.tz - pz, fl = Math.sqrt(fx * fx + fy * fy + fz * fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+    var rx = -fz, rz = fx, rl = Math.sqrt(rx * rx + rz * rz) || 1; rx /= rl; rz /= rl;
+    var ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy, th = Math.tan(CAM_FOV * Math.PI / 360), asp = w / h;
+    var placed = [{ x: w - 58, y: 0, w: 58, h: 132 }], refresh = (plc.n++ % 45) === 0;
+    [].forEach.call($('labels').querySelectorAll('.lbl:not(.place)'), function (o) { if (o.hidden) return; var r = o.getBoundingClientRect(); placed.push({ x: r.left - hr.left, y: r.top - hr.top, w: r.width, h: r.height }); });
+    els.forEach(function (el) {
+      var id = el.dataset.id, a = L.anchors[id];
+      if (!a) { placeWrite(el, true, null); return; }
+      var dx = a[0] - px, dy = a[1] - py, dz = a[2] - pz, zc = dx * fx + dy * fy + dz * fz;
+      if (zc <= 0.5) { placeWrite(el, true, null); return; }
+      var x = (dx * rx + dz * rz) / (zc * th * asp), y = (dx * ux + dy * uy + dz * uz) / (zc * th);
+      x = (x + 1) / 2 * w; y = (1 - y) / 2 * h;
+      if (el.hidden) { el.hidden = false; plc.size[id] = null; }
+      if (!plc.size[id] || refresh) plc.size[id] = { w: el.offsetWidth || 90, h: el.offsetHeight || 22 };
+      var sz = plc.size[id], edge = false, mx = sz.w / 2 + 8;
+      if (x < 30 || x > w - 30 || y < 48 || y > h - 8) {
+        if (!PLACE_EDGE[id]) { placeWrite(el, true, null); return; }
+        edge = true; x = Math.max(mx, Math.min(w - mx, x)); y = Math.max(52 + sz.h, Math.min(h - 10, y));       // ce este in afara bazei ramane lipit de margine, ca un indicator de directie
+      }
+      var bx = x - sz.w / 2, by = y - sz.h - (edge ? 0 : 10), shift = 0, ok = false, t, q, o;
+      for (t = 0; t < 6 && !ok; t++) {
+        ok = true;
+        for (q = 0; q < placed.length; q++) { o = placed[q]; if (bx < o.x + o.w + 4 && bx + sz.w + 4 > o.x && by - shift < o.y + o.h + 3 && by - shift + sz.h + 3 > o.y) { ok = false; break; } }
+        if (!ok) shift += sz.h + 5;
+      }
+      if (!ok || by - shift < 44) { placeWrite(el, true, null); return; }
+      placed.push({ x: bx, y: by - shift, w: sz.w, h: sz.h });
+      el.classList.toggle('edge', edge); el.style.setProperty('--stem', (10 + shift) + 'px');
+      placeWrite(el, false, 'translate3d(' + x.toFixed(1) + 'px,' + (y - shift).toFixed(1) + 'px,0) translate(-50%,-100%)' + (edge ? '' : ' translateY(-10px)'));
+    });
   }
   function rebuild(viewInstant) {
     if (!has3d) return;
     Scene3D.build({ it: st.it, pv: st.pv, bess: st.bess });
     var t = labelTexts(); for (var id in t) Scene3D.setLabelText(id, t[id]);
+    applyLabels();
     Scene3D.go(st.rack ? 'rack' : st.thermal ? 'thermal' : chapters[st.ch].getAttribute('data-view'), viewInstant);
     tick();
   }
   function clock(h) { var hh = Math.floor(h), mm = Math.round((h - hh) * 60); if (mm === 60) { hh++; mm = 0; } return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm; }
-  function lab(id, on, text) { Scene3D.setLabelOn(id, on); if (on) Scene3D.setLabelText(id, text); }
+  function lab(id, on, text) { on = on && !inPlace(); Scene3D.setLabelOn(id, on); if (on) Scene3D.setLabelText(id, text); }
   // randul de calcul pentru o ora cu zecimale (pas de un sfert de ora daca modelul il da)
   function rowAt(h) {
     var d = cache.fine; h = ((h % 24) + 24) % 24;
@@ -511,12 +649,12 @@
   function tick() {     // tot ce depinde de ora
     var o = simNow(), r = o.r, so = st.outage, out = o.out, eps = o.eps;
     $('clock').textContent = clock(st.hour);
-    $('f-load').textContent = o.load; $('f-pv').textContent = o.pv; $('f-batt').textContent = o.batt;
+    $('f-load').textContent = o.load; $('f-pv').textContent = o.pv; $('f-batt').textContent = o.batt; $('chip-batt').hidden = st.bess === 0;
     $('l-grid').textContent = o.gridLbl; $('f-grid').textContent = o.grid;
     $('chip-temp').hidden = !o.temp; $('f-temp').textContent = o.temp;
     $('chip-gen').hidden = !so; $('f-gen').textContent = so === 2 ? 'dau ' + mw(r.load) : so === 3 ? 'se răcesc' : outStep >= 3 ? 'pornesc' : 'gata de pornire';
     var dn = $('day-now');
-    if (dn) dn.innerHTML = '<b>Ora ' + clock(st.hour) + '.</b> Consum: ' + o.load + '. Panourile: ' + o.pv + '. Bateriile: ' + o.batt + '. ' + (out ? 'Rețea: pană de curent.' : o.gridLbl + ': ' + o.grid + '.') + (o.temp ? ' Afară: ' + o.temp + '.' : '');
+    if (dn) dn.innerHTML = '<b>Ora ' + clock(st.hour) + '.</b> Consum: ' + o.load + '. Panourile: ' + o.pv + '. ' + (st.bess > 0 ? 'Bateriile: ' + o.batt + '. ' : '') + (out ? 'Rețea: pană de curent.' : o.gridLbl + ': ' + o.grid + '.') + (o.temp ? ' Afară: ' + o.temp + '.' : '');
     moveCursor();
     if (!has3d) return;
     var s = M.sunPos(st.month, st.hour); Scene3D.setSun(s.el, s.az, st.wx);
@@ -533,20 +671,21 @@
       if ((f = Scene3D.flow('gen'))) f.set(so === 2 ? 0.85 : 0, 1);
     }
     lab('f_pv', !out && r.pv > eps, mw(r.pv));
-    lab('f_bess', !out && (o.ch > eps || o.dis > eps), o.ch > eps ? 'se încarcă ' + mw(o.ch) : 'dau ' + mw(o.dis));
+    lab('f_bess', st.bess > 0 && !out && (o.ch > eps || o.dis > eps), o.ch > eps ? 'se încarcă ' + mw(o.ch) : 'dau ' + mw(o.dis));
     lab('f_grid', out || o.gr > eps || o.ex > eps, out ? 'pană' : o.ex > eps ? 'dăm în rețea ' + mw(o.ex) : 'luăm din rețea ' + mw(o.gr));
     lab('f_gen', so === 2, mw(r.load));
     if (st.bess > 0) Scene3D.setLabelText('bess', 'Baterii · ' + trim(num(st.bess, 2)) + ' MWh · ' + (out ? pct(o.soc) + ' pline' : o.ch > eps ? 'ajung la ' + pct(o.soc) : o.dis > eps ? 'coboară la ' + pct(o.soc) : pct(o.soc) + ' pline'));
   }
 
-  function render() { calc(); fill(); drawOutage(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawFund(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }
+  function render() { calc(); fill(); drawOutage(); drawDay(); drawMonths(); drawMoney(); drawTen(); drawSens(); drawBank(); drawTeam(); drawCompare(); drawGantt(); tick(); syncUi(); }
   function syncUi() {
-    [].forEach.call($('scen').children, function (b) { b.setAttribute('aria-pressed', b.dataset.s === st.scen); });
     [].forEach.call($('wx').children, function (b) { b.setAttribute('aria-pressed', +b.dataset.w === st.wx); });
-    ['fund', 'fund2'].forEach(function (id) { [].forEach.call($(id).children, function (b) { b.setAttribute('aria-pressed', b.dataset.f === st.fund); }); });
+    ['fund', 'fund2'].forEach(function (id) { [].forEach.call($(id).children, function (b) { b.setAttribute('aria-pressed', +b.dataset.f === st.fund); }); });
     $('month').value = st.month; $('hour').value = st.hour;
     var dk = $('dock'); if (dk) dk.classList.toggle('live', st.playing || playLeft > 0 || st.outage > 0 || chapters[st.ch].hasAttribute('data-dock') || chapters[st.ch].getAttribute('data-view') === 'power');
-    $('o-pv').textContent = trim(num(st.pv, 2)) + ' MW'; $('o-bess').textContent = trim(num(st.bess, 2)) + ' MWh';
+    $('o-pv').textContent = st.pv > 0 ? mwp(st.pv) : 'fără panouri'; $('o-bess').textContent = st.bess > 0 ? trim(num(st.bess, 2)) + ' MWh' : 'fără baterii';
+    $('lg-batt').hidden = st.bess === 0;
+    if (has3d) Scene3D.setLabelOn('bess', st.bess > 0 && !inPlace());
   }
 
   /* ---------- moduri speciale ale machetei ---------- */
@@ -571,8 +710,8 @@
     if (p.genCount && p.genMW) fuel += ' Sunt ' + p.genCount + ' generatoare de câte ' + mw(p.genMW) + (p.genNeeded && p.genNeeded < p.genCount ? '; ajung ' + p.genNeeded + ', restul sunt rezervă' : '') + '.';
     if (p.fuelLph && p.fuelHours) fuel += ' Ard cam ' + num(Math.round(p.fuelLph / 5) * 5) + ' de litri de motorină pe oră, iar rezervorul' + (p.tankLiters ? ' de ' + num(Math.round(p.tankLiters / 100) * 100) + ' de litri' : '') + ' ajunge ' + trim(num(p.fuelHours, 0)) + ' de ore.';
     return [
-      { t: 'Secunda 0', k: '0 s', h: 'Rețeaua cade.', d: 'Punctele albastre de pe cablul dinspre stație se opresc.', sc: 1, src: 'UPS-urile (bateriile din clădire)' },
-      { t: 'Aceeași clipă', k: 'UPS', h: 'UPS-urile țin calculatoarele pornite.', d: 'Preiau tot consumul fără nicio pauză și îl pot duce singure cam ' + um + ' minute. Luminițele lor devin portocalii.', sc: 1, src: 'UPS-urile (bateriile din clădire)' },
+      { t: 'Secunda 0', k: '0 s', h: 'Rețeaua cade.', d: 'Punctele albastre de pe cablul dinspre postul de transformare se opresc.', sc: 1, src: 'UPS-urile (bateriile mici din hală)' },
+      { t: 'Aceeași clipă', k: 'UPS', h: 'UPS-urile țin calculatoarele pornite.', d: 'Preiau tot consumul fără nicio pauză și îl pot duce singure cam ' + um + ' minute. Luminițele lor devin portocalii.', sc: 1, src: 'UPS-urile (bateriile mici din hală)' },
       { t: 'Secunda ' + gs, k: gs + ' s', h: 'Generatoarele diesel pornesc.', d: 'Motoarele se turează. Până ajung la turație, UPS-urile duc în continuare tot consumul.', sc: 1, src: 'UPS-urile, generatoarele pornesc' },
       { t: 'Secunda ' + gl, k: gl + ' s', h: 'Generatoarele duc tot consumul.', d: 'Se vede fumul la coșuri și curentul portocaliu dinspre ele.' + fuel, sc: 2, src: 'generatoarele' },
       { t: 'Când revine rețeaua', k: 'revine', h: 'Centrul trece înapoi pe rețea.', d: 'Așteptăm ' + rm + ' minute ca rețeaua să fie stabilă, apoi generatoarele se răcesc și se opresc. Clienții nu au simțit nimic.', sc: 3, src: 'rețeaua; generatoarele se răcesc' }
@@ -655,15 +794,8 @@
     roofUi(roof);
     if (has3d) { Scene3D.setRoof(roof); Scene3D.go(view, instant); Scene3D.setAuto(view === 'overview' || view === 'hero'); }
     [].forEach.call(document.querySelectorAll('.lbl'), function (l) { l.classList.toggle('hot', PICK_CH[l.dataset.id] === i); });
+    applyLabels(); if (has3d) tick();
     playUi();
-  }
-
-  function setScenario(k) {
-    var s = M.SCEN[k]; resetModes(); st.scen = k; st.it = s.it; st.pv = s.pv; st.bess = s.bess;
-    var a = $('s-pv'), b = $('s-bess');
-    a.max = 8 * s.it; a.step = s.it < 0.5 ? 0.05 : s.it < 2 ? 0.25 : 1; a.value = s.pv;
-    b.max = 12 * s.it; b.step = s.it < 0.5 ? 0.25 : s.it < 2 ? 0.5 : 2.5; b.value = s.bess;
-    render(); rebuild(false);
   }
 
   /* ---------- pornire ---------- */
@@ -678,7 +810,9 @@
     $('money-ctrls').innerHTML =
       '<div id="grp-cloud"><div class="ctrl"><label for="s-price">Preț pe GPU</label><output id="o-price" for="s-price"></output><input type="range" id="s-price" min="1.5" max="8" step="0.1" value="' + A.gpuHourPrice + '"></div>' +
       '<div class="ctrl"><label for="s-occ">Cât timp sunt închiriate GPU-urile</label><output id="o-occ" for="s-occ"></output><input type="range" id="s-occ" min="30" max="95" step="1" value="' + A.occupancy * 100 + '"></div></div>';
-    drawAssumptions();
+    $('fund').innerHTML = fundBtns(); $('fund2').innerHTML = fundBtns();
+    $('s-pv').max = BZ.pvDrawMWp; $('s-pv').value = st.pv; $('s-bess').value = st.bess;
+    drawAssumptions(); drawFund(); drawPlace();
 
     if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) $('hint').textContent = 'Trage cu degetul ca să rotești · două degete apropie';
     has3d = Scene3D.init({
@@ -696,18 +830,17 @@
     } else {
       Scene3D.makeLabels(['building', 'pv', 'bess', 'sub', 'gen', 'cool', 'fiber'].map(function (id) { return { id: id, text: PICK_NAME[id] }; })
         .concat(['f_pv', 'f_bess', 'f_grid', 'f_gen'].map(function (id) { return { id: id, text: '', cls: 'flow' }; }))
-        .concat(Object.keys(PART_NAME).map(function (id) { return { id: id, text: PART_NAME[id], cls: 'part' }; })));
+        .concat(Object.keys(PART_NAME).map(function (id) { return { id: id, text: PART_NAME[id], cls: 'part' }; }))
+        .concat(PLACE_IDS.map(function (id) { return { id: id, text: PLACE_NAME[id], cls: 'place' }; })));
+      PLACE_IDS.forEach(function (id) { Scene3D.setLabelOn(id, false); });
     }
     calc(); render();
     if (has3d) { Scene3D.build({ it: st.it, pv: st.pv, bess: st.bess }); var t = labelTexts(); for (var id in t) Scene3D.setLabelText(id, t[id]); }
     goChapter(0, true); tick();
 
     // controale
-    function scenClick(e) { var b = e.target.closest('button'); if (b && b.dataset.s) setScenario(b.dataset.s); }
-    $('scen').addEventListener('click', scenClick);
-    ['t-cmp', 't-fund', 't-team'].forEach(function (id) { $(id).addEventListener('click', scenClick); });
     $('wx').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { st.wx = +b.dataset.w; render(); } });
-    function fundClick(e) { var b = e.target.closest('button'); if (b) { st.fund = b.dataset.f; render(); } }
+    function fundClick(e) { var b = e.target.closest('button'); if (b) { st.fund = +b.dataset.f; render(); } }
     $('fund').addEventListener('click', fundClick); $('fund2').addEventListener('click', fundClick);
     $('cases').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;

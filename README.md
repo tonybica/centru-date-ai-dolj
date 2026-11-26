@@ -1,8 +1,10 @@
-# Centrul de date AI Dolj
+# Centrul de date AI de la Râureni
 
-Site de prezentare pentru un centru de date AI în județul Dolj, cu parc fotovoltaic și baterii: machetă 3D interactivă, plan pe 10 ani, fonduri europene, calendar și riscuri.
+Site de prezentare pentru un centru de date AI de 1 MW pus într-o hală existentă, la Râureni, Râmnicu Vâlcea, cu panouri pe acoperișurile halelor: machetă 3D interactivă a bazei, plan pe 10 ani, fonduri europene, calendar și riscuri.
 
 **Deschide site-ul:** https://tonybica.github.io/centru-date-ai-dolj/
+
+Adresa are încă „dolj” în nume, pentru că prima variantă a planului era pentru un teren din Dolj. Conținutul este cel nou.
 
 Merge pe calculator și pe telefon, fără nimic de instalat. Toate cifrele sunt estimări de pornire, făcute în noiembrie 2026; presupunerile sunt listate în ultimul capitol.
 

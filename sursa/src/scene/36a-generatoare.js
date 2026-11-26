@@ -1,23 +1,33 @@
-    // generatoare (vest): rezervoarele stau la nord de fiecare grup, cablurile ies pe la capatul dinspre cladire
-    var gen = grp(root), zGen0 = -D / 2 + 3, genO = [], gStep = genS * 5.6 + 1.2;
-    for (i = 0; i < nGen; i++) genO.push(genset(gen, xGen, zGen0 + i * gStep, genLen, genS));
-    (function () {
-      var gx1 = xGen + genLen / 2 + 0.4, gxc = -W / 2 - 1.6, gz0 = zGen0, gz1 = zGen0 + (nGen - 1) * gStep, gzm = (gz0 + gz1) / 2, tw = 0.6, ty = 0.2175, q, t, gw = 2.6 * genS;
-      // canal de cabluri cu capace de beton: o ramura de la fiecare grup, un colector de-a lungul randului, intrarea in peretele de vest la mijlocul randului
-      for (q = 0; q < nGen; q++) box(gen, gxc - tw / 2 - gx1, 0.035, tw, SH.base, (gx1 + gxc - tw / 2) / 2, ty, gz0 + q * gStep, false);
-      box(gen, tw, 0.035, gz1 - gz0 + tw, SH.base, gxc, ty, gzm, false);
-      box(gen, -W / 2 - (gxc + tw / 2), 0.035, tw, SH.base, (-W / 2 + gxc + tw / 2) / 2, ty, gzm, false);
-      if (!Q.lite) {                                                                    // rosturile dintre capace
-        for (t = gz0; t <= gz1 + 0.01; t += 1) flat(gen, tw, 0.03, SH.dark, gxc, 0.237, t + 0.5 > gz1 + tw / 2 ? t : t + 0.5);
-        for (q = 0; q < nGen; q++) for (t = gx1 + 0.5; t < gxc - tw / 2; t += 1) flat(gen, 0.03, tw, SH.dark, t, 0.237, gz0 + q * gStep);
-      }
-      // trecerea prin perete: cutie etansa cu semn de pericol
-      box(gen, 0.25, 0.55, 0.9, SH.silver, -W / 2 - 0.125, 0.2 + 0.275, gzm, false); box(gen, 0.02, 0.2, 0.3, SH.hazard, -W / 2 - 0.261, 0.55, gzm, false);
-      // stalpi de protectie spre drum, la fiecare grup si la punctul de umplere
-      for (q = 0; q < nGen; q++) {
-        var gzq = gz0 + q * gStep, gxw = xGen - genLen / 2 - 1.1;
-        bollard(gen, gxw, gzq - gw / 2 - 0.2); bollard(gen, gxw, gzq + gw / 2 + 0.2);
-        bollard(gen, xGen - genLen * 0.25 - 0.7 * genS - 0.15 * genS - 0.7, gzq - (gw / 2 + 0.9 * genS + 0.1 + 0.95 * genS) + 0.7 * genS);
-      }
-    })();
+    /* --- energie: canale de cabluri, generatoare, post de transformare, racord de 20 kV, baterii (optional), stalpi de iluminat --- */
+    // canal de cabluri cu capace de beton, drept, pe x sau pe z; y = suprafata pe care sta; (ox, oz) = originea grupului in care se deseneaza
+    function en_lid(g, xa, za, xb, zb, y, ox, oz) {
+      var ax = Math.abs(xb - xa) > Math.abs(zb - za), len = ax ? Math.abs(xb - xa) : Math.abs(zb - za), n = Math.max(1, Math.round(len / 0.8)), q;
+      ox = ox || 0; oz = oz || 0; if (len < 0.05) return;
+      box(g, ax ? len : 0.76, 0.03, ax ? 0.76 : len, SH.dark, (xa + xb) / 2 - ox, y + 0.015, (za + zb) / 2 - oz, false);     // marginea canalului
+      box(g, ax ? len : 0.6, 0.05, ax ? 0.6 : len, SH.base, (xa + xb) / 2 - ox, y + 0.025, (za + zb) / 2 - oz, false);        // capacele
+      if (!Q.lite) for (q = 1; q < n; q++) flat(g, ax ? 0.025 : 0.6, ax ? 0.6 : 0.025, SH.dark, xa + (xb - xa) * q / n - ox, y + 0.054, za + (zb - za) * q / n - oz);
+    }
+    function en_pit(g, x, z, y, ox, oz) {                // camin de tragere: rama de beton si capac de fonta
+      ox = ox || 0; oz = oz || 0;
+      box(g, 1.1, 0.07, 1.1, SH.base, x - ox, y + 0.035, z - oz, false); box(g, 0.78, 0.02, 0.78, SH.dark, x - ox, y + 0.08, z - oz, false);
+    }
+    // santul comun de cabluri de pe culoarul de serviciu (z = zCor), cu camine la fiecare ramificatie. Tine de platforma: apare odata cu ea.
+    var en_tx0 = platX0 + 1, en_tx1 = 15;
+    en_lid(platG, en_tx0, zCor, en_tx1, zCor, 0.2, pcx, pcz);
+    en_pit(platG, en_tx0, zCor, 0.2, pcx, pcz); en_pit(platG, xInG, zCor, 0.2, pcx, pcz); en_pit(platG, xInB, zCor, 0.2, pcx, pcz); en_pit(platG, en_tx1, zCor, 0.2, pcx, pcz);
+    en_lid(platG, xInB, zCor + 0.55, xInB, zNw - 0.9, 0.2, pcx, pcz);                                              // ramura spre dulapul de cabluri de pe perete
+    // generatoare: grupuri in containere de 12 m, lungi pe z, cu radiatorul spre nord (platforma libera, pe unde vine cisterna) si capatul cu cabluri spre hala.
+    // Piesa `genset` este lunga pe x, asa ca grupul `gen` este rotit o data: x local = z al bazei (masurat de la mijlocul zonei), z local = -x al bazei.
+    var gen = grp(root), genO = [], genZ = RZ.gen, en_gz = (RZ.gen[2] + RZ.gen[3]) / 2, en_gst = (RZ.gen[1] - RZ.gen[0]) / nGen, en_gx = [], en_gze = en_gz + genLen / 2 + 0.4;
+    gen.position.set(0, 0, en_gz); gen.rotation.y = -Math.PI / 2;
+    for (i = 0; i < nGen; i++) {
+      var en_x = RZ.gen[0] + i * en_gst + (en_gst - 6.1 * genS) / 2 + 1.3 * genS + 0.3, en_o = genset(gen, 0, -en_x, genLen, genS), en_tz = -en_x - 3.35 * genS - 0.1;
+      en_gx.push(en_x); genO.push([-en_o[2], en_o[1], en_gz + en_o[0]]);
+      // stalpisori de protectie: la capatul cu radiatorul si la punctul de umplere
+      bollard(gen, -genLen / 2 - 0.9, -en_x - 1.0 * genS); bollard(gen, -genLen / 2 - 0.9, -en_x + 1.0 * genS); bollard(gen, -genLen * 0.25 - 1.6 * genS, en_tz);
+      // canalul de cabluri al grupului: din fundatie pana la caminul de pe santul comun
+      en_lid(platG, en_x, en_gze, en_x, zCor - 0.55, 0.2, pcx, pcz); en_pit(platG, en_x, zCor, 0.2, pcx, pcz);
+    }
+    var genA = [(RZ.gen[0] + RZ.gen[1]) / 2, 6.5, en_gz];
+    var genPath = [[en_gx[nGen - 1], en_gze - 0.4], [en_gx[nGen - 1], zCor], [xInB, zCor], [xInB, zNw]];
     tag(gen, 'gen');

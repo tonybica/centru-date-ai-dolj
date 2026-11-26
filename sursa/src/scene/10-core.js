@@ -11,6 +11,10 @@ var Scene3D = (function () {
   var cam = { tx: 0, ty: 0, tz: 0, dist: 300, az: 0.6, pol: 1.0 }, goal = null;
   var flows = {}, labelEls = {}, pickObjs = [], tags = [];
   var roofGroup = null, wallGroup = null, roofOpen = false, roofK = 0;
+  // Macheta se construieste in coordonatele bazei (x = dinspre calea ferata spre interiorul bazei, z = de-a lungul caii ferate) si se roteste o data,
+  // ca nordul real sa fie nordul scenei: asa soarele si busola raman corecte. 140,5 grade = 180 - 39,5 (directia caii ferate fata de nord).
+  var NORTH_ROT = 140.5 * Math.PI / 180;
+  var camLoc = new T.Vector3();
   var handlers = { pick: null, hover: null, north: null, touched: null };
   var auto = false, lastT = 0, ok = false, nightK = 0, running = true;
   var parts = null, buildK = [1, 1, 1, 1, 1, 1, 1, 1], outage = 0, rackOpen = false, rackK = 0, thermal = false, labelOn = {}, clouds = [], puffGen = null, puffHeat = null, THERM = [];
@@ -237,7 +241,7 @@ var Scene3D = (function () {
     });
     TEX.sign = canvasTex(512, 128, function (g, w, h) {
       g.fillStyle = '#20262a'; g.fillRect(0, 0, w, h); g.fillStyle = '#f2a600'; g.fillRect(22, 30, 14, 68);
-      var fam = 'px "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif', txt = 'DATA CENTER DOLJ'; g.font = '600 62' + fam; var fs = Math.min(62, 62 * (w - 78) / g.measureText(txt).width);
+      var fam = 'px "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif', txt = 'CENTRU DE DATE AI'; g.font = '600 62' + fam; var fs = Math.min(62, 62 * (w - 78) / g.measureText(txt).width);
       g.fillStyle = '#f4f5f2'; g.font = '600 ' + fs.toFixed(1) + fam; g.textBaseline = 'middle'; g.fillText(txt, 54, 66);
     }, { repeat: false, keep: true });
     TEX.shade = canvasTex(128, 128, function (g, w, h) {

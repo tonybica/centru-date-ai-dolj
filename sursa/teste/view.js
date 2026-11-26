@@ -1,4 +1,5 @@
-// look=tx,ty,tz,dist,az,pol pune camera oriunde (tinta, distanta, unghi in jurul axei verticale, unghi fata de verticala: 1.5 = aproape de sol)
+// lookb=tx,ty,tz,dist,az,pol pune camera oriunde, in coordonatele bazei (x spre interiorul bazei, z de-a lungul caii ferate; az 0 = privit dinspre +z)
+// look=tx,ty,tz,dist,az,pol pune camera oriunde, in coordonatele scenei (rotite spre nordul real) (tinta, distanta, unghi in jurul axei verticale, unghi fata de verticala: 1.5 = aproape de sol)
 // ANCH=1 tipareste si ancorele etichetelor, ca sa stii unde sunt obiectele
 // capturi doar cu macheta: node view.js 1200 760 "nume|ch1;wait=500" "nume2|eval=Scene3D._cam.pol=1.3"
 const { chromium, devices } = require('playwright');
@@ -24,6 +25,7 @@ const path = require('path');
       else if (a.startsWith('click=')) await page.evaluate(sel => document.querySelector(sel).click(), a.slice(6));
       else if (a.startsWith('range=')) { const [id, v] = a.slice(6).split('@'); await page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }, [id, v]); }
       else if (a.startsWith('look=')) await page.evaluate(v => { Scene3D.setAuto(false); Scene3D.zoom(1); const c = Scene3D._cam; c.tx = v[0]; c.ty = v[1]; c.tz = v[2]; c.dist = v[3]; c.az = v[4]; c.pol = v[5]; }, a.slice(5).split(',').map(Number));
+      else if (a.startsWith('lookb=')) await page.evaluate(v => { Scene3D.setAuto(false); Scene3D.zoom(1); const c = Scene3D._cam, r = Scene3D.layout().north || 0, co = Math.cos(r), si = Math.sin(r); c.tx = v[0] * co + v[2] * si; c.ty = v[1]; c.tz = -v[0] * si + v[2] * co; c.dist = v[3]; c.az = v[4] + r; c.pol = v[5]; }, a.slice(6).split(',').map(Number));
       else if (a.startsWith('eval=')) await page.evaluate(a.slice(5));
       else if (a.startsWith('wait=')) await page.waitForTimeout(+a.slice(5));
     }

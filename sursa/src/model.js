@@ -5,8 +5,11 @@ var Model = (function () {
 
   var MONTHS = ['ianuarie', 'februarie', 'martie', 'aprilie', 'mai', 'iunie', 'iulie', 'august', 'septembrie', 'octombrie', 'noiembrie', 'decembrie'];
   var MSHORT = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep', 'oct', 'noi', 'dec'];
-  // kWh produsi de 1 kWp intr-o luna, zona Craiova, panouri fixe orientate sud (aprox. 1.345 kWh/kWp/an)
-  var YIELD = [55, 75, 115, 135, 150, 155, 165, 160, 130, 100, 60, 45];
+  // kWh produsi de 1 kWp intr-o luna. Pornim de la zona Craiova, panouri fixe spre sud (aprox. 1.345 kWh/kWp/an)
+  // si scadem 10%: la Ramnicu Valcea e ceva mai putin soare, iar panourile stau culcate pe acoperisuri,
+  // jumatate pe panta dinspre nord. Rezulta aprox. 1.210 kWh/kWp/an.
+  var YIELD_K = 0.90;
+  var YIELD = [55, 75, 115, 135, 150, 155, 165, 160, 130, 100, 60, 45].map(function (v) { return v * YIELD_K; });
   var DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   var DAYLEN = [9.2, 10.4, 11.9, 13.5, 14.8, 15.5, 15.1, 13.9, 12.4, 10.9, 9.6, 8.8];
   // ora la care soarele e cel mai sus, pe ceasul local (ora de vara din aprilie pana in octombrie)
@@ -18,10 +21,25 @@ var Model = (function () {
   ];
   (function () { var m = 0; WEATHER.forEach(function (w) { m += w.f * w.p; }); WEATHER.forEach(function (w) { w.f /= m; }); })();
 
+  // Site-ul prezinta o singura marime: Mediu, 1 MW, in hala libera 1 din baza. Pilot ramane doar pentru
+  // comparatie (ar incapea in hala libera 2). Marimea Mare (5 MW) nu incape in baza si nu se calculeaza.
   var SCEN = {
-    pilot: { key: 'pilot', name: 'Pilot', it: 0.25, pv: 1, bess: 1 },
-    mediu: { key: 'mediu', name: 'Mediu', it: 1, pv: 4, bess: 4 },
-    mare: { key: 'mare', name: 'Mare', it: 5, pv: 20, bess: 20 }
+    mediu: { key: 'mediu', name: 'Mediu', it: 1, pv: 1.2, bess: 0, hall: 'hala liberă 1', hallM2: 862 },
+    pilot: { key: 'pilot', name: 'Pilot', it: 0.25, pv: 0.25, bess: 0, hall: 'hala liberă 2', hallM2: 594 }
+  };
+  // Baza: masuratori din satelit (eroare de circa 15%) si din harta retelei electrice. Nimic verificat pe teren.
+  var BASE = {
+    areaHa: 9.3, lenM: 456, widM: 200,     // perimetrul bazei
+    buildings: 26, roofM2: 14700,          // cladiri si acoperisuri in total
+    hallM2: 862, hallL: 46, hallW: 19,     // hala libera 1, unde intra centrul
+    hall2M2: 594,                          // hala libera 2 (ar ajunge pentru Pilot)
+    longHallM2: 3100,                      // toata hala lunga, din care hala 1 este un capat
+    yardAHa: 0.7, yardBHa: 0.5,            // cele doua curti deschise de langa hala 1
+    pvMaxMWp: 1.5, roofM2PerMWp: 6000,     // cat duc acoperisurile bune, cu tot cu cele mici
+    pvDrawMWp: 1.2,                        // cat incape pe hala centrului si pe cele opt hale mari desenate cu panouri (cursorul nu trece de aici)
+    gridReqMW: 1.5,                        // puterea de cerut la racordare, cu post propriu la 20 kV
+    line110m: 185, st1: 'Râureni', st1km: 3.4, st2: 'Stupărei', st2km: 4.5,
+    mareNeedM2: [3400, 4000]               // cat ar cere marimea Mare
   };
 
   // Presupuneri (valori de pornire)
@@ -32,14 +50,15 @@ var Model = (function () {
     gpuPerServer: 8,
     kwPerRack: 45,
     capexFacilityFixed: 0.5,   // mil EUR: proiectare, avize, racord minim
-    capexFacilityPerMW: 9.0,   // mil EUR / MW IT: cladire, electrice, racire, UPS, generatoare
+    capexFacilityPerMW: 7.65,  // mil EUR / MW IT: electrice, racire, UPS, generatoare si reamenajarea halei.
+                               // Cu 15% sub o cladire noua (9,0), pentru ca hala exista.
     capexGpuPerMW: 30.0,       // mil EUR / MW IT: servere GPU, retea, stocare
     capexPvPerMWp: 0.60,       // mil EUR / MWp
     capexBessPerMWh: 0.25,     // mil EUR / MWh
     haPerMWp: 1.2,
     landDcHaBase: 0.4, landDcHaPerMW: 0.5,
-    landDcPricePerHa: 0.15,    // mil EUR / ha (teren industrial, ~15 EUR/mp)
-    landPvPricePerHa: 0.015,   // mil EUR / ha (teren pentru panouri, ~1,5 EUR/mp)
+    landDcPricePerHa: 0,       // terenul si hala sunt ale firmei: nu se cumpara nimic
+    landPvPricePerHa: 0,       // panourile stau pe acoperisuri
     gridPrice: 170,            // EUR / MWh, tot inclus (energie + tarife de retea + taxe), fara TVA
     exportPrice: 40,           // EUR / MWh pentru surplusul vandut la pranz
     bessHours: 2,              // bateria se poate descarca complet in 2 ore
@@ -130,10 +149,9 @@ var Model = (function () {
       loadAvg: L, peak: it * a.pue,
       annualMWh: L * 8760,
       households: L * 8760 / a.householdMWh,
-      buildingM2: 120 + 650 * it,
-      landDcHa: a.landDcHaBase + a.landDcHaPerMW * it,
-      landPvHa: pv * a.haPerMWp,
-      landHa: a.landDcHaBase + a.landDcHaPerMW * it + pv * a.haPerMWp
+      buildingM2: 120 + 650 * it,          // suprafata de care are nevoie centrul, in hala
+      roofM2: pv * BASE.roofM2PerMWp,      // acoperis bun de care au nevoie panourile
+      landDcHa: 0, landPvHa: 0, landHa: 0  // nu se cumpara teren
     };
   }
 
@@ -145,7 +163,7 @@ var Model = (function () {
       facility: a.capexFacilityFixed + a.capexFacilityPerMW * it,
       pv: a.capexPvPerMWp * pv,
       bess: a.capexBessPerMWh * bess,
-      land: ph.landDcHa * a.landDcPricePerHa + ph.landPvHa * a.landPvPricePerHa
+      land: 0
     };
     cap.total = cap.gpu + cap.facility + cap.pv + cap.bess + cap.land;
 
@@ -186,27 +204,93 @@ var Model = (function () {
     for (var i = 0; i < 60; i++) { var mid = (lo + hi) / 2; if (npv(mid) > 0) lo = mid; else hi = mid; }
     return (lo + hi) / 2;
   }
-  // fonduri europene si ajutor de stat: valori orientative, noiembrie 2026 (de verificat in ghidul fiecarui apel)
+  // Fonduri europene si ajutor de stat in judetul Valcea: stare din octombrie-noiembrie 2026, din pagini de consultanta si presa
+  // (paginile oficiale nu au putut fi citite). Se confirma la sursa inainte de orice pas.
+  // Concluzia cautarii: pentru proiectul asa cum este (cumparam GPU-uri si inchiriem calcul) niciun grant nu poate fi pus
+  // cinstit in plan. Cifra de planificare este 0; grantul apare doar ca scenariu optimist.
   var FUNDS = {
-    immIntensity: 0.70,   // ajutor regional pentru IMM in Dolj: pana la 70% (mijlocii) sau 75% (mici) din costurile eligibile
-    immCap: 1.5,          // mil EUR pe proiect in apelul regional pentru IMM (0,2 - 1,5 mil.)
-    fptjMaxInv: 10,       // mil EUR: investitia maxima pentru IMM in Fondul de Participare Tranzitie Justa (50 la firme mari)
-    fptjShare: 0.75,      // presupunere: fondul finanteaza cel mult 75% din investitie, restul sunt bani proprii sau credit obisnuit
-    fptjGrant: 0.5,       // pana la 50% din finantare se transforma in grant
-    fptjYears: 12, fptjGrace: 3, fptjRate: 0.045,
-    bessPerMWh: 0.069, bessCap: 15, bessMinMW: 1
+    plan: 0,                // mil EUR: grantul pe care se sprijina planul
+    intensity: 0.75,        // ajutor regional in Valcea pentru o firma mijlocie (70% pentru una mare): contributie proprie de cel putin 25%
+    grantMin: 0.5, grantMax: 10,   // mil EUR: limitele apelului STEP din Programul Regional Sud-Vest Oltenia
+    optimistic: [2, 6],     // mil EUR: scenariul optimist, doar cu cercetare proprie reala
+    steps: [0, 3, 5, 10],   // treptele de grant aratate in pagina (aceleasi exemple ca in planul pentru banca)
+    softYears: 12, softGrace: 3, softRate: 0.045   // pastrate pentru un eventual credit avantajos; acum nefolosite (soft = 0)
   };
-  function funding(key, f, bess, a) {
+  // lista programelor, afisata in capitolul "Fonduri europene". cls: 'open' deschis, 'wait' anuntat, 'no' nu se potriveste, 'help' ajuta fara sa fie grant
+  var FUND_LIST = [
+    { key: 'step', cls: 'open', name: 'Apelul STEP din Programul Regional Sud-Vest Oltenia',
+      st: 'Deschis din 19 octombrie 2026 până pe 18 ianuarie 2027, ora 12. Se poate închide mai devreme dacă se strâng prea multe cereri.',
+      sum: 'Grant între 0,5 și 10 milioane de euro pe proiect, dintr-un buget de 27,6 milioane pentru toată regiunea. Acoperă cel mult 75% din cheltuieli la o firmă mijlocie.',
+      what: 'Se numește „Sprijin pentru dezvoltarea tehnologiilor strategice” și este gestionat de Agenția pentru Dezvoltare Regională Sud-Vest Oltenia. Vâlcea este eligibilă, iar firma îndeplinește condițiile de bază.',
+      fit: 'Plătește dezvoltarea sau fabricarea unei tehnologii, nu folosirea ei. Un centru care cumpără GPU-uri și închiriază putere de calcul este folosire, deci așa cum este gândit proiectul nu se încadrează. Ar intra doar refăcut în jurul unei cercetări proprii reale, cu un partener de cercetare. Atunci suma realistă ar fi 2–6 milioane de euro.',
+      href: 'https://bursafondurilor.ro/pr-sud-vest-oltenia-step/', src: 'Bursa Fondurilor' },
+    { key: 'techup', cls: 'wait', name: 'TechUp România',
+      st: 'Anunțat prin hotărâre de guvern în august 2026. Ghidul nu era publicat în noiembrie 2026 și nu are dată de pornire. Nu înainte de 2027.',
+      sum: 'În cel mai bun caz, circa 5,9 milioane de euro.',
+      what: 'Schemă națională de ajutor de stat pentru tehnologii avansate: calcul avansat, inteligență artificială, infrastructură digitală.',
+      fit: 'Cere tot o cercetare proprie, dusă până la prototip. Clădirile sunt gândite ca noi, deci reamenajarea halei este îndoielnică.',
+      href: 'https://rcgconsulting.ro/techup-romania-finantare-tehnologii-avansate/', src: 'RCG Consulting' },
+    { key: 'pv', cls: 'no', name: 'Bani pentru panouri și baterii',
+      st: 'Nicio linie deschisă pentru firme private. Apelul pentru autoconsum din Fondul pentru Modernizare s-a închis în septembrie 2025.',
+      sum: 'Dacă apare un apel nou cu aceleași reguli: cel mult circa 0,5 milioane de euro pentru 1,2 MWp.',
+      what: 'Fondul pentru Modernizare a plătit în trecut o parte din panourile puse de firme pentru consumul propriu.',
+      fit: 'De urmărit. Suma este mică față de investiție.' },
+    { key: 'fptj', cls: 'no', name: 'Fondul de Participare Tranziție Justă',
+      st: 'Nu se aplică: este doar pentru Gorj, Hunedoara, Dolj, Galați, Prahova și Mureș.',
+      sum: 'În planul pentru Dolj aducea un grant de 5 milioane de euro.',
+      what: 'Credit și grant la un loc, pentru județele care renunță la cărbune.',
+      fit: 'Pierdut prin mutarea în bază.' },
+    { key: 'tax', cls: 'help', name: 'Scutirea impozitului pe profitul reinvestit',
+      st: 'În vigoare.',
+      sum: 'Economia este 16% din profitul reinvestit, cel mult cât impozitul datorat.',
+      what: 'Profitul firmei folosit pentru echipamente noi nu se mai impozitează.',
+      fit: 'Nu este grant, dar ajută în anul în care se pun calculatoarele în funcțiune. Se calculează cu contabilul.' },
+    { key: 'guar', cls: 'help', name: 'Garanții pentru credit',
+      st: 'Garanția Băncii de Investiții și Dezvoltare acoperă până la 70% din credit în Vâlcea. Garanția europeană InvestEU prin bănci partenere nu era încă pornită în septembrie 2026.',
+      sum: 'Nu aduc bani nerambursabili.',
+      what: 'Statul sau Uniunea Europeană garantează o parte din credit, iar banca cere mai puține garanții de la firmă.',
+      fit: 'Ușurează creditul, nu micșorează investiția.' }
+  ];
+  // G = grantul ales, in mil EUR. Intoarce cat se poate lua de fapt.
+  function funding(G, f) {
     var c = f.capex, F = FUNDS, elig = c.gpu + c.facility + c.pv + c.bess;
-    var out = { key: key, grant: 0, soft: 0, elig: elig };
-    out.immPossible = Math.min(F.immCap, F.immIntensity * elig);
-    out.fptjFin = Math.min(F.fptjMaxInv, F.fptjShare * elig);
-    out.fptjPossible = F.fptjGrant * out.fptjFin;
-    out.bessPossible = (bess > 0 && bess / a.bessHours >= F.bessMinMW - 1e-9) ? Math.min(F.bessCap, F.bessPerMWh * bess, c.bess) : 0;
-    if (key === 'imm') out.grant = out.immPossible;
-    else if (key === 'fptj') { out.grant = out.fptjPossible; out.soft = out.fptjFin - out.grant; }
+    var out = { key: G > 0 ? 'grant' : 'none', want: +G || 0, soft: 0, elig: elig };
+    out.byIntensity = F.intensity * elig;                 // cat ar permite regula de ajutor regional
+    out.max = Math.min(F.grantMax, out.byIntensity);      // cat permite apelul
+    out.grant = Math.max(0, Math.min(out.want, out.max));
+    out.share = elig > 0 ? out.grant / elig : 0;
     return out;
   }
+  // Calculul facut pentru banca (alt model, mai strict: contracte ferme pe 3 ani pentru 70% din capacitate,
+  // credit pentru echipamente pe 3 ani, credit pentru infrastructura pe 10 ani cu 1 an de gratie, dobanda 7%,
+  // bani proprii 35% din ce ramane dupa grant). Cifre fixe, preluate din evaluarea bazei (2026-11-26), in mil EUR.
+  // DSCR = de cate ori acopera banii castigati rata la banca, in anul cel mai greu (anul 2).
+  var BANK = {
+    need: 42.8, capex: 38.87, contingency: 1.94, dscrTarget: 1.30, grantForTarget: 6.5,
+    rows: [
+      { grant: 0, equity: 14.97, loan: 27.80, dscr: 1.12, irr: 0.090, back: 8.5 },
+      { grant: 3, equity: 13.90, loan: 25.81, dscr: 1.20, irr: 0.123, back: 7.8 },
+      { grant: 5, equity: 13.18, loan: 24.48, dscr: 1.25, irr: 0.148, back: 7.1 },
+      { grant: 10, equity: 11.39, loan: 21.15, dscr: 1.43, irr: 0.228, back: 3.5 }
+    ],
+    // cum se ajunge la pragul de 1,30 fara grant
+    levers: [
+      { name: 'Bani proprii 43,9% în loc de 35%', equity: 18.72, loan: 23.92, dscr: '1,30' },
+      { name: 'Contracte ferme pentru 80%, 90% sau 100% din capacitate, pe 3 ani', equity: 14.97, loan: 27.80, dscr: '1,19 · 1,25 · 1,31' },
+      { name: 'Contracte pentru 70% pe 4 ani și creditul pentru echipamente tot pe 4 ani', equity: 14.97, loan: 27.80, dscr: '1,38' },
+      { name: 'Contracte pentru 70% pe 5 ani și creditul pentru echipamente tot pe 5 ani', equity: 14.97, loan: 27.80, dscr: '1,60' }
+    ],
+    // ce se intampla cand merge mai prost sau mai bine, fara grant
+    sens: [
+      { name: 'Fără contracte ferme (cazul prudent)', dscr: 0.67 },
+      { name: 'Preț de 3,0 € pe GPU pe oră', dscr: 0.95 },
+      { name: 'Piața de azi: 4,5 € și 75% ocupare', dscr: 1.52 }
+    ],
+    firmContractsGpu: 386, firmContractsShare: 0.70, firmRevenue: 11.85, // contracte ferme pe 3 ani
+    rev1: 13.83, rev3: 14.76, ebitda1: 9.89, ebitda3: 10.56,
+    refreshYear: 6, refreshCost: 24.0, refreshFromCash: 8.4,
+    dolj: { capex: 43.11, grant: 5, equity: 14.73, loan: 27.36, dscr: 1.23 }
+  };
   function annuity(p, r, n) { return p > 0 && n > 0 ? (r > 0 ? p * r / (1 - Math.pow(1 + r, -n)) : p / n) : 0; }
   // zece ani: crestere treptata, credit, fonduri, GPU-uri inlocuite in anul 6
   function tenYear(it, pv, bess, a, mode, year, fund) {
@@ -215,7 +299,7 @@ var Model = (function () {
     var grant = Math.min(fund.grant || 0, c.total), soft = Math.min(fund.soft || 0, c.total - grant);
     var rest = Math.max(0, c.total - grant - soft), loan = a.loanShare * rest, equity = rest - loan;
     var n = a.loanYears, ann = annuity(loan, a.interest, n);
-    var sN = F.fptjYears - F.fptjGrace, sAnn = annuity(soft, F.fptjRate, sN);
+    var sN = F.softYears - F.softGrace, sAnn = annuity(soft, F.softRate, sN);
     var refreshCost = mode === 'cloud' ? a.gpuRefreshCost * c.gpu : 0, rLoan = a.loanShare * refreshCost, rAnn = annuity(rLoan, a.interest, a.gpuLifeYears);
     var rows = [{ y: 0, cash: -equity, cum: -equity }], cum = -equity, fl = [-equity], pf2 = [-(c.total - grant)], be = null, low = -equity;
     for (var y = 1; y <= 10; y++) {
@@ -224,7 +308,7 @@ var Model = (function () {
       var main = f.rev.main * ramp * pf, es = 0.35 + 0.65 * ramp, rev = main + f.rev.energy * es;
       var opex = f.opex.energy * es + f.opex.staff + f.opex.maint + f.opex.fixedOther + f.opex.varRate * main;
       var ebitda = rev - opex, debt = y <= n ? ann : 0;
-      if (soft > 0) debt += y <= F.fptjGrace ? soft * F.fptjRate : (y <= F.fptjYears ? sAnn : 0);
+      if (soft > 0) debt += y <= F.softGrace ? soft * F.softRate : (y <= F.softYears ? sAnn : 0);
       var isRefresh = refreshCost > 0 && y > 1 && (y - 1) % a.gpuLifeYears === 0;
       if (refreshCost > 0 && y > a.gpuLifeYears) debt += rAnn;
       var refresh = isRefresh ? refreshCost - rLoan : 0;
@@ -234,7 +318,7 @@ var Model = (function () {
       fl.push(cash); pf2.push(ebitda - (isRefresh ? refreshCost : 0));
     }
     // ce mai valoreaza activele dupa 10 ani, minus creditul ramas
-    var softLeft = soft > 0 ? sAnn * (1 - Math.pow(1 + F.fptjRate, -(F.fptjYears - 10))) / F.fptjRate : 0;
+    var softLeft = soft > 0 ? sAnn * (1 - Math.pow(1 + F.softRate, -(F.softYears - 10))) / F.softRate : 0;
     var gross = 0.5 * c.facility + 0.6 * c.pv + 0.3 * c.bess + c.land + 0.1 * refreshCost, residual = gross - softLeft;
     fl[10] += residual; pf2[10] += gross;
     return { rows: rows, equity: equity, loan: loan, grant: grant, soft: soft, annuity: ann, breakeven: be, low: low, residual: residual, irr: irr(fl), irrP: irr(pf2), fin: f, refreshCost: refreshCost };
@@ -259,7 +343,7 @@ var Model = (function () {
     var energyNet = f.opex.energy - f.rev.energy;
     var parts = [];
     if (mode === 'cloud') parts.push(['Uzura calculatoarelor', c.gpu / a.gpuLifeYears * k]);
-    parts.push(['Uzura clădirii, panourilor și bateriilor', (f.dep - c.gpu / a.gpuLifeYears) * k]);
+    parts.push(['Uzura halei, a instalațiilor și a panourilor', (f.dep - c.gpu / a.gpuLifeYears) * k]);
     parts.push([mode === 'cloud' ? 'Curent' : 'Curent, după ce plătește clientul', energyNet * k]);
     parts.push(['Oameni', f.opex.staff * k]);
     parts.push(['Mentenanță, licențe, vânzări', (f.opex.maint + f.opex.other) * k]);
@@ -267,11 +351,11 @@ var Model = (function () {
     return { parts: parts, total: total, price: mode === 'cloud' ? a.gpuHourPrice : a.coloPrice, unit: mode === 'cloud' ? 'oră de GPU' : 'kW pe lună' };
   }
 
-  // pozitia soarelui (Craiova, 44,3 grade nord): inaltime si azimut fata de sud, in radiani
+  // pozitia soarelui (Ramnicu Valcea, 45,05 grade nord): inaltime si azimut fata de sud, in radiani
   function sunPos(month, hour) {
     var doy = [15, 46, 75, 105, 135, 166, 196, 227, 258, 288, 319, 349][month];
     var dec = -23.44 * Math.PI / 180 * Math.cos(2 * Math.PI * (doy + 10) / 365);
-    var lat = 44.3 * Math.PI / 180, H = (hour - NOON[month]) * 15 * Math.PI / 180;
+    var lat = 45.05 * Math.PI / 180, H = (hour - NOON[month]) * 15 * Math.PI / 180;
     var sinEl = Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H);
     var el = Math.asin(Math.max(-1, Math.min(1, sinEl)));
     var az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat));
@@ -279,7 +363,7 @@ var Model = (function () {
   }
 
   return {
-    MONTHS: MONTHS, MSHORT: MSHORT, YIELD: YIELD, DAYS: DAYS, WEATHER: WEATHER, SCEN: SCEN, A: A,
+    MONTHS: MONTHS, MSHORT: MSHORT, YIELD: YIELD, DAYS: DAYS, WEATHER: WEATHER, SCEN: SCEN, A: A, BASE: BASE, BANK: BANK, FUND_LIST: FUND_LIST,
     pvProfile: pvProfile, loadMW: loadMW, simulateDay: simulateDay, simulateYear: simulateYear,
     physical: physical, finance: finance, sunPos: sunPos, tenYear: tenYear, sensitivity: sensitivity, unitCost: unitCost, funding: funding, FUNDS: FUNDS
   };

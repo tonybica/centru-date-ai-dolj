@@ -3,11 +3,11 @@
   function applyBuild() {
     if (!parts) return;
     var p = parts, b = buildK, f, i, n;
-    f = b[0]; p.plat.visible = f > 0.01; p.plat.scale.set(Math.max(0.02, f), 1, Math.max(0.02, f)); p.siteG.visible = f >= 0.5; p.fenceG.visible = f >= 0.8;
+    f = b[0]; p.plat.visible = f > 0.01; p.plat.scale.set(Math.max(0.02, f), 1, Math.max(0.02, f));      // baza exista deja: curtile, halele si gardul se vad de la inceput
     f = b[1]; p.sub.visible = f > 0.01; p.sub.scale.y = Math.max(0.02, Math.min(1, f * 1.5)); n = p.lineG.children.length;
     for (i = 0; i < n; i++) p.lineG.children[i].visible = f > 0.01 && (n - i) <= Math.ceil(f * n);
-    f = b[2]; p.floorM.visible = f > 0.01; p.wallGroup.visible = f > 0.04; p.shell = Math.min(1, f / 0.85);
-    f = b[3]; [p.cool, p.gen, p.elec, p.partG, p.lampG].forEach(function (g) { g.visible = f > 0.01; g.scale.y = Math.max(0.02, f); });
+    f = b[2]; p.shell = 1; p.partG.visible = f > 0.01; p.partG.scale.y = Math.max(0.02, f);                // hala exista deja: peretii si podeaua se vad de la inceput; reamenajarea ridica peretii dinauntru
+    f = b[3]; [p.cool, p.gen, p.elec, p.lampG].forEach(function (g) { g.visible = f > 0.01; g.scale.y = Math.max(0.02, f); });
     f = b[4]; p.itg.visible = f > 0.01; p.rk.count = Math.round(p.n1 * f); p.rk2.count = Math.round(p.n2 * f); p.itx.visible = f > 0.5; p.rack.g.visible = f > 0.9;
     f = b[5]; if (p.tables) { p.tables.count = Math.round(p.nT * f); p.inv.visible = f > 0.2; p.pvG.visible = f > 0.05; }
     f = b[6]; p.bess.visible = f > 0.01; if (p.bessI) p.bessI.count = Math.ceil(f * p.nB);
@@ -256,7 +256,9 @@
       if (!vis) { elx.hidden = true; continue; }
       if (elx.hidden) { elx.hidden = false; lsize[id] = null; }
       if (!lsize[id] || refresh) lsize[id] = { w: elx.offsetWidth || 90, h: elx.offsetHeight || 22 };
-      var sz = lsize[id], rx = x - sz.w / 2, ry = y - sz.h - 10, shift = 0, okp = false;
+      var sz = lsize[id], rx = x - sz.w / 2, ry = y - sz.h - 10, shift = 0, okp = false, dxl = 0;
+      if (rx + sz.w > w - 6) dxl = w - 6 - rx - sz.w; if (rx + dxl < 6) dxl = 6 - rx;           // eticheta ramane intreaga in cadru: o impingem de la margine, iar piciorul ramane pe obiect
+      dxl = Math.max(-(sz.w / 2 - 12), Math.min(sz.w / 2 - 12, dxl)); rx += dxl;
       for (var t = 0; t < 5 && !okp; t++) {
         okp = true;
         for (var q = 0; q < placed.length; q++) {
@@ -267,7 +269,8 @@
       }
       if (!okp || ry - shift < 44) { elx.hidden = true; continue; }
       placed.push({ x: rx, y: ry - shift, w: sz.w, h: sz.h });
-      elx.style.transform = 'translate(' + x.toFixed(1) + 'px,' + (y - shift).toFixed(1) + 'px) translate(-50%,-100%) translateY(-10px)';
+      elx.style.transform = 'translate(' + (x + dxl).toFixed(1) + 'px,' + (y - shift).toFixed(1) + 'px) translate(-50%,-100%) translateY(-10px)';
+      elx.style.setProperty('--sx', (-dxl).toFixed(1) + 'px');
       elx.style.setProperty('--stem', (10 + shift) + 'px');
     }
   }
@@ -317,11 +320,12 @@
     if (Q.lite && !busy && t - lastT < 24) return;      // pe telefon, cat timp nimic nu se misca repede, ajung 30 de cadre pe secunda
     var dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t; drew = true;
     stepCamera(dt);
-    for (var id in flows) flows[id].update(dt, camera.position);
+    if (root) { camLoc.copy(camera.position); root.worldToLocal(camLoc); }                                 // fluxurile sunt in coordonatele bazei
+    for (var id in flows) flows[id].update(dt, camLoc);
     var i;
     if (!reduced && outage !== 1) TEX.fan.rotation += dt * 7;
     if (puffGen) puffGen.update(dt); if (puffHeat) puffHeat.update(dt);
-    if (!reduced && parts && parts.cloudG.visible) for (i = 0; i < clouds.length; i++) { var cl = clouds[i]; cl.position.x += cl.userData.v * dt; if (cl.position.x > L.cx + L.R * 1.7) cl.position.x = L.cx - L.R * 1.7; }
+    if (!reduced && parts && parts.cloudG.visible) for (i = 0; i < clouds.length; i++) { var cl = clouds[i]; cl.position.x += cl.userData.v * dt; if (cl.position.x > L.lcx + L.R * 1.7) cl.position.x = L.lcx - L.R * 1.7; }
     var rt = rackOpen ? 1 : 0;
     if (Math.abs(rackK - rt) > 0.001) { rackK += (rt - rackK) * (reduced ? 1 : Math.min(1, dt * 2.6)); shadowDirty = true; } else rackK = rt;
     if (parts) {
@@ -333,7 +337,7 @@
       var target = roofOpen ? 1 : 0;
       if (Math.abs(roofK - target) > 0.001) { roofK += (target - roofK) * (reduced ? 1 : Math.min(1, dt * 4)); shadowDirty = true; } else roofK = target;
       var op = 1 - roofK; for (i = 0; i < ROOFM.length; i++) ROOFM[i].opacity = op;
-      roofGroup.position.y = roofK * (L.H * 1.2 + 3); roofGroup.visible = roofK < 0.97 && buildK[2] >= 0.92;
+      roofGroup.position.y = roofK * (L.H * 1.2 + 3); roofGroup.visible = roofK < 0.97;
       if (wallGroup) wallGroup.scale.y = Math.max(0.02, (1 - 0.6 * roofK - 0.25 * rackK) * (parts ? parts.shell : 1));
       if (parts) {             // sub acoperisul inchis nu se vede nimic: nu desenam interiorul
         var showIn = roofK > 0.01 || rackK > 0.01 || !roofGroup.visible;

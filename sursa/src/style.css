@@ -1,4 +1,4 @@
-/* Layout: macheta 3D a campusului ramane pe ecran in stanga; povestea pe capitole curge in dreapta. Pe telefon se asaza una sub alta. */
+/* Layout: macheta 3D a bazei ramane pe ecran in stanga; povestea pe capitole curge in dreapta. Pe telefon se asaza una sub alta. */
 :root {
   --bg: #eef1ec; --surface: #ffffff; --surface-2: #f3f5f1; --ink: #15211c; --muted: #56655d; --line: #d3dbd4;
   --sun: #f2a600; --batt: #00b894; --grid: #257de0; --fiber: #6a4ce2; --gen: #e4572e;
@@ -42,8 +42,7 @@ button, input, select { font: inherit; color: inherit; }
 .brand svg { flex: none; }
 .brand h1 { margin: 0; font: 700 20px/1.1 var(--font-display); letter-spacing: .01em; }
 .brand p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
-.pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pick > span { font-size: 13px; color: var(--muted); }
+.size { margin: 0; font-size: 13px; line-height: 1.3; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
 
 .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
 .seg button { border: 0; background: transparent; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: 600 14px var(--font-display); color: var(--muted); white-space: nowrap; }
@@ -53,6 +52,9 @@ button, input, select { font: inherit; color: inherit; }
 .seg.small button { padding: 4px 10px; font-size: 13px; }
 .seg.wide { display: flex; } .seg.wide button { flex: 1; }
 .seg.wrap { flex-wrap: wrap; border-radius: 16px; } .seg.wrap button { flex: 1 1 auto; padding: 6px 10px; }
+/* treptele de grant: nota mica sta sub suma, nu langa ea */
+.seg.grant button { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; border-radius: 13px; }
+.seg.grant button small { margin: 1px 0 0; font-size: 11px; }
 
 /* ---- corp ---- */
 .main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 460px); gap: 12px; }
@@ -66,13 +68,16 @@ button, input, select { font: inherit; color: inherit; }
 .lbl { position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer; white-space: nowrap;
   background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
   font: 600 12.5px var(--font-display); letter-spacing: .01em; box-shadow: var(--shadow); }
-.lbl::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: var(--stem, 10px); background: var(--ink); opacity: .55; }
+.lbl::after { content: ""; position: absolute; left: calc(50% + var(--sx, 0px)); top: 100%; width: 1px; height: var(--stem, 10px); background: var(--ink); opacity: .55; }
 .lbl[hidden] { display: none; }
 .lbl.flow, .lbl.part { pointer-events: none; cursor: default; }
 .lbl.flow { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .lbl.flow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--grid); flex: none; }
 .lbl.flow[data-id="f_pv"]::before { background: var(--sun); } .lbl.flow[data-id="f_bess"]::before { background: var(--batt); } .lbl.flow[data-id="f_gen"]::before { background: var(--gen); }
 .lbl.part { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+/* etichetele locului (capitolul „Locul”): numesc ce este in baza si in jur, nu se apasa */
+.lbl.place { pointer-events: none; cursor: default; background: var(--surface-2); border: 1px dashed var(--muted); font-weight: 500; font-size: 12px; }
+.lbl.place.edge { border-style: solid; } .lbl.place.edge::after { display: none; }
 .lbl:hover, .lbl.hot { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 .hud { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; flex-wrap: wrap; max-width: calc(100% - 76px); }
@@ -175,9 +180,12 @@ thead th { font: 600 13px var(--font-display); color: var(--muted); }
 tr.sum td { font-weight: 600; border-top: 1px solid var(--ink); }
 tr.total td { font: 700 16px var(--font-display); border-bottom: 0; }
 td.neg { color: var(--bad); } td.pos { color: var(--good); }
-.cmp th button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px; cursor: pointer; font: 600 13px var(--font-display); }
-.cmp th button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.cmp td.on, .cmp th.on { background: var(--surface-2); }
+.cmp td.on, .cmp th.on, #t-bank tr.on td, #t-fit tr.on td { background: var(--surface-2); }
+.cmp th.on { color: var(--ink); }
+table.cmp td.n { white-space: nowrap; }
+table.cmp td.nofit { white-space: normal; vertical-align: middle; text-align: center; color: var(--muted); font-size: 12px; border-left: 1px solid var(--line); }
+#t-fit td:first-child, #t-fit th:first-child, #t-bank td:first-child, #t-bank th:first-child { padding-left: 6px; }
+#t-bank th { vertical-align: bottom; }
 .cmp td small { display: block; color: var(--muted); font-size: 11.5px; }
 
 .bars { display: flex; flex-direction: column; gap: 8px; }
@@ -185,6 +193,7 @@ td.neg { color: var(--bad); } td.pos { color: var(--good); }
 .bar span:nth-child(2) { font-weight: 600; font-variant-numeric: tabular-nums; }
 .bar i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; display: block; }
 .bar i u { display: block; height: 100%; border-radius: 4px; background: var(--ink); min-width: 2px; }
+.bar i:empty { height: 0; }
 
 .act { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: var(--r); padding: 12px; background: var(--surface-2); }
 .act input[type="range"] { width: 100%; }
@@ -208,10 +217,13 @@ table.txt th, table.txt td { text-align: left; vertical-align: top; }
 .cases button[aria-pressed="true"] small { color: inherit; opacity: .8; }
 .progs { display: flex; flex-direction: column; gap: 10px; }
 .prog { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-.prog.best { border-color: var(--ink); border-width: 2px; }
+.prog h4 { line-height: 1.35; }
+.prog.open { border-left: 4px solid var(--good); } .prog.wait { border-left: 4px solid var(--sun); } .prog.no { border-left: 4px solid var(--bad); } .prog.help { border-left: 4px solid var(--muted); }
 .prog p, .prog ul { font-size: 14px; }
 .prog .status { font-size: 13px; color: var(--muted); }
 .tagc { display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: 600 11.5px/1.5 var(--font-display); vertical-align: 1px; white-space: nowrap; }
+.tagc.open { background: var(--good); color: var(--surface); } .tagc.wait { background: var(--note); color: var(--note-ink); box-shadow: inset 0 0 0 1px var(--sun); }
+.tagc.no { background: var(--bad); color: var(--surface); } .tagc.help { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .gantt { --now: 100%; display: flex; flex-direction: column; gap: 5px; }
 .grow { display: grid; grid-template-columns: minmax(0, 44%) minmax(0, 1fr); gap: 8px; align-items: center; font-size: 12.5px; line-height: 1.25; color: var(--muted); }
 .grow.live, .grow.done { color: var(--ink); } .grow.live span { font-weight: 600; }
@@ -271,19 +283,19 @@ table.sens td.cur button { outline: 2px solid var(--ink); outline-offset: 1px; }
   .scroll { overflow: visible; padding: 18px 14px 20px; }
   .brand h1 { font-size: 18px; }
   .seg button { padding: 6px 11px; }
-  .cmp td:not(:first-child), #t-pl td:not(:first-child) { white-space: nowrap; }
+  #t-pl td:not(:first-child) { white-space: nowrap; }
   .gaxis b:nth-child(even) { display: none; }
 }
 @media (max-width: 480px) {
   table { font-size: 12.5px; } th, td { padding: 6px 5px; }
   table.sens th, table.sens td { padding: 2px; } table.sens thead th { font-size: 11.5px; }
   table.sens td button { font-size: 11.5px; padding: 7px 0; }
-  .pick > span { display: none; }
+  .size { border-radius: 10px; }
   #t-ten { font-size: 12px; } #t-ten th, #t-ten td { padding: 6px 2px; } #t-ten thead th { font-size: 11.5px; }
 }
 @media (pointer: coarse) {
   /* tinte de apasat de 44 px pe ecrane cu degetul: in text crestem butonul; in bara de sub macheta si pe macheta ramane mic la vedere si marim doar zona care prinde degetul */
-  .seg button, .toc button, .pager .go, .btn.big, .playrow .btn, .stepnav .btn, .cases button, .cmp th button, table.sens td button { min-height: 44px; }
+  .seg button, .toc button, .pager .go, .btn.big, .playrow .btn, .stepnav .btn, .cases button, table.sens td button { min-height: 44px; }
   .dock .btn, .dock select, .hud .btn, .dock .seg button { min-height: 36px; position: relative; }
   .zoom .btn.sq { width: 38px; height: 38px; position: relative; }
   .dock .btn::after, .hud .btn::after, .dock .seg button::after { content: ''; position: absolute; inset: -4px 0; }

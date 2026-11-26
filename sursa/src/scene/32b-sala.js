@@ -1,8 +1,4 @@
-    // rackuri: perechi de randuri spate in spate (culoar cald la mijloc)
-    var nGpu = Math.ceil(p.it * 1000 / 45), nAll = nGpu + Math.ceil(nGpu * 0.3);
-    var hallW = xO - xE - 3, hallD = D - 5, perRowMax = Math.max(2, Math.min(24, Math.floor(hallD / 0.62)));
-    var pairs = Math.max(1, Math.ceil(nAll / (2 * perRowMax))); while (pairs * 5.4 > hallW && pairs > 1) pairs--;
-    var perRow = Math.ceil(nAll / (pairs * 2));
+    /* --- sala de date: rackurile (numarul lor se socoteste in 32a-electrica.js) --- */
     // rackul GPU are sus doua furtunuri care urca la colectoarele de rand (albastru = rece, rosu = cald)
     var rackT = tpl(function (g) {
         box(g, 1.2, 2.2, 0.6, SH.rackBody, 0, 0, 0); vpl(g, 0.58, 2.16, SH.rackFront, 0.603, 0, 0, Math.PI / 2);
@@ -11,7 +7,7 @@
       rackT2 = tpl(function (g) { box(g, 1.2, 2.2, 0.6, SH.rackAlt, 0, 0, 0); vpl(g, 0.58, 2.16, SH.rackFront, 0.603, 0, 0, Math.PI / 2); });
     var rk = inst(itg, rackT, nGpu), rk2 = inst(itg, rackT2, Math.max(1, nAll - nGpu));
     var hallCx = (xE + xO) / 2, n1 = 0, n2 = 0, rowLen = perRow * 0.62, rackPos = [hallCx + (pairs - 1) * 2.7 + 1.2, rowLen / 2 - 0.31];
-    var hz = rowLen / 2 + 1.2, hx0 = hallCx - (pairs - 1) * 2.7 - 2.1, hx1 = W / 2, hzz = -Math.min(hz + 0.9, D / 2 - 0.8);
+    var hz = rowLen / 2 + 1.2, hx0 = hallCx - (pairs - 1) * 2.7 - 2.1, hzz = -Math.min(hz + 0.9, D / 2 - 0.8);
 
     // unelte mici pentru sala: tevi pe cele trei axe, cot, stalp cu talpa, jgheab de cabluri cu margini
     function salaPX(m, r, z, y, xa, xb) { cyl(itx, r, r, Math.abs(xb - xa), m, (xa + xb) / 2, y, z, 10, [0, 0, Math.PI / 2], false); }
@@ -107,7 +103,7 @@
     (function () {
       var xw = xE + 0.125, xl = rackPos[0] + 0.35, tp = [], gap = gxa - xw;
       salaTray(true, xw, xl, zCt, 0.45);
-      box(itx, 0.22, 0.06, 0.5, SH.steel, xw + 0.11, 2.69, zCt, false); box(itx, 0.05, 0.4, 0.5, SH.steel, xw + 0.025, 2.5, zCt, false);      // consola de perete
+      box(itx, 0.2, 0.05, 0.5, SH.steel, xw + 0.12, 2.695, zCt, false); box(itx, 0.04, 0.3, 0.5, SH.steel, xw + 0.02, 2.41, zCt, false); beam(itx, SH.steel, xw + 0.03, 2.3, zCt, xw + 0.2, 2.68, zCt, 0.035, false);      // consola de perete
       if (gap > 3.6) {       // stalpi in T pe portiunea fara cadre, feriti de drumul de la usa de incarcare
         if (xD - 1.9 > xw + 0.8) tp.push(xD - 1.9);
         if (xD + 1.9 < gxa - 0.8) tp.push(xD + 1.9);
@@ -116,32 +112,43 @@
       tp.forEach(function (x) { salaPost(x, zCt, 2.64); box(itx, 0.08, 0.08, 0.6, SH.steel, x, 2.68, zCt, false); });
     })();
 
-    // colectoarele cladirii (apa rece albastru, apa calda rosu): vin prin peretele de est si stau pe stalpi in T
-    cyl(itx, 0.11, 0.11, hx1 - hx0, SH.blue, (hx0 + hx1) / 2, 2.9, hzz, 12, [0, 0, Math.PI / 2], false); cyl(itx, 0.11, 0.11, hx1 - hx0, SH.red, (hx0 + hx1) / 2, 2.9, hzz + 0.35, 12, [0, 0, Math.PI / 2], false);
+    // colectoarele cladirii (apa rece albastru, apa calda rosu): pleaca de la flansele oarbe din vest, trec pe la capetele randurilor,
+    // cotesc spre nord si ies prin peretele de nord la x = xCW si xCW + 0.35, la inaltimea yCW; afara le preia instalatia de racire
     (function () {
-      var ts = [], x, n, k2;
+      var ts = [], x, n, k2, zs = (hzz + in_za) / 2 - 0.25, zv = hzz - 0.75;
+      [[SH.blue, hzz, xCW], [SH.red, hzz + 0.35, xCW + 0.35]].forEach(function (e) {
+        cyl(itx, 0.11, 0.11, e[2] - hx0, e[0], (hx0 + e[2]) / 2, yCW, e[1], 12, [0, 0, Math.PI / 2], false);
+        sph(itx, 0.117, e[0], e[2], yCW, e[1], false, 1, 1);                                                                           // cotul
+        cyl(itx, 0.11, 0.11, e[1] + D / 2 - 0.02, e[0], e[2], yCW, (e[1] - D / 2 + 0.02) / 2, 12, [Math.PI / 2, 0, 0], false);        // pana in grosimea peretelui de nord
+        cyl(itx, 0.16, 0.16, 0.04, SH.steel, hx0, yCW, e[1], 12, [0, 0, Math.PI / 2], false);                                         // flansa oarba: de aici se prelungeste cand apar randuri noi
+        cyl(itx, 0.18, 0.18, 0.04, SH.steel, e[2], yCW, in_za + 0.02, 12, [Math.PI / 2, 0, 0], false);                                // rozeta la perete
+        cyl(itx, 0.125, 0.125, 0.04, SH.dark, e[2], yCW, zs, 10, [Math.PI / 2, 0, 0], false);                                         // colierul de pe suport
+        // robinetul de izolare al cladirii, cu flanse si roata de mana
+        cyl(itx, 0.16, 0.16, 0.03, SH.steel, e[2], yCW, zv - 0.07, 12, [Math.PI / 2, 0, 0], false); cyl(itx, 0.16, 0.16, 0.03, SH.steel, e[2], yCW, zv + 0.07, 12, [Math.PI / 2, 0, 0], false);
+        cyl(itx, 0.14, 0.14, 0.11, SH.dark, e[2], yCW, zv, 12, [Math.PI / 2, 0, 0], false);
+        box(itx, 0.035, 0.22, 0.035, SH.steel, e[2], yCW + 0.22, zv, false); cyl(itx, 0.1, 0.1, 0.025, SH.stripe, e[2], yCW + 0.34, zv, 10, null, false);
+      });
       for (pr = 0; pr < pairs; pr++) { x = hallCx + (pr - (pairs - 1) / 2) * 5.4; ts.push(x - 0.9, x + 0.9); }
-      x = ts[ts.length - 1]; n = Math.ceil((xO - x) / 3.6);
-      for (k2 = 1; k2 < n; k2++) ts.push(x + (xO - x) * k2 / n);
-      n = Math.ceil((W / 2 - 0.4 - xO) / 5.2);                                                   // in zona birourilor, cat mai putini stalpi
-      for (k2 = 1; k2 < n; k2++) ts.push(xO + (W / 2 - 0.4 - xO) * k2 / n);
+      x = ts[ts.length - 1]; n = Math.ceil((xCW - 0.55 - x) / 3.4);
+      for (k2 = 1; k2 <= n; k2++) ts.push(x + (xCW - 0.55 - x) * k2 / n);
       ts.forEach(function (tx) {
-        salaPost(tx, hzz + 0.175, 2.71); box(itx, 0.08, 0.08, 0.8, SH.steel, tx, 2.75, hzz + 0.175, false);
-        cyl(itx, 0.125, 0.125, 0.04, SH.dark, tx, 2.9, hzz, 10, [0, 0, Math.PI / 2], false); cyl(itx, 0.125, 0.125, 0.04, SH.dark, tx, 2.9, hzz + 0.35, 10, [0, 0, Math.PI / 2], false);
+        salaPost(tx, hzz + 0.175, yCW - 0.19); box(itx, 0.08, 0.08, 0.8, SH.steel, tx, yCW - 0.15, hzz + 0.175, false);
+        cyl(itx, 0.125, 0.125, 0.04, SH.dark, tx, yCW, hzz, 10, [0, 0, Math.PI / 2], false); cyl(itx, 0.125, 0.125, 0.04, SH.dark, tx, yCW, hzz + 0.35, 10, [0, 0, Math.PI / 2], false);
       });
-      [hzz, hzz + 0.35].forEach(function (z) {
-        cyl(itx, 0.16, 0.16, 0.04, SH.steel, hx0, 2.9, z, 12, [0, 0, Math.PI / 2], false);                                                   // flansa oarba la capat
-        cyl(itx, 0.15, 0.15, 0.03, SH.steel, xO - 0.14, 2.9, z, 12, [0, 0, Math.PI / 2], false); cyl(itx, 0.15, 0.15, 0.03, SH.steel, xO + 0.14, 2.9, z, 12, [0, 0, Math.PI / 2], false);   // trecerea prin peretele birourilor
-        cyl(itx, 0.17, 0.17, 0.04, SH.steel, W / 2 - 0.42, 2.9, z, 12, [0, 0, Math.PI / 2], false);                                          // rozeta la peretele de est
-      });
+      salaPost(xCW + 0.175, zs, yCW - 0.19); box(itx, 0.8, 0.08, 0.08, SH.steel, xCW + 0.175, yCW - 0.15, zs, false);                // suportul portiunii care merge spre perete
     })();
 
-    // butelii de stingere cu gaz, prinse de perete, cu teava lor comuna
-    for (i = 0; i < 4; i++) { cyl(itx, 0.16, 0.16, 1.6, SH.red, xE + 0.4, 1.1, D / 2 - 1.2 - i * 0.45, 10, null, false); sph(itx, 0.16, SH.red, xE + 0.4, 1.9, D / 2 - 1.2 - i * 0.45, false, 0.5, 0); cyl(itx, 0.04, 0.04, 0.22, SH.steel, xE + 0.4, 2.06, D / 2 - 1.2 - i * 0.45, 6, null, false); }
-    box(itx, 0.05, 0.05, 1.9, SH.steel, xE + 0.21, 1.5, D / 2 - 1.875, false); box(itx, 0.1, 0.05, 0.05, SH.steel, xE + 0.17, 1.5, D / 2 - 1.0, false); box(itx, 0.1, 0.05, 0.05, SH.steel, xE + 0.17, 1.5, D / 2 - 2.75, false);
-    salaPZ(SH.red, 0.03, xE + 0.4, 2.17, D / 2 - 1.2, D / 2 - 2.9); salaCot(SH.red, 0.03, xE + 0.4, 2.17, D / 2 - 2.9);
-    cyl(itx, 0.03, 0.03, 0.26, SH.red, xE + 0.27, 2.17, D / 2 - 2.9, 8, [0, 0, Math.PI / 2], false); cyl(itx, 0.05, 0.03, 0.08, SH.steel, xE + 0.5, 2.17, D / 2 - 2.9, 8, [0, 0, Math.PI / 2], false);
-    if (D / 2 - 2.4 > rowLen / 2 + 1.5) {
-      box(itx, 1.2, 0.14, 1.0, SH.wood, xD, 0.37, D / 2 - 2.2, false); box(itx, 1.05, 0.9, 0.9, SH.box, xD, 0.89, D / 2 - 2.2);
-      box(itx, 1.2, 0.14, 1.0, SH.wood, xD + 1.6, 0.37, D / 2 - 2.0, false); box(itx, 0.7, 2.0, 0.85, SH.rackAlt, xD + 1.6, 1.44, D / 2 - 2.0);
-    }
+    // butelii de stingere cu gaz, prinse de peretele salii electrice, la nord de usa, cu teava lor comuna si duza
+    var in_gz = in_dEl - 0.6;
+    for (i = 0; i < 4; i++) { cyl(itx, 0.16, 0.16, 1.6, SH.red, xE + 0.4, 1.1, in_gz - 1.2 - i * 0.45, 10, null, false); sph(itx, 0.16, SH.red, xE + 0.4, 1.9, in_gz - 1.2 - i * 0.45, false, 0.5, 0); cyl(itx, 0.04, 0.04, 0.22, SH.steel, xE + 0.4, 2.06, in_gz - 1.2 - i * 0.45, 6, null, false); }
+    box(itx, 0.05, 0.05, 1.9, SH.steel, xE + 0.21, 1.5, in_gz - 1.875, false); box(itx, 0.1, 0.05, 0.05, SH.steel, xE + 0.17, 1.5, in_gz - 1.0, false); box(itx, 0.1, 0.05, 0.05, SH.steel, xE + 0.17, 1.5, in_gz - 2.75, false);
+    salaPZ(SH.red, 0.03, xE + 0.4, 2.17, in_gz - 1.2, in_gz - 2.9); salaCot(SH.red, 0.03, xE + 0.4, 2.17, in_gz - 2.9);
+    cyl(itx, 0.03, 0.03, 0.26, SH.red, xE + 0.27, 2.17, in_gz - 2.9, 8, [0, 0, Math.PI / 2], false); cyl(itx, 0.05, 0.03, 0.08, SH.steel, xE + 0.5, 2.17, in_gz - 2.9, 8, [0, 0, Math.PI / 2], false);
+    // sala este mai mare decat cer cele 1 MW de acum: locul randurilor viitoare este doar vopsit pe podea (verde), nu ocupat
+    [-1, 1].forEach(function (s2) {
+      var gpx = hallCx + s2 * ((pairs - 1) * 2.7 + 5.4);
+      if (gpx - 2.9 < xE + 0.3 || gpx + 2.9 > xO - 0.3) return;
+      in_dash(itx, gpx - 1.8, gpx - 0.6, -rowLen / 2, rowLen / 2, SH.green); in_dash(itx, gpx + 0.6, gpx + 1.8, -rowLen / 2, rowLen / 2, SH.green);
+      in_dash(itx, gpx - 1.8, gpx + 1.8, -rowLen / 2 - 0.87, -rowLen / 2 - 0.07, SH.green);                       // locul unitatilor de racire de la capat
+      flat(itx, 3.3, 1.65, SH.in_grow, gpx, 0.307, 0.6);
+    });

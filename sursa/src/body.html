@@ -4,28 +4,21 @@
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--accent)"/><circle cx="23" cy="11" r="4.5" fill="var(--sun)"/><rect x="7" y="17" width="12" height="10" rx="1.5" fill="var(--on-accent)"/><path d="M21 27l3-8h5l-3 8z" fill="var(--grid)"/></svg>
       <div>
-        <h1>Centrul de date AI Dolj</h1>
-        <p>Plan de afacere, variantă de lucru</p>
+        <h1>Centrul de date AI de la Râureni</h1>
+        <p>Plan de afacere pentru baza Bica SRL, Râmnicu Vâlcea. Variantă de lucru.</p>
       </div>
     </div>
-    <div class="pick">
-      <span id="pick-lbl">Mărimea proiectului</span>
-      <div class="seg" id="scen" role="group" aria-labelledby="pick-lbl">
-        <button type="button" data-s="pilot" aria-pressed="false">Pilot<small>250 kW</small></button>
-        <button type="button" data-s="mediu" aria-pressed="true">Mediu<small>1 MW</small></button>
-        <button type="button" data-s="mare" aria-pressed="false">Mare<small>5 MW</small></button>
-      </div>
-    </div>
+    <p class="size">Mărimea Medie: 1 MW de calculatoare, în hala liberă 1</p>
   </header>
 
   <main class="main">
-    <section class="stage" aria-label="Macheta 3D a campusului">
+    <section class="stage" aria-label="Macheta 3D a bazei">
       <div class="view" id="view">
-        <canvas id="gl" aria-label="Machetă 3D: clădirea centrului de date, parcul fotovoltaic, bateriile și stația electrică"></canvas>
+        <canvas id="gl" aria-label="Machetă 3D: baza de la Râureni, cu hala centrului de date, instalațiile din curte și panourile de pe acoperișuri"></canvas>
         <div class="labels" id="labels"></div>
         <div class="hud">
           <button type="button" class="btn" id="b-roof" aria-pressed="false">Ridică acoperișul</button>
-          <button type="button" class="btn" id="b-over">Tot campusul</button>
+          <button type="button" class="btn" id="b-over">Toată baza</button>
           <button type="button" class="btn" id="b-top">De sus</button>
         </div>
         <div class="zoom">
@@ -53,7 +46,7 @@
         <div class="dock-row chips" aria-live="off">
           <span class="chip"><i class="sw load"></i>Consum <b id="f-load"></b></span>
           <span class="chip"><i class="sw sun"></i>Panouri <b id="f-pv"></b></span>
-          <span class="chip wide"><i class="sw batt"></i>Baterii <b id="f-batt"></b></span>
+          <span class="chip wide" id="chip-batt" hidden><i class="sw batt"></i>Baterii <b id="f-batt"></b></span>
           <span class="chip"><i class="sw grid"></i><span id="l-grid">Luăm din rețea</span> <b id="f-grid"></b></span>
           <span class="chip" id="chip-temp" hidden>Afară <b id="f-temp"></b></span>
           <span class="chip" id="chip-gen" hidden><i class="sw gen"></i>Generatoare <b id="f-gen"></b></span>
@@ -67,30 +60,60 @@
 
         <article class="chapter" data-title="Ideea" data-view="hero">
           <p class="eyebrow"></p>
-          <h2>O fabrică de calcul, alimentată în parte de soare</h2>
-          <p>Un centru de date AI este o clădire plină de calculatoare foarte puternice. Firmele care fac inteligență artificială au nevoie de ele, dar rareori le cumpără. Le închiriază, cu ora sau pe contract.</p>
-          <p>Noi am deține clădirea, instalațiile de curent și de răcire și calculatoarele. Clienții plătesc pentru puterea de calcul pe care o folosesc.</p>
+          <h2>O fabrică de calcul într-o hală pe care firma o are deja</h2>
+          <p>Un centru de date AI este o hală plină de calculatoare foarte puternice. Firmele care fac inteligență artificială au nevoie de ele, dar rareori le cumpără. Le închiriază, cu ora sau pe contract.</p>
+          <p>Centrul intră în capătul liber al halei lungi din baza firmei de la Râureni, în Râmnicu Vâlcea. Nu se cumpără teren și nu se ridică o clădire nouă. Răcirea, generatoarele și postul de transformare, adică cutia care coboară tensiunea curentului, stau în curtea de lângă hală.</p>
           <p class="fine">Trei unități apar peste tot. <b>kW</b> (kilowatt) măsoară puterea, adică cât curent se trage într-o clipă: un fier de călcat trage cam 2 kW. <b>MW</b> (megawatt) înseamnă 1.000 kW. <b>MWh</b> (megawatt-oră) măsoară energia: 1 MW tras timp de o oră.</p>
-          <p>Cea mai mare cheltuială lunară este curentul. De aceea lângă clădire stau un parc fotovoltaic și baterii. Soarele din Dolj acoperă o parte din consum, iar restul vine din rețea.</p>
+          <p>Cea mai mare cheltuială lunară este curentul. Panourile de pe acoperișurile halelor dau cam <b data-v="coverage"></b> din el. Restul vine din rețea.</p>
           <dl class="stats">
             <div class="stat"><dt>Puterea calculatoarelor</dt><dd><span data-v="it"></span><small><span data-v="gpus"></span> plăci grafice (GPU)</small></dd></div>
             <div class="stat"><dt>Investiție</dt><dd><span data-v="capexTotal"></span><small>din care <span data-v="capexGpu"></span> calculatoarele</small></dd></div>
-            <div class="stat"><dt>Teren</dt><dd><span data-v="landHa"></span> ha<small>din care <span data-v="pvHa"></span> ha panouri</small></dd></div>
-            <div class="stat"><dt>Curent din soare și baterii</dt><dd><span data-v="coverage"></span><small>restul din rețea</small></dd></div>
+            <div class="stat"><dt>Loc</dt><dd><span data-v="hallM2"></span> m²<small>hala liberă 1, fără teren de cumpărat</small></dd></div>
+            <div class="stat"><dt>Curent din soare</dt><dd><span data-v="coverage"></span><small>restul din rețea</small></dd></div>
           </dl>
-          <p>O parte din bani poate veni din fonduri europene, pentru că Dolj este județ din Programul Tranziție Justă. Capitolul „Fonduri europene” arată ce programe există și cât schimbă cifrele.</p>
-          <p>Alege sus mărimea proiectului. Rotește macheta trăgând de ea și apasă pe orice obiect ca să afli ce face. Cu „Înainte” treci la capitolul următor.</p>
-          <p class="note">Toate cifrele sunt estimări de pornire, făcute în noiembrie 2026. Presupunerile sunt listate în ultimul capitol.</p>
+          <p class="note"><b>Spus de la început:</b> <span data-v="prudentShort"></span> Planul merge doar cu contracte ferme, semnate cu clienții înainte să fie comandate echipamentele.</p>
+          <p>Un <b>grant</b>, adică bani europeni care nu se dau înapoi, ar ajuta. Dar niciun program nu se potrivește proiectului așa cum este. De aceea planul se sprijină pe un grant de 0. Capitolul „Fonduri europene” arată ce am găsit.</p>
+          <p>Rotește macheta trăgând de ea și apasă pe orice obiect ca să afli ce face. Cu „Înainte” treci la capitolul următor.</p>
+          <p class="fine">Toate cifrele sunt estimări de pornire, făcute în noiembrie 2026. Nu sunt oferte. Presupunerile sunt listate în ultimul capitol.</p>
+        </article>
+
+        <article class="chapter" data-title="Locul" data-view="place" hidden>
+          <p class="eyebrow"></p>
+          <h2>Baza Bica SRL de la Râureni</h2>
+          <p>Baza are circa <b><span data-v="baseHa"></span> hectare</b>, adică <span data-v="baseLen"></span> pe <span data-v="baseWid"></span> de metri. Se întinde de-a lungul unui triaj de cale ferată, locul cu multe linii unde se formează trenurile de marfă. Are <span data-v="baseBuildings"></span> de clădiri și circa <span data-v="baseRoofM2"></span> m² de acoperișuri.</p>
+          <h3>Unde intră centrul</h3>
+          <p>Centrul intră în <b>hala liberă 1</b>, capătul liber al halei lungi. Hala are circa <span data-v="hallL"></span> pe <span data-v="hallW"></span> metri și <span data-v="hallM2"></span> m², măsurați pe acoperiș. Centrul are nevoie de circa <span data-v="needM2"></span> m².</p>
+          <p class="note">Hala încape <b>la limită</b>. Înăuntru trebuie să fie liberi cel puțin <span data-v="hallMinM2"></span> m². Dacă nu sunt, centrul iese de circa <span data-v="itSmall"></span> în loc de <span data-v="it"></span>.</p>
+          <p><b>Curtea A</b>, de circa <span data-v="yardAHa"></span> hectare, este lângă hală. Acolo stau instalațiile: răcitoarele, postul de transformare și generatoarele. <b>Curtea B</b>, de circa <span data-v="yardBHa"></span> hectare, este pe partea dinspre intrare.</p>
+          <h3>Ce câștigă proiectul din acest loc</h3>
+          <ul>
+            <li>Hala și terenul sunt ale firmei.</li>
+            <li>Curtea este împrejmuită și are poartă.</li>
+            <li>Camioanele au drum de acces.</li>
+            <li>Sunt deja oameni la fața locului.</li>
+          </ul>
+          <h3>Ce este cinstit de spus</h3>
+          <p>Măsurătorile sunt făcute pe imagini din satelit, cu o eroare de circa 15%. Nimic nu a fost încă verificat la fața locului.</p>
+          <h3>Trei lucruri de verificat înainte de orice</h3>
+          <ol>
+            <li><b>Hala, pe dinăuntru.</b> Suprafața liberă, înălțimea liberă și cât poate duce podeaua. Un dulap plin cu calculatoare cântărește peste o tonă.</li>
+            <li><b>Acoperișurile.</b> Cât pot duce structurile lor. Panourile adaugă circa 15 kg pe fiecare metru pătrat.</li>
+            <li><b>Cartea funciară.</b> Că tot perimetrul este al firmei.</li>
+          </ol>
+          <h3>Ce încape în bază</h3>
+          <div class="tblwrap"><table class="txt" id="t-fit"></table></div>
+          <p class="note">Locul are și un risc adevărat: baza este lângă o platformă chimică. Capitolul „Riscuri” spune ce înseamnă asta și ce test se face înainte de orice decizie.</p>
+          <p class="fine">Macheta arată baza de sus. Etichetele numesc hala centrului, restul halei lungi, hala liberă 2, cele două curți, triajul, poarta, linia de 110 kV și direcția platformei chimice. Clădirile bazei sunt așezate după imaginea din satelit. Ce este dincolo de gard, adică triajul, platforma chimică, vecinii și dealurile, este desenat orientativ.</p>
         </article>
 
         <article class="chapter" data-title="Calculatoarele" data-view="inside" hidden>
           <p class="eyebrow"></p>
-          <h2>Ce se află în clădire</h2>
+          <h2>Ce se află în hală</h2>
           <p>Piesa de bază este placa grafică, pe scurt <b>GPU</b>. Un GPU face un număr uriaș de calcule în același timp, exact ce cere inteligența artificială.</p>
           <ul>
             <li><b>Serverul</b> este un calculator cu 8 GPU-uri. Consumă cam 14 kW, cât cinci cuptoare electrice pornite deodată, și costă câteva sute de mii de euro.</li>
             <li><b>Rackul</b> este dulapul metalic în care stau 3 servere, unul peste altul.</li>
-            <li><b>Sala de date</b> este camera cu rânduri de rackuri, cabluri și țevi de răcire. Culoarul roșu din machetă este cel cald, pe unde iese căldura.</li>
+            <li><b>Sala de date</b> este partea din hală cu rânduri de rackuri, cabluri și țevi de răcire. Culoarul roșu din machetă este cel cald, pe unde iese căldura.</li>
           </ul>
           <div class="act">
             <button type="button" class="btn big" id="b-rack" aria-pressed="false">Deschide un rack</button>
@@ -101,7 +124,7 @@
             <ul>
               <li><b>Plăcile verzi</b> sunt cele 8 GPU-uri ale serverului. Blocul arămiu de pe fiecare este placa de răcire.</li>
               <li><b>Țevile subțiri</b> aduc lichid rece (albastru) pe fiecare cip și îl duc înapoi cald (roșu).</li>
-              <li><b>Sus</b> stă switch-ul de rețea, care leagă serverele între ele cu fibră foarte rapidă.</li>
+              <li><b>Sus</b> stă comutatorul de rețea, care leagă serverele între ele cu fibră foarte rapidă.</li>
               <li><b>Jos</b> este raftul de alimentare. Un rack plin trage cam 45 kW, cât un bloc mic de locuințe.</li>
             </ul>
           </div>
@@ -109,35 +132,35 @@
             <div class="stat"><dt>GPU-uri</dt><dd data-v="gpus"></dd></div>
             <div class="stat"><dt>Servere</dt><dd data-v="servers"></dd></div>
             <div class="stat"><dt>Rackuri cu servere</dt><dd data-v="racks"></dd></div>
-            <div class="stat"><dt>Clădire</dt><dd><span data-v="buildingM2"></span> m²</dd></div>
+            <div class="stat"><dt>Loc ocupat în hală</dt><dd><span data-v="buildingM2"></span> m²</dd></div>
           </dl>
-          <p class="note">Calculatoarele ocupă puțin loc. La mărimea <span data-v="scenName"></span> încap în <span data-v="racks"></span> dulapuri. Cea mai mare parte din clădire este pentru instalațiile electrice și de răcire.</p>
+          <p class="note">Calculatoarele ocupă puțin loc: încap în <span data-v="racks"></span> dulapuri. Cea mai mare parte din hală este pentru instalațiile electrice și de răcire. În sala de date rămâne loc de creștere: contururile vopsite pe podea arată unde mai pot veni rackuri.</p>
         </article>
 
         <article class="chapter" data-title="Curentul" data-view="power" hidden>
           <p class="eyebrow"></p>
           <h2>Curentul nu are voie să se oprească</h2>
-          <p>Calculatoarele merg zi și noapte, tot anul. La mărimea <span data-v="scenName"></span>, centrul trage în medie <b data-v="loadAvg"></b>. Într-un an asta înseamnă <b><span data-v="annualMWh"></span> MWh</b>, cât consumă aproximativ <b data-v="households"></b> de locuințe.</p>
-          <p>Curentul vine din rețea printr-o stație de transformare. <span data-v="gridNote"></span></p>
+          <p>Calculatoarele merg zi și noapte, tot anul. Centrul trage în medie <b data-v="loadAvg"></b>. Într-un an asta înseamnă <b><span data-v="annualMWh"></span> MWh</b>, cât consumă aproximativ <b data-v="households"></b> de locuințe.</p>
+          <p>Curentul vine din rețea. Centrul are nevoie de un <b>post de transformare</b> propriu la 20 kV, adică 20.000 de volți. Postul este cutia care coboară tensiunea de pe linie la cea pe care o folosesc echipamentele. De la distribuitor, Distribuție Oltenia, se cer circa <b data-v="gridReq"></b>.</p>
+          <p>O linie de 110 kV trece la circa <span data-v="line110m"></span> m de bază. Două stații mari sunt la <span data-v="st1km"></span> km (<span data-v="st1"></span>) și la <span data-v="st2km"></span> km (<span data-v="st2"></span>). Este un semn bun, nu o garanție.</p>
           <p>Siguranța are trei trepte: baterii mici numite <b>UPS</b>, care preiau sarcina într-o clipă, <b>generatoare diesel</b>, care pornesc în mai puțin de un minut, și, unde se poate, <b>două linii din rețea</b> pe trasee diferite.</p>
           <div class="act">
             <button type="button" class="btn big" id="b-outage" aria-pressed="false">Simulează o pană de curent</button>
             <div class="tl" id="out-bar" role="group" aria-label="Pașii penei de curent"></div>
             <p class="outnow" id="out-now" aria-live="polite"></p>
-            <ol class="steps" id="outage-steps">
-              <li data-s="1"><b>Secunda 0.</b> Rețeaua cade.</li>
-              <li data-s="2"><b>Aceeași clipă.</b> UPS-urile din clădire țin calculatoarele pornite.</li>
-              <li data-s="3"><b>Secunda 15.</b> Generatoarele diesel pornesc.</li>
-              <li data-s="4"><b>Secunda 45.</b> Generatoarele duc tot consumul.</li>
-              <li data-s="5"><b>Când revine rețeaua.</b> Centrul trece înapoi pe rețea, iar generatoarele se opresc.</li>
-            </ol>
+            <ol class="steps" id="outage-steps"></ol>
             <div class="stepnav">
               <button type="button" class="btn" id="out-prev">◀ Pasul dinainte</button>
               <button type="button" class="btn" id="out-next">Primul pas ▶</button>
             </div>
           </div>
-          <p>Panourile obișnuite se opresc singure când cade rețeaua, din motive de siguranță. Bateriile mari din curte pot ajuta la o pană doar dacă invertorul lor este făcut să lucreze și fără rețea. Este o opțiune care se cere din proiectare.</p>
-          <p class="note">Avizul de racordare (ATR), de la Distribuție Oltenia sau Transelectrica, este de obicei pasul cel mai lung din tot proiectul și poate dura peste un an. De aceea terenul se alege după rețea.</p>
+          <p data-v="outPanels"></p>
+          <h3>Ce nu știm încă</h3>
+          <ul>
+            <li>Câtă putere are baza aprobată astăzi.</li>
+            <li>Unde va pune distribuitorul punctul de racordare. Traseul cablului îngropat din machetă este presupunerea noastră.</li>
+          </ul>
+          <p class="note"><b>Avizul tehnic de racordare</b>, pe scurt <b>ATR</b>, este hârtia prin care distribuitorul spune câtă putere poate da și în ce condiții. Rămâne pasul cel mai lung din tot proiectul și poate dura peste un an.</p>
         </article>
 
         <article class="chapter" data-title="Răcirea" data-view="cooling" hidden>
@@ -150,47 +173,52 @@
             <p class="fine">Macheta se colorează ca într-o cameră termică. Rackurile sunt cele mai fierbinți. Țevile albastre duc lichid la aproximativ 30 °C, cele roșii îl aduc înapoi la peste 40 °C, iar răcitoarele de afară aruncă toată căldura în aer.</p>
           </div>
           <p>Eficiența se măsoară cu un număr numit <b>PUE</b>. Am presupus PUE 1,25. Asta înseamnă că la fiecare 1 kW pentru calculatoare se mai consumă 0,25 kW pentru răcire și pierderi. <span data-v="pueRange"></span></p>
-          <p>În Dolj verile trec de 38 °C, așa că răcirea se dimensionează pentru cele mai calde zile. Circuitul este închis și consumă foarte puțină apă.</p>
+          <p>În Vâlcea verile trec de 35 °C, așa că răcirea se dimensionează pentru cele mai calde zile. Circuitul este închis și consumă foarte puțină apă.</p>
+          <p>Baza este aproape de o platformă chimică. De aceea halele rămân închise, răcirea se face cu lichid în circuit închis, iar aerul care intră trece prin filtre chimice.</p>
           <dl class="stats">
             <div class="stat"><dt>Căldură de scos afară</dt><dd data-v="heat"></dd></div>
             <div class="stat"><dt>Consum pentru răcire și pierderi</dt><dd data-v="overhead"></dd></div>
           </dl>
-          <p class="note">Căldura poate avea o a doua viață: sere, uscătoare de cereale sau încălzirea unor hale din apropiere. Merită discutat cu vecinii terenului.</p>
+          <p class="note">Căldura poate avea o a doua viață. Iarna poate încălzi atelierele și halele firmei, aflate la câțiva metri. Este un avantaj adevărat al acestui loc.</p>
         </article>
 
         <article class="chapter" data-title="Soarele" data-dock data-view="pv" hidden>
           <p class="eyebrow"></p>
-          <h2>Parcul fotovoltaic</h2>
-          <p>În zona Craiovei, 1 kW de panouri produce cam 1.350 kWh pe an, printre cele mai bune valori din țară. 1 MW de panouri ocupă aproximativ 1,2 hectare.</p>
-          <p>Centrul consumă aproape la fel zi și noapte, iar soarele produce doar ziua, mai ales vara. Dacă punem multe panouri, la prânz avem surplus, iar noaptea luăm tot din rețea.</p>
+          <h2>Panouri pe acoperișuri</h2>
+          <p>Pentru un câmp de panouri nu este loc. Din cele <span data-v="baseHa"></span> hectare ale bazei sunt libere circa <span data-v="freeHa"></span>, iar instalațiile au nevoie de ele. Panourile stau deci pe acoperișurile halelor.</p>
+          <p>Puterea panourilor se măsoară în <b>MWp</b>, megawatt de vârf: cât dau ele în plin soare. 1 MWp are nevoie de circa <span data-v="roofPerMWp"></span> m² de acoperiș bun. Planul folosește <b data-v="pvPlan"></b>, pe hala centrului și pe încă opt hale mari: aproape tot ce încape pe ele. Cu toate acoperișurile mici la un loc, plafonul ar fi circa <span data-v="pvMax"></span>.</p>
           <div class="ctrl">
             <label for="s-pv">Puterea panourilor</label><output id="o-pv" for="s-pv"></output>
-            <input type="range" id="s-pv" min="0" max="8" step="0.25" value="4">
+            <input type="range" id="s-pv" min="0" max="1.2" step="0.1" value="1.2">
           </div>
           <dl class="stats">
-            <div class="stat"><dt>Teren pentru panouri</dt><dd><span data-v="pvHa"></span> ha</dd></div>
+            <div class="stat"><dt>Acoperiș folosit</dt><dd><span data-v="roofM2"></span> m²</dd></div>
             <div class="stat"><dt>Producție pe an</dt><dd><span data-v="pvGen"></span> MWh</dd></div>
-            <div class="stat"><dt>Acoperă din consum</dt><dd><span data-v="coverage"></span><small>cu tot cu baterii</small></dd></div>
+            <div class="stat"><dt>Acoperă din consum</dt><dd data-v="coverage"></dd></div>
             <div class="stat"><dt>Surplus trimis în rețea</dt><dd><span data-v="wasteShare"></span><small>din ce produc panourile</small></dd></div>
           </dl>
-          <p>Ca panourile să producă într-un an cât consumă centrul, ar fi nevoie de <b data-v="pvFull"></b>. Chiar și atunci, noaptea și iarna curentul ar veni tot din rețea.</p>
+          <p data-v="pvLine"></p>
+          <p data-v="solarLine"></p>
+          <p>Ca panourile să producă într-un an cât consumă centrul, ar fi nevoie de <b data-v="pvFull"></b>, de circa <span data-v="pvFullTimes"></span> ori cât duc acoperișurile. Chiar și atunci, noaptea și iarna curentul ar veni tot din rețea.</p>
           <p>Alege „Cu nori” în bara de sub machetă și urmărește umbrele norilor cum trec peste panouri. De aceea producția unei zile nu este niciodată o curbă perfectă.</p>
-          <p class="note">Regulă practică: panouri de 3–4 ori puterea calculatoarelor. Peste acest prag, tot mai multă energie pleacă în rețea la prânz, când prețul este mic.</p>
+          <p class="note"><b>De verificat:</b> cât pot duce structurile acoperișurilor și dacă trei acoperișuri au deja panouri. Așa pare pe o imagine din satelit, dar nu și pe alta.</p>
+          <p class="fine">La Râmnicu Vâlcea am socotit circa <span data-v="yieldKwh"></span> kWh pe an din fiecare kW de panouri culcate pe acoperiș.</p>
         </article>
 
         <article class="chapter" data-title="Bateriile și rețeaua" data-dock data-view="bess" hidden>
           <p class="eyebrow"></p>
-          <h2>Bateriile mută soarele spre seară</h2>
-          <p>La prânz panourile dau mai mult decât consumăm. Bateriile se încarcă atunci și dau curentul înapoi seara. Eticheta lor din machetă arată cât de pline sunt la sfârșitul orei alese.</p>
+          <h2>De ce nu punem baterii mari</h2>
+          <p>Cu <span data-v="pvPlan"></span>, panourile dau la prânz cel mult cam cât consumă centrul. Nu rămâne surplus de pus deoparte pentru seară. Mută cursorul: partea acoperită de soare nu se schimbă, crește doar costul, cu <span data-v="bessCost"></span> pentru fiecare MWh de baterii.</p>
           <div class="ctrl">
             <label for="s-bess">Capacitatea bateriilor</label><output id="o-bess" for="s-bess"></output>
-            <input type="range" id="s-bess" min="0" max="12" step="0.5" value="4">
+            <input type="range" id="s-bess" min="0" max="4" step="0.5" value="0">
           </div>
+          <p data-v="bessLine"></p>
           <div class="chart">
             <h4>De unde vine curentul într-o zi de <span data-v="monthName"></span> (<span data-v="wxName"></span>)</h4>
             <div class="legend">
               <span><i class="sw sun"></i>Direct din panouri</span>
-              <span><i class="sw batt"></i>Din baterii</span>
+              <span id="lg-batt" hidden><i class="sw batt"></i>Din baterii</span>
               <span><i class="sw grid"></i>Din rețea</span>
               <span><i class="sw line"></i>Cât produc panourile</span>
             </div>
@@ -202,12 +230,13 @@
             </div>
             <p class="fine">Linia neagră cu ceas arată ora aleasă. Apasă pe o oră din grafic sau pornește ziua întreagă: poți pune pauză oricând, iar viteza, luna și vremea se schimbă din bara de sub machetă. Punctele care curg pe cabluri și cifrele de lângă ele arată puterea din acel moment.</p>
           </div>
-          <p>Pe tot anul: <b data-v="directShare"></b> direct din panouri, <b data-v="battShare"></b> din baterii, <b data-v="gridShare"></b> din rețea.</p>
+          <p data-v="yearLine"></p>
           <div class="chart">
-            <h4>Cât din consum acoperă soarele și bateriile, pe luni</h4>
+            <h4 data-v="monthsTitle"></h4>
             <div id="c-months"></div>
           </div>
           <details id="t-months"><summary>Vezi cifrele pe luni</summary><div class="tblwrap" id="t-months-body"></div></details>
+          <p>La o pană de curent, rezerva vine de la UPS și de la generatoare. Ele sunt incluse în costul halei.</p>
           <h3>De ce rămâne rețeaua baza</h3>
           <ul>
             <li>Noaptea panourile nu produc nimic.</li>
@@ -215,31 +244,31 @@
             <li>Vin și săptămâni întregi cu cer închis.</li>
             <li>O singură noapte de iarnă pe baterii ar cere cam <span data-v="nightMWh"></span> MWh, iar a doua zi n-am avea cu ce să le reîncărcăm.</li>
           </ul>
-          <p class="note">Calculul folosește un preț fix la curent. În piață, seara curentul este de câteva ori mai scump decât la prânz, deci bateria valorează mai mult decât arată aici. Un studiu ENTSO-E citat în iulie 2026 pune România printre țările cu cele mai rentabile baterii din Europa (<a href="https://www.romania-insider.com/romania-battery-storage-profitability-july-2026" target="_blank" rel="noopener">Romania Insider</a>).</p>
+          <p class="fine">Calculul folosește un preț fix la curent. În piață, seara curentul este mai scump decât la prânz, deci o baterie poate câștiga și din diferența de preț. Ar fi o altă afacere, cu alt calcul, și nu face parte din acest plan. Un studiu ENTSO-E citat în iulie 2026 pune România printre țările cu cele mai rentabile baterii din Europa (<a href="https://www.romania-insider.com/romania-battery-storage-profitability-july-2026" target="_blank" rel="noopener">Romania Insider</a>).</p>
         </article>
 
         <article class="chapter" data-title="Internetul" data-view="fiber" hidden>
           <p class="eyebrow"></p>
           <h2>Fibra optică leagă centrul de lume</h2>
           <p>Centrul se leagă la internet prin fibră optică, liniile mov din machetă. Sunt necesare cel puțin două trasee separate, de la operatori diferiți. Dacă un excavator taie un cablu, celălalt ține centrul conectat.</p>
-          <p>Antrenarea modelelor AI nu este sensibilă la distanță. Câteva miimi de secundă în plus până la București sau Frankfurt nu contează. De aceea centrul poate sta acolo unde curentul și terenul sunt convenabile.</p>
-          <p>Pentru clienții care răspund în timp real utilizatorilor, de exemplu un asistent virtual, distanța contează ceva mai mult. Craiova este la câteva miimi de secundă de București și de Sofia, ceea ce este suficient pentru aproape orice serviciu.</p>
-          <p class="note">La alegerea terenului se întreabă operatorii de fibră pe unde trec traseele lor. Un teren lângă un drum național are de obicei fibră aproape, dar se verifică.</p>
+          <p>Antrenarea modelelor AI nu este sensibilă la distanță. Câteva miimi de secundă în plus până la București sau Frankfurt nu contează. De aceea centrul poate sta într-o hală din Râmnicu Vâlcea.</p>
+          <p>Pentru clienții care răspund în timp real utilizatorilor, de exemplu un asistent virtual, distanța contează ceva mai mult. Râmnicu Vâlcea este la câteva miimi de secundă de București, ceea ce este suficient pentru aproape orice serviciu.</p>
+          <p class="note"><b>De întrebat:</b> operatorii de fibră, despre traseele care trec prin zona industrială. Sunt necesare două trasee independente. Fibra merge adesea de-a lungul căilor ferate și al drumurilor principale, dar asta se verifică.</p>
         </article>
 
         <article class="chapter" data-title="Piața și clienții" data-view="overview" hidden>
           <p class="eyebrow"></p>
           <h2>Cine mai face asta și cine ar cumpăra</h2>
-          <h3>Vecinul mare: ClusterPower, la Mischii</h3>
-          <p>La câțiva kilometri de Craiova funcționează din 2022 un centru de date pentru AI, făcut de ClusterPower. Prima etapă a costat aproximativ 36–40 de milioane de euro și a primit ajutor de stat de 82 de milioane de lei. În ianuarie 2026, compania a anunțat împreună cu un partener o extindere uriașă, până la 800 MW, la Mischii și Făurești, cu etape gata între sfârșitul lui 2026 și 2029.</p>
+          <h3>Reperul din regiune: ClusterPower, la Mischii</h3>
+          <p>La Mischii, în județul Dolj, la circa 120 km de bază, funcționează din 2022 un centru de date pentru AI, făcut de ClusterPower. Prima etapă a costat aproximativ 36–40 de milioane de euro și a primit ajutor de stat de 82 de milioane de lei. În ianuarie 2026, compania a anunțat împreună cu un partener o extindere uriașă, până la 800 MW, la Mischii și Făurești, cu etape gata între sfârșitul lui 2026 și 2029.</p>
           <div class="two">
-            <div><h4>De ce este o veste bună</h4><p>Arată că Dolj este un loc potrivit. Aduce în zonă rețea electrică întărită, fibră, furnizori și oameni care știu meseria.</p></div>
-            <div><h4>De ce este o problemă</h4><p>Este un concurent mult mai mare la clienții mari, la puterea disponibilă în rețea și la angajați.</p></div>
+            <div><h4>Ce arată</h4><p>Că în România există cerere și că există oameni care știu meseria.</p></div>
+            <div><h4>De ce este o problemă</h4><p>Este un concurent mult mai mare la clienții mari și la angajați.</p></div>
           </div>
           <p>Noi nu putem concura la mărime. Locul nostru este la clienții pe care un gigant îi tratează ca pe un număr: firme mici și mijlocii, universități, instituții care vor datele în România și contracte făcute pe măsura lor.</p>
           <h3>România, în 2026</h3>
           <ul>
-            <li>Proiecte anunțate și neterminate de peste <b>1,8 GW</b>, mai ales în Ilfov, Cluj, Timișoara și Dolj.</li>
+            <li>Proiecte anunțate și neterminate de peste <b>1,8 GW</b>, adică 1.800 MW, mai ales în Ilfov, Cluj, Timișoara și Dolj.</li>
             <li>Piața echipamentelor pentru centre de date: aproximativ 347 de milioane de dolari în 2025, cu o estimare de 795 de milioane în 2035.</li>
             <li>Cel puțin două „fabrici de AI” cu bani publici și privați pornesc în 2026. Sunt posibili parteneri, dar și concurenți pentru cercetare.</li>
             <li>Ce îi oprește pe investitori: accesul la rețea. Cu energie deja disponibilă, un proiect se face în 1,5–2 ani. Fără, în 3–4 ani.</li>
@@ -248,16 +277,16 @@
           <div class="tblwrap"><table class="txt">
             <thead><tr><th>Produs</th><th>Cui</th><th>Cum se plătește</th></tr></thead>
             <tbody>
-              <tr><td><b>GPU pe contract</b></td><td>Firme de AI, furnizori mari de cloud</td><td>Preț fix pe 1–3 ani. Venit sigur, baza planului.</td></tr>
-              <tr><td><b>GPU la cerere</b></td><td>Startup-uri, cercetători</td><td>Cu ora, mai scump, fără angajament.</td></tr>
+              <tr><td><b>GPU pe contract</b></td><td>Firme de AI, furnizori mari de servicii de calcul</td><td>Preț fix pe 1–3 ani. Venit sigur, baza planului.</td></tr>
+              <tr><td><b>GPU la cerere</b></td><td>Firme tinere, cercetători</td><td>Cu ora, mai scump, fără angajament.</td></tr>
               <tr><td><b>Servicii</b></td><td>Clienți fără echipă tehnică</td><td>Abonament pentru administrare, stocare, suport.</td></tr>
             </tbody>
           </table></div>
-          <p class="note">Partea cea mai grea din plan este primul client mare. O bancă și un evaluator de fonduri europene privesc cu totul altfel un proiect care are deja o scrisoare de intenție semnată.</p>
+          <p class="note">Partea cea mai grea din plan este primul client mare. O bancă privește cu totul altfel un proiect care are deja contracte ferme semnate.</p>
           <details><summary>Surse pentru piață</summary>
             <ul>
               <li><a href="https://economedia.ro/centrul-de-date-de-36-de-milioane-de-euro-de-la-craiova-va-deveni-operational-de-luna-viitoare.html" target="_blank" rel="noopener">Economedia</a>: centrul ClusterPower de la Mischii, investiție și ajutor de stat (2022).</li>
-              <li><a href="https://baxtel.com/data-center/clusterpower-craiova" target="_blank" rel="noopener">Baxtel</a>: fișa ClusterPower Craiova și anunțul de 800 MW din ianuarie 2026.</li>
+              <li><a href="https://baxtel.com/data-center/clusterpower-craiova" target="_blank" rel="noopener">Baxtel</a>: fișa centrului ClusterPower și anunțul de 800 MW din ianuarie 2026.</li>
               <li><a href="https://www.revistabiz.ro/romania-are-in-pregatire-proiecte-data-center-de-peste-18-gw/" target="_blank" rel="noopener">Revista Biz</a>: analiza Tema Energy, proiecte de peste 1,8 GW (octombrie 2026).</li>
               <li><a href="https://www.euronews.ro/articole/romania-va-avea-doua-fabrici-ai-functionale-in-2026" target="_blank" rel="noopener">Euronews România</a>: fabricile de AI din 2026.</li>
               <li><a href="https://www.euronews.ro/articole/romania-nou-hub-regional-pentru-centre-de-date-investitorii-cer-energie-rapida-si" target="_blank" rel="noopener">Euronews România</a>: ce cer investitorii, accesul la rețea.</li>
@@ -272,6 +301,7 @@
           <p class="note" data-v="prudentLine"></p>
           <h3>Investiția: <span data-v="capexTotal"></span></h3>
           <div class="bars" id="c-capex"></div>
+          <p data-v="saveLine"></p>
           <h3>Un an de funcționare</h3>
           <div id="money-ctrls"></div>
           <div class="tblwrap"><table id="t-pl"></table></div>
@@ -279,7 +309,6 @@
           <h3>Cât ne costă o oră de GPU</h3>
           <div class="bars" id="c-unit"></div>
           <p data-v="unitLine"></p>
-          <p class="note" data-v="solarLine"></p>
           <p class="fine">Prețurile GPU-urilor închiriate se mișcă mult. În noiembrie 2026, la furnizorii specializați, mediana pentru un GPU de generație nouă (B200) era în jur de 8,5 $ pe oră la cerere, cu 27–47% mai puțin pe contracte de 1–3 ani. Am pornit de la 3,5 € pe oră, sub prețul pieței, pentru că un furnizor nou trebuie să ofere o reducere. Prețul median pentru H100 a crescut cu 39% într-un an, după ce scăzuse puternic în 2024–2025 (<a href="https://getdeploying.com/gpu-price-index" target="_blank" rel="noopener">GetDeploying</a>). Mută cursorul ca să vezi ce se întâmplă dacă prețurile scad din nou.</p>
         </article>
 
@@ -291,15 +320,12 @@
           <div class="cases" id="cases" role="group" aria-labelledby="cases-lbl"></div>
           <div class="ctrl"><label for="s-loan">Cât din bani vine din credit</label><output id="o-loan" for="s-loan"></output><input type="range" id="s-loan" min="0" max="80" step="5" value="50"></div>
           <div class="ctrl"><label for="s-int">Dobânda creditului</label><output id="o-int" for="s-int"></output><input type="range" id="s-int" min="3" max="12" step="0.5" value="7"></div>
-          <h4 id="fund-lbl">Fonduri europene</h4>
-          <div class="seg wide wrap" id="fund" role="group" aria-labelledby="fund-lbl">
-            <button type="button" data-f="none" aria-pressed="false">Fără fonduri</button>
-            <button type="button" data-f="imm" aria-pressed="false">Grant pentru IMM</button>
-            <button type="button" data-f="fptj" aria-pressed="true">Fond Tranziție Justă</button>
-          </div>
+          <h4 id="fund-lbl">Grant european, dacă s-ar obține</h4>
+          <div class="seg wide wrap grant" id="fund" role="group" aria-labelledby="fund-lbl"></div>
+          <p class="fine">Planul se sprijină pe „Fără grant”. Celelalte trepte arată doar cât ar schimba un grant. Suma nu poate fi promisă. Depinde de apel, adică de programul care primește cereri în acea perioadă, de mărimea firmei și de un consultant.</p>
           <dl class="stats">
             <div class="stat"><dt>Bani proprii la început</dt><dd data-v="tenEquity"></dd></div>
-            <div class="stat"><dt>Din fonduri europene</dt><dd><span data-v="tenGrant"></span><small data-v="tenGrantSub"></small></dd></div>
+            <div class="stat"><dt>Grant</dt><dd><span data-v="tenGrant"></span><small data-v="tenGrantSub"></small></dd></div>
             <div class="stat"><dt>Recuperarea banilor</dt><dd data-v="tenBreak"></dd></div>
             <div class="stat"><dt>Strâns după 10 ani</dt><dd data-v="tenCum"></dd></div>
           </dl>
@@ -312,130 +338,65 @@
           <details><summary>Vezi tabelul pe ani</summary><div class="tblwrap"><table id="t-ten"></table></div></details>
           <h3>În ce an se întorc banii, după preț și ocupare</h3>
           <div class="tblwrap"><table class="sens" id="t-sens"></table></div>
-          <p class="fine">Apasă pe o căsuță ca să folosești acele valori în tot planul. Căsuța încadrată este varianta de acum.</p>
+          <p class="fine">Pe rânduri este prețul unei ore de GPU, în euro. Pe coloane este ocuparea, adică în cât din timp sunt închiriate GPU-urile. Apasă pe o căsuță ca să folosești acele valori în tot planul. Căsuța încadrată este varianta de acum.</p>
           <p class="note" data-v="tenNote"></p>
-          <p class="fine">Presupuneri pentru acest capitol: anul 1 la jumătate din clienții țintă, anul 2 la 80%. Chiria unui GPU scade cu 8% pe an pe măsură ce îmbătrânește. În anul 6 se cumpără GPU-uri noi, la 80% din prețul primelor, cu un credit care se plătește în 5 ani. Creditul de la început se plătește în 7 ani. Fără impozit pe profit și fără inflație.</p>
+          <p class="fine">Presupuneri pentru acest calcul: anul 1 la jumătate din clienții țintă, anul 2 la 80%. Chiria unui GPU scade cu 8% pe an pe măsură ce îmbătrânește. În anul 6 se cumpără GPU-uri noi, la 80% din prețul primelor, cu un credit care se plătește în 5 ani. Creditul de la început se plătește în 7 ani. Fără impozit pe profit și fără inflație.</p>
+
+          <h3>Ce spune calculul pentru bancă</h3>
+          <p>Pentru bancă am făcut un al doilea calcul, mai aspru și cu alte reguli. El pornește de la contracte ferme pe trei ani pentru <span data-v="firmShare"></span> din capacitate, adică <span data-v="firmGpu"></span> de GPU-uri. Creditul pentru echipamente se plătește înapoi tot în trei ani.</p>
+          <p>Banca se uită la un număr numit pe scurt <b>DSCR</b>, gradul de acoperire a ratelor. El spune de câte ori acoperă banii câștigați în anul cel mai greu rata de plătit la bancă în acel an. Băncile cer cel puțin <b data-v="dscrTarget"></b>. Fără grant iese <b data-v="dscr0"></b>, sub prag.</p>
+          <div class="tblwrap"><table id="t-bank"></table></div>
+          <p class="fine">Sume în milioane de euro. De finanțat sunt în total circa <span data-v="bankNeed"></span>: investiția, plus 5% pentru cheltuieli neprevăzute, bani de lucru pentru primele luni și dobânda din timpul construcției.</p>
+          <h4>Cum se ajunge la <span data-v="dscrTarget"></span> fără grant</h4>
+          <div class="tblwrap"><table class="txt" id="t-levers"></table></div>
+          <p class="note" data-v="leverLine"></p>
+          <h4>Dacă merge mai prost sau mai bine, fără grant</h4>
+          <ul id="l-sens"></ul>
+          <p data-v="noContractLine"></p>
+          <p>În anul <span data-v="refreshYear"></span> se înlocuiesc GPU-urile. Costă <b data-v="refreshCost"></b>, din care <span data-v="refreshCash"></span> vin din banii strânși de centru până atunci, iar restul din credit.</p>
+          <p class="fine">De ce diferă cele două calcule: graficul de mai sus merge pe piața liberă, cu clienți care vin treptat. Calculul pentru bancă pornește de la contracte semnate dinainte.</p>
         </article>
 
         <article class="chapter" data-title="Fonduri europene" data-view="overview" hidden>
           <p class="eyebrow"></p>
-          <h2>Ce bani europeni se pot lua în Dolj</h2>
-          <p>Dolj este unul dintre cele șase județe din <b>Programul Tranziție Justă</b>, făcut pentru zonele care renunță la cărbune. Regiunea Sud-Vest Oltenia are și unele dintre cele mai mari plafoane de ajutor de stat din țară. Fondurile nu plătesc tot proiectul, dar pot schimba mult primele etape.</p>
-          <h3>Regulile de bază</h3>
+          <h2>Ce bani europeni se pot lua în Vâlcea</h2>
+          <p>Am căutat un grant la care proiectul să fie eligibil, adică să îndeplinească condițiile. Starea este cea din 26 noiembrie 2026.</p>
+          <p class="note"><b>Pentru proiectul așa cum este, adică noi cumpărăm GPU-uri și închiriem putere de calcul, niciun grant nu poate fi pus cinstit într-un plan pentru bancă. Cifra de planificare este <span data-v="fundPlan"></span>.</b></p>
+          <p>Un <b>apel</b>, adică perioada în care un program primește cereri, este deschis acum, iar Vâlcea este eligibilă. Dar el plătește dezvoltarea sau fabricarea unei tehnologii, nu folosirea ei.</p>
+          <p>Un grant apare doar ca scenariu optimist, de <span data-v="fundOpt"></span> milioane de euro, cu plafon la <span data-v="fundCap"></span>. Și doar dacă proiectul este refăcut în jurul unei cercetări proprii reale, împreună cu un partener de cercetare. Suma nu poate fi promisă: depinde de apel, de mărimea firmei și de un consultant.</p>
+          <h3>Programele pe care le-am verificat</h3>
+          <div class="progs" id="funds"></div>
+          <h3>Regulile care contează</h3>
           <ul>
-            <li><b>Cât acoperă.</b> Ajutorul regional plătește o parte din costurile eligibile: clădire și echipamente noi. În zonele din Sud-Vest Oltenia cuprinse în planul de tranziție justă, Comisia Europeană a ridicat plafonul de la 60% la 70% în 2023. Ghidul regional pentru IMM din 2023 dădea 70% firmelor mijlocii și 75% celor mici.</li>
-            <li><b>Restul îl aduci tu.</b> De regulă cel puțin un sfert din costurile eligibile, plus tot ce nu este eligibil. Pot fi bani proprii sau credit.</li>
-            <li><b>Banii vin după.</b> Plătești facturile, apoi ceri rambursarea. Este nevoie de un credit-punte.</li>
-            <li><b>Nu începi înainte.</b> Dacă semnezi comenzi sau începi lucrările înainte să depui cererea, proiectul nu mai poate fi finanțat.</li>
-            <li><b>Rămâi pe loc.</b> Investiția și locurile de muncă se păstrează câțiva ani după terminare, de obicei trei ani la firmele mici.</li>
-            <li><b>Firma contează.</b> Multe apeluri cer cel puțin un an fiscal încheiat. Mărimea firmei se calculează împreună cu firmele legate de ea, de exemplu alte firme ale familiei.</li>
+            <li><b>Nimic înainte de cerere.</b> Nu se comandă nimic și nu începe nicio lucrare înainte de depunerea cererii, pentru nicio parte a centrului.</li>
+            <li><b>Cel puțin 25% contribuție proprie</b>, din bani fără niciun sprijin public. În plus, firma trebuie să arate că poate finanța tot restul și că poate plăti în avans, pentru că grantul vine după ce banii au fost cheltuiți.</li>
+            <li><b>Mărimea firmei</b> se socotește împreună cu firmele legate de ea.</li>
+            <li><b>Investiția se păstrează</b> trei până la cinci ani. Înlocuirea GPU-urilor din anul 6 poate cădea în această perioadă.</li>
+            <li><b>Durata.</b> Evaluarea și contractul vin, realist, la mijlocul sau spre sfârșitul lui 2027.</li>
           </ul>
-          <h3>Programele care se potrivesc</h3>
-          <div class="progs">
-            <div class="prog best">
-              <h4>Fondul de Participare Tranziție Justă <span class="tagc">cel mai potrivit</span></h4>
-              <p>Credit și grant la un loc, prin Banca de Investiții și Dezvoltare. Are 188,7 milioane de euro pentru tehnologii digitale, curate și biotehnologii, în șase județe, printre care Dolj.</p>
-              <ul>
-                <li>IMM: investiții de până la 10 milioane de euro. Firme mari: până la 50 de milioane.</li>
-                <li>Până la jumătate din finanțare se transformă în grant, dacă investiția este terminată la timp.</li>
-                <li>Credit pe cel mult 12 ani, cu până la 3 ani în care plătești doar dobânda.</li>
-                <li>Se finanțează doar active noi.</li>
-              </ul>
-              <p class="status">Stadiu: acordul a fost semnat pe 30 martie 2026. Datele apelurilor nu sunt încă anunțate.</p>
-            </div>
-            <div class="prog">
-              <h4>Granturi pentru firme mici și mijlocii</h4>
-              <p>Prin Programul Tranziție Justă și Programul Regional Sud-Vest Oltenia, gestionate de ADR Sud-Vest Oltenia.</p>
-              <ul>
-                <li>Microîntreprinderi: 50.000–300.000 de euro, cu cel puțin 10% contribuție proprie. Dolj a avut 36,4 milioane de euro.</li>
-                <li>IMM, apelul regional: 200.000–1,5 milioane de euro pe proiect.</li>
-              </ul>
-              <p class="status">Stadiu: apelul pentru microîntreprinderi s-a închis pe 30 noiembrie 2025. Se urmăresc sesiunile noi.</p>
-            </div>
-            <div class="prog">
-              <h4>Parcuri industriale ale primăriilor</h4>
-              <p>21 de milioane de euro pentru Dolj, din Programul Tranziție Justă. Banii îi iau primăriile, nu firmele. Pentru noi contează altfel: un parc industrial nou poate oferi teren cu drum, curent și canalizare.</p>
-              <p class="status">Stadiu: apel pentru primării între ianuarie și iulie 2026. Merită întrebat Consiliul Județean ce parcuri se pregătesc.</p>
-            </div>
-            <div class="prog">
-              <h4>Fondul pentru Modernizare: baterii</h4>
-              <p>150 de milioane de euro pentru baterii noi, legate singure la rețea. Cel mult 69.000 de euro pe MWh și 15 milioane de euro pe firmă. Minimum 1 MW, cu cel puțin 2 MWh la fiecare MW. Bateriile montate împreună cu panouri nu au fost eligibile.</p>
-              <p class="status">Stadiu: sesiunea 1 septembrie – 30 octombrie 2026 s-a închis. Bateria noastră s-ar potrivi doar ca proiect separat.</p>
-            </div>
-            <div class="prog">
-              <h4>Panouri pentru consum propriu</h4>
-              <p>Apelul din toamna lui 2026, de 500 de milioane de euro, a fost doar pentru instituții publice. Pentru firme nu am găsit un apel deschis acum.</p>
-              <p class="status">Stadiu: de urmărit la Ministerul Energiei.</p>
-            </div>
-            <div class="prog">
-              <h4>Produse și servicii noi cu AI (PoCIDIF 2.1)</h4>
-              <p>Granturi de 200.000–3 milioane de euro pentru firme mici din IT care fac un produs nou. Nu plătește clădirea, dar poate plăti dezvoltarea unui serviciu propriu care rulează pe GPU-urile noastre.</p>
-              <p class="status">Stadiu: termenul a fost 30 septembrie 2026.</p>
-            </div>
-            <div class="prog">
-              <h4>Ajutor de stat pentru investiții mari</h4>
-              <p>Noua schemă a Ministerului Finanțelor, de 1 miliard de euro, este gândită pentru fabrici, cu investiții de cel puțin 50 de milioane de lei. Centrele de date nu apar în proiect. ClusterPower a primit ajutor pe o schemă mai veche.</p>
-              <p class="status">Stadiu: proiect de hotărâre din aprilie 2026. De verificat forma finală.</p>
-            </div>
-            <div class="prog">
-              <h4>Programe direct de la Bruxelles</h4>
-              <p>„Gigafabricile de AI” (până la 10 miliarde de euro) și EIC STEP Scale Up (10–30 de milioane de euro, ca participare la capital) sunt pentru proiecte mult mai mari sau pentru firme care inventează tehnologie.</p>
-              <p class="status">Stadiu: nu se potrivesc acum.</p>
-            </div>
-          </div>
           <h3>Ce schimbă la cifre</h3>
-          <div class="tblwrap"><table class="cmp" id="t-fund"></table></div>
           <p class="fine"><span data-v="caseNow"></span> Cele trei cazuri de preț se aleg în capitolul „Zece ani”.</p>
-          <div class="seg wide wrap" id="fund2" role="group" aria-label="Fonduri folosite în calcul">
-            <button type="button" data-f="none" aria-pressed="false">Fără fonduri</button>
-            <button type="button" data-f="imm" aria-pressed="false">Grant pentru IMM</button>
-            <button type="button" data-f="fptj" aria-pressed="true">Fond Tranziție Justă</button>
-          </div>
+          <div class="seg wide wrap grant" id="fund2" role="group" aria-label="Grantul folosit în calcul"></div>
           <p data-v="fundLine"></p>
-          <p class="note">Fondurile ajută cel mai mult la mărimile Pilot și Mediu, pentru că au plafon pe proiect. La mărimea Mare acoperă doar câteva procente. Asta întărește ideea de a începe mic și de a crește în etape, fiecare etapă cu cererea ei.</p>
-          <h3>Cum se pregătește o cerere</h3>
-          <ol>
-            <li>Se înființează firma din timp, cu codurile CAEN potrivite: găzduire și prelucrarea datelor, plus producerea de energie. Codurile exacte se verifică cu contabilul.</li>
-            <li>Teren cu acte curate și certificat de urbanism.</li>
-            <li>Studiu de fezabilitate și plan de afaceri, cu oferte reale de la furnizori.</li>
-            <li>Cererea pentru avizul de racordare.</li>
-            <li>Un consultant de fonduri europene, plătit de obicei în parte la succes.</li>
-            <li>Depunerea cererii, înainte de orice comandă.</li>
-            <li>Evaluarea și contractul durează de obicei 6–12 luni.</li>
-            <li>Achiziții, construcție, cereri de rambursare.</li>
-          </ol>
-          <p class="fine">Cifrele din calcul sunt cazul cel mai bun: grantul maxim, obținut din prima. Am presupus că Fondul de Participare finanțează cel mult trei sferturi din investiție, cu dobândă de 4,5% la partea de credit. Condițiile reale apar în ghidul fiecărui apel și trebuie verificate cu un consultant.</p>
-          <details><summary>Surse pentru fonduri</summary>
-            <ul>
-              <li><a href="https://startupcafe.ro/noi-finantari-firme-romanesti-judete-fond-ptj-milioane-euro-97253" target="_blank" rel="noopener">StartupCafe</a>: Fondul de Participare Tranziție Justă, martie 2026.</li>
-              <li><a href="https://startupcafe.ro/p-comunicat-de-presa-oportunitati-de-finantare-prin-programul-tranzitie-justa-2021-2027-pentru-comunitatile-din-judetele-gorj-si-dolj-93149" target="_blank" rel="noopener">ADR Sud-Vest Oltenia</a>: apelurile din 2026 pentru Gorj și Dolj.</li>
-              <li><a href="https://startupcafe.ro/granturi-imm-300-000-5-milioane-eur-judet-mures-valea-jiului-program-tranzitie-justa-ptj-86502" target="_blank" rel="noopener">StartupCafe</a>: granturile pentru microîntreprinderi din Programul Tranziție Justă.</li>
-              <li><a href="https://romania.representation.ec.europa.eu/news/ajutoare-de-stat-comisia-aproba-modificarea-hartii-ajutoarelor-regionale-pentru-romania-aferente-2023-02-20_ro" target="_blank" rel="noopener">Comisia Europeană</a>: harta ajutoarelor regionale, plafon ridicat la 70% (2023).</li>
-              <li><a href="https://startupcafe.ro/fonduri-europene-2023-ajutoare-firme-judete-dolj-gorj-mehedinti-olt-valcea-ghid-22592" target="_blank" rel="noopener">StartupCafe</a>: ghidul regional pentru IMM din Oltenia, 2023.</li>
-              <li><a href="https://startupcafe.ro/fonduri-europene-2026-perioada-inscrieri-granturi-15-milioane-eur-firme-romanesti-investesc-stocare-energie-electrica-ghid-oficial-baterii-stand-alone-105220" target="_blank" rel="noopener">StartupCafe</a>: Fondul pentru Modernizare, baterii, august 2026.</li>
-              <li><a href="https://financialintelligence.ro/buget-de-500-de-milioane-de-euro-pentru-capacitati-de-producere-a-energiei-din-surse-de-energie-solara-cu-stocare/" target="_blank" rel="noopener">Financial Intelligence</a>: apelul de 500 de milioane de euro pentru instituții publice.</li>
-              <li><a href="https://startupcafe.ro/granturi-imm-2026-200000-3-milioane-eur-proiecte-inteligenta-artificiala-roboti-tehnologii-varf-perioada-depunere-102814" target="_blank" rel="noopener">StartupCafe</a>: PoCIDIF 2.1, granturi pentru produse cu AI.</li>
-              <li><a href="https://startupcafe.ro/schema-de-ajutoare-de-1-miliard-eur-pentru-companiile-care-investesc-in-romania-proiect-oficial-98859" target="_blank" rel="noopener">StartupCafe</a>: schema de ajutor de stat de 1 miliard de euro.</li>
-              <li><a href="https://digital-strategy.ec.europa.eu/ro/news/eu-launches-ai-gigafactories-call-boost-europes-computing-capacity-and-unlock-more-eu30-billion" target="_blank" rel="noopener">Comisia Europeană</a>: apelul pentru gigafabrici de AI.</li>
-            </ul>
-          </details>
+          <p data-v="bankLine"></p>
+          <p class="fine">De unde știm: starea apelurilor vine din pagini de consultanță și din presă, din octombrie și noiembrie 2026. Paginile oficiale nu au putut fi citite. De aceea totul se confirmă la sursă înainte de orice pas.</p>
         </article>
 
         <article class="chapter" data-title="Echipa" data-view="building" hidden>
           <p class="eyebrow"></p>
           <h2>Cine ține centrul în funcțiune</h2>
           <p>Un centru de date are nevoie de puțini oameni, dar de oameni buni, prezenți zi și noapte.</p>
-          <div class="tblwrap"><table class="cmp" id="t-team"></table></div>
+          <div class="tblwrap"><table id="t-team"></table></div>
           <h3>Ce se dă în afară</h3>
           <ul>
-            <li>Paza și curățenia.</li>
-            <li>Întreținerea generatoarelor, a răcirii și a stației electrice, prin contracte cu producătorii.</li>
+            <li>Întreținerea generatoarelor, a răcirii și a postului de transformare, prin contracte cu producătorii.</li>
             <li>Contabilitatea, partea juridică și consultanța pentru fonduri.</li>
           </ul>
           <h3>De unde vin oamenii</h3>
           <ul>
-            <li>Universitatea din Craiova are facultăți de automatică, calculatoare și electrotehnică.</li>
-            <li>Specialiști din energie care caută alt drum, pe măsură ce se închid capacitățile pe cărbune. Programul Tranziție Justă plătește și cursuri de recalificare.</li>
+            <li>Firma are deja oameni la fața locului, care întrețin baza și camioanele.</li>
+            <li>Specialiștii pentru sala de date vin din București, Sibiu, Pitești sau Craiova, ori sunt formați aici.</li>
+            <li>Universitatea din Craiova, cu facultăți de automatică, calculatoare și electrotehnică, este una dintre mai multe universități aflate la circa două ore de drum.</li>
             <li>Ingineri care au lucrat deja în centre de date din țară.</li>
           </ul>
           <p class="note">Nu trebuie să fii inginer ca să conduci afacerea. Primul angajat important este un director tehnic care a mai construit sau a mai operat un centru de date.</p>
@@ -444,48 +405,57 @@
         <article class="chapter" data-title="Calendarul" data-view="overview" hidden>
           <p class="eyebrow"></p>
           <h2>De la idee la primul client</h2>
-          <p>La mărimea <span data-v="scenName"></span>, drumul durează aproximativ <b><span data-v="calTotal"></span> de luni</b>. Mai mult de jumătate din timp trece cu avize și finanțare, înainte de prima cupă de pământ.</p>
+          <p>Drumul durează aproximativ <b><span data-v="calTotal"></span> de luni</b>. Mai mult de jumătate din timp trece cu teste, avize și finanțare, înainte de prima lucrare.</p>
           <div class="act">
             <div class="row">
               <button type="button" class="btn big" id="b-build" aria-pressed="false">▶ Construiește</button>
               <output id="o-build" for="s-build"></output>
             </div>
-            <input type="range" id="s-build" min="0" max="27" step="0.25" value="27" aria-label="Luna din calendar">
+            <input type="range" id="s-build" min="0" max="23" step="0.25" value="23" aria-label="Luna din calendar">
           </div>
           <div class="gantt" id="c-gantt"></div>
-          <p class="fine">Barele gri sunt pregătirea, cele negre sunt construcția. Mută cursorul și urmărește macheta cum se ridică.</p>
+          <p class="fine">Barele șterse sunt pregătirea, cele pline sunt lucrările. Mută cursorul și urmărește macheta cum se completează.</p>
           <ul>
-            <li><b>Avizul de racordare</b> dictează ritmul. Fără el nu se știe nici măcar câtă putere poate primi terenul.</li>
-            <li><b>Fondurile europene</b> adaugă luni de evaluare și cer ca nimic să nu fie comandat înainte de depunere.</li>
+            <li><b>Locul există deja.</b> Nu căutăm teren și nu ridicăm o clădire. Asta scutește câteva luni.</li>
+            <li><b>Avizul de racordare</b> dictează în continuare ritmul.</li>
+            <li><b>Fondurile europene</b>, dacă se cere un grant, adaugă luni de evaluare și cer ca nimic să nu fie comandat înainte de depunere.</li>
             <li><b>Echipamentele</b> au termene lungi: transformatoarele și generatoarele se comandă cu 8–12 luni înainte, GPU-urile cu 3–6 luni.</li>
-            <li><b>Construcția</b> propriu-zisă durează sub un an.</li>
           </ul>
           <p class="note">„Pasul zero”, cu 1–2 servere ținute într-un centru de date existent, se poate face chiar din primele luni și aduce primii clienți înainte ca al nostru să fie gata.</p>
         </article>
 
-        <article class="chapter" data-title="Scenariile" data-view="overview" hidden>
+        <article class="chapter" data-title="De ce mărimea Medie" data-view="overview" hidden>
           <p class="eyebrow"></p>
-          <h2>Trei mărimi, aceeași idee</h2>
-          <p>Apasă pe numele unei coloane ca să vezi macheta la acea mărime.</p>
+          <h2>De ce mărimea Medie</h2>
+          <p>În bază încap două mărimi. A treia, cea Mare, nu încape.</p>
           <div class="tblwrap"><table class="cmp" id="t-cmp"></table></div>
-          <p class="fine"><span data-v="caseNow"></span> Creditul și fondurile sunt cele alese în capitolul „Zece ani”.</p>
-          <p><b>Recomandare:</b> terenul și racordul la rețea se aleg pentru mărimea Mare, iar construcția începe cu mărimea Pilot. Așa riscăm puțin la început și avem unde crește.</p>
+          <p class="fine"><span data-v="caseNow"></span> Veniturile și profitul sunt pentru un an obișnuit. Mărimea Pilot este calculată doar pentru comparație.</p>
+          <p><b>Recomandare:</b> mărimea Medie este cât poate primi hala. Mărimea Pilot ar încăpea în hala liberă 2 și rămâne primul pas prudent, dacă pentru mărimea Medie nu se pot semna contracte ferme. Calculul pentru bancă spune același lucru: fără contracte ferme, proiectul nu poate fi finanțat.</p>
           <p class="note" data-v="prudentLine"></p>
         </article>
 
         <article class="chapter" data-title="Riscuri" data-view="overview" hidden>
           <p class="eyebrow"></p>
           <h2>Ce poate merge prost și ce facem</h2>
+          <h3>Riscurile locului</h3>
           <div class="risks">
-            <div class="risk"><h4>Nu vin clienții</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Fără contracte, calculatoarele stau și pierd valoare. <b>Ce facem:</b> scrisori de intenție înainte de construcție, „pasul zero” ca să avem deja clienți, pornire cu mărimea Pilot.</p></div>
+            <div class="risk"><h4>Aerul de lângă platforma chimică</h4><p class="lvl"><span>Șanse de măsurat</span><span class="hi">Lovitură mare</span></p><p>Baza este lângă o platformă chimică mare și o centrală electrică. Gazele corozive strică electronica. Ghidul de specialitate BICSI 002 recomandă 8 km față de uzinele chimice și 1,6 km față de căile ferate. Presa a scris despre o scurgere de clor pe platformă pe 13 noiembrie 2026. <b>Ce facem:</b> un test de coroziune de 30 de zile, cu plăcuțe de cupru și de argint, înainte de orice decizie. Apoi hale închise, răcire cu lichid și filtre chimice.</p></div>
+            <div class="risk"><h4>Zona Seveso</h4><p class="lvl"><span>Șanse de verificat</span><span class="hi">Lovitură mare</span></p><p>Așa se numește zona de siguranță din jurul uzinelor care lucrează cu substanțe periculoase. <b>Ce facem:</b> verificăm dacă baza este în această zonă și ce se poate face acolo.</p></div>
+            <div class="risk"><h4>Vibrațiile de la triaj</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Baza se întinde de-a lungul triajului de cale ferată. <b>Ce facem:</b> măsurăm vibrațiile. Dacă este nevoie, rackurile stau pe suporți care le amortizează.</p></div>
+            <div class="risk"><h4>Hala este la limită</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Centrul cere circa <span data-v="needM2"></span> m², iar hala are <span data-v="hallM2"></span> m² măsurați din satelit. <b>Ce facem:</b> măsurăm înăuntru. Dacă nu sunt liberi <span data-v="hallMinM2"></span> m², centrul iese de circa <span data-v="itSmall"></span>.</p></div>
+            <div class="risk"><h4>Acoperișurile nu țin panourile</h4><p class="lvl"><span class="mid">Șanse medii</span><span>Lovitură mică</span></p><p><b>Ce facem:</b> o expertiză a structurii. Mai puține panouri schimbă puțin: soarele acoperă oricum doar <span data-v="coverage"></span> din consum.</p></div>
+            <div class="risk"><h4>Fără grant</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Este cazul probabil: niciun grant nu se potrivește proiectului așa cum este. Acoperirea ratelor, numărul la care se uită banca, este atunci <span data-v="dscr0"></span>, sub pragul de <span data-v="dscrTarget"></span>. <b>Ce facem:</b> contracte ferme pe patru ani sau pentru mai multă capacitate, ori mai mulți bani proprii. Vezi capitolul „Zece ani”.</p></div>
+          </div>
+          <h3>Riscurile afacerii</h3>
+          <div class="risks">
+            <div class="risk"><h4>Nu vin clienții</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Fără contracte, calculatoarele stau și pierd valoare. <b>Ce facem:</b> contracte ferme înainte de comanda echipamentelor și „pasul zero”, ca să avem deja clienți.</p></div>
             <div class="risk"><h4>Scade chiria GPU-urilor</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="hi">Lovitură mare</span></p><p>Prețurile se pot schimba cu zeci de procente într-un an. <b>Ce facem:</b> contracte pe 1–3 ani cu preț fix și planul făcut pe prețuri prudente.</p></div>
-            <div class="risk"><h4>Racordul întârzie sau costă mult</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="hi">Lovitură mare</span></p><p>Operatorul poate cere întăriri de rețea plătite de noi. <b>Ce facem:</b> întrebăm ce putere este disponibilă înainte să cumpărăm terenul și alegem un loc lângă o stație.</p></div>
-            <div class="risk"><h4>Se scumpește curentul</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Curentul este cea mai mare cheltuială lunară. <b>Ce facem:</b> panouri și baterii proprii și contract de energie pe termen lung.</p></div>
-            <div class="risk"><h4>Nu iese finanțarea</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="hi">Lovitură mare</span></p><p>Fondurile europene sunt o competiție, iar banca cere garanții. <b>Ce facem:</b> planul trebuie să stea în picioare și fără grant, construim în etape, căutăm un partener cu capital.</p></div>
-            <div class="risk"><h4>Echipamentul se demodează</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="mid">Lovitură medie</span></p><p>O generație nouă de GPU-uri apare la 1–2 ani. <b>Ce facem:</b> punem bani deoparte pentru înlocuire în anul 6 și construim clădirea astfel încât să primească rackuri mai puternice.</p></div>
-            <div class="risk"><h4>Concurentul mare de lângă noi</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>ClusterPower poate lua clienții mari și oamenii buni. <b>Ce facem:</b> țintim clienții mici și mijlocii și oferim ce un gigant nu oferă, adică flexibilitate și răspuns rapid.</p></div>
-            <div class="risk"><h4>Lipsesc oamenii pricepuți</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Meseria este nouă în zonă. <b>Ce facem:</b> director tehnic cu experiență angajat devreme, colaborare cu Universitatea din Craiova, contracte de întreținere cu producătorii.</p></div>
-            <div class="risk"><h4>Se strică ceva important</h4><p class="lvl"><span class="lo">Șanse mici</span><span class="hi">Lovitură mare</span></p><p>Un incendiu sau o defecțiune la răcire poate opri totul. <b>Ce facem:</b> echipamente dublate, stingere automată, asigurare, probe lunare cu generatoarele.</p></div>
+            <div class="risk"><h4>Racordul întârzie sau costă mult</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="hi">Lovitură mare</span></p><p>Distribuitorul poate cere întăriri de rețea plătite de noi. <b>Ce facem:</b> întrebăm din primele săptămâni câtă putere are baza și ce cere un racord de <span data-v="gridReq"></span>.</p></div>
+            <div class="risk"><h4>Se scumpește curentul</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Curentul este cea mai mare cheltuială lunară. <b>Ce facem:</b> panouri proprii și contract de energie pe termen lung.</p></div>
+            <div class="risk"><h4>Echipamentul se demodează</h4><p class="lvl"><span class="hi">Șanse mari</span><span class="mid">Lovitură medie</span></p><p>O generație nouă de GPU-uri apare la 1–2 ani. <b>Ce facem:</b> punem bani deoparte pentru înlocuirea din anul 6 și amenajăm hala astfel încât să primească rackuri mai puternice.</p></div>
+            <div class="risk"><h4>Concurenți mult mai mari</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Centrele mari pot lua clienții mari și oamenii buni. <b>Ce facem:</b> țintim clienții mici și mijlocii și oferim ce un gigant nu oferă, adică flexibilitate și răspuns rapid.</p></div>
+            <div class="risk"><h4>Lipsesc oamenii pricepuți</h4><p class="lvl"><span class="mid">Șanse medii</span><span class="mid">Lovitură medie</span></p><p>Meseria este nouă în zonă. <b>Ce facem:</b> director tehnic cu experiență angajat devreme, oameni formați aici și contracte de întreținere cu producătorii.</p></div>
+            <div class="risk"><h4>Se strică ceva important</h4><p class="lvl"><span>Șanse mici</span><span class="hi">Lovitură mare</span></p><p>Un incendiu sau o defecțiune la răcire poate opri totul. <b>Ce facem:</b> echipamente dublate, stingere automată, asigurare, probe lunare cu generatoarele.</p></div>
           </div>
         </article>
 
@@ -494,30 +464,33 @@
           <h2>Ce facem întâi</h2>
           <h3>Primele 90 de zile</h3>
           <ol>
-            <li><b>Pasul zero.</b> Închiriem loc într-un centru de date existent pentru 1–2 servere și învățăm piața cu bani puțini.</li>
-            <li>Vorbim cu 3–5 posibili clienți și cerem scrisori de intenție.</li>
-            <li>Înființăm firma, ca să aibă vechime când apar apelurile de fonduri.</li>
-            <li>Mergem la ADR Sud-Vest Oltenia și la un consultant, cu întrebarea: ce apel se potrivește unui centru de date și când se deschide?</li>
-            <li>Facem o listă scurtă de terenuri lângă stații electrice și întrebăm operatorul de rețea ce putere este disponibilă.</li>
+            <li><b>Testul de coroziune.</b> Durează 30 de zile, cu plăcuțe de cupru și de argint puse în hală.</li>
+            <li><b>Zona Seveso.</b> Întrebăm la inspectoratul județean pentru situații de urgență și la agenția de mediu.</li>
+            <li><b>Vibrațiile.</b> Le măsurăm lângă triaj.</li>
+            <li><b>Hala.</b> O măsurăm pe dinăuntru și cerem o expertiză a structurii, pentru hală și pentru acoperișuri.</li>
+            <li><b>Curentul.</b> Întrebăm Distribuție Oltenia câtă putere are baza și ce cere un racord de <span data-v="gridReq"></span>.</li>
+            <li><b>Cartea funciară.</b></li>
+            <li><b>Clienții.</b> Vorbim cu doi sau trei posibili clienți despre contracte ferme.</li>
+            <li><b>Fondurile.</b> Vorbim cu un consultant pentru fonduri europene.</li>
           </ol>
           <h3>Apoi</h3>
-          <ol start="6">
-            <li>Alegem terenul. Facem studiul de fezabilitate și cerem avizul de racordare.</li>
-            <li>Depunem cererea de finanțare și vorbim cu banca, înainte de orice comandă.</li>
-            <li>Construim în etape, începând cu mărimea Pilot.</li>
+          <ol start="9">
+            <li>Studiul de fezabilitate.</li>
+            <li>Cererea pentru avizul de racordare.</li>
+            <li>Discuția cu banca, înainte de orice comandă.</li>
           </ol>
-          <p class="note"><b>Decizia care lipsește:</b> ce buget este realist pentru familie. De el depinde dacă pornim cu Pilot pe bani proprii și fonduri sau căutăm de la început un partener.</p>
+          <p class="note"><b>Decizia care lipsește:</b> câți bani proprii pot fi puși în joc. De ea depinde dacă se merge pe mărimea Medie, pe Pilot sau cu un partener.</p>
           <details><summary>Presupunerile din calcul</summary><ul id="assume"></ul></details>
           <details><summary>Surse pentru prețuri</summary>
             <ul>
               <li><a href="https://getdeploying.com/gpu-price-index" target="_blank" rel="noopener">GetDeploying</a>: indice de prețuri pentru GPU-uri închiriate, noiembrie 2026.</li>
               <li><a href="https://akash.network/the-bid/h100-rental-price-2026-cost-per-hour/" target="_blank" rel="noopener">Akash</a>: prețul pe oră pentru H100 la mai mulți furnizori, 2026.</li>
-              <li><a href="https://financialintelligence.ro/studiu-aei-criza-energetica-sau-criza-fabricata-pzu-ieftin-astazi-contracte-scumpe-pentru-maine/" target="_blank" rel="noopener">Financial Intelligence</a>: studiu AEI, oferte de energie de 620–700 lei/MWh pentru firme, august 2026.</li>
+              <li><a href="https://financialintelligence.ro/studiu-aei-criza-energetica-sau-criza-fabricata-pzu-ieftin-astazi-contracte-scumpe-pentru-maine/" target="_blank" rel="noopener">Financial Intelligence</a>: studiu AEI, oferte de energie de 620–700 lei pe MWh pentru firme, august 2026.</li>
               <li><a href="https://www.capital.ro/eurostat-romania-a-inregistrat-cea-mai-mare-crestere-a-preturilor-la-energie-electrica-cu-peste-58.html" target="_blank" rel="noopener">Capital</a>: date Eurostat despre prețul curentului pentru firme în UE.</li>
               <li><a href="https://www.romania-insider.com/romania-battery-storage-profitability-july-2026" target="_blank" rel="noopener">Romania Insider</a>: studiu ENTSO-E despre rentabilitatea bateriilor.</li>
             </ul>
           </details>
-          <p class="fine">Estimări orientative, făcute în noiembrie 2026 din prețuri publice și reguli din industrie. Costurile pentru clădire, calculatoare, panouri și baterii sunt presupuneri, fără oferte de la furnizori. Nu înlocuiesc un studiu de fezabilitate.</p>
+          <p class="fine">Estimări orientative, făcute în noiembrie 2026 din prețuri publice și reguli din industrie. Costurile pentru hală, calculatoare și panouri sunt presupuneri, fără oferte de la furnizori. Măsurătorile bazei sunt din satelit. Nu înlocuiesc un studiu de fezabilitate.</p>
         </article>
 
       </div>

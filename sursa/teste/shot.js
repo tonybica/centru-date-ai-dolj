@@ -14,11 +14,9 @@ const path = require('path');
     const [name, ...acts] = s.split(':');
     for (const a of acts) {
       if (a.startsWith('ch')) { await page.evaluate(i => document.querySelectorAll('#toc button')[i].click(), +a.slice(2)); }
-      else if (a.startsWith('scen=')) { await page.click(`#scen button[data-s="${a.slice(5)}"]`); }
       else if (a.startsWith('hour=')) { await page.evaluate(v => { const e = document.getElementById('hour'); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }, a.slice(5)); }
       else if (a.startsWith('month=')) { await page.evaluate(v => { const e = document.getElementById('month'); e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); }, a.slice(6)); }
       else if (a.startsWith('wx=')) { await page.click(`#wx button[data-w="${a.slice(3)}"]`); }
-      else if (a.startsWith('mode=')) { await page.click(`#mode button[data-m="${a.slice(5)}"]`); }
       else if (a.startsWith('click=')) { await page.click(a.slice(6)); }
       else if (a.startsWith('eclick=')) { await page.evaluate(sel => document.querySelector(sel).click(), a.slice(7)); }
       else if (a.startsWith('wait=')) { await page.waitForTimeout(+a.slice(5)); }
